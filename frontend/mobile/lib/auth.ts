@@ -22,4 +22,13 @@ export const auth = {
     await SecureStore.deleteItemAsync('funcao')
     await SecureStore.deleteItemAsync('nome')
   },
+
+  async isGerente(): Promise<boolean> {
+    return (await SecureStore.getItemAsync('funcao')) === 'Gerente'
+  },
+
+  async isSupervisor(): Promise<boolean> {
+    const f = await SecureStore.getItemAsync('funcao')
+    return f === 'Supervisor' || f === 'Gerente'
+  },
 }

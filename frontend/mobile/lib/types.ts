@@ -40,3 +40,10 @@ export interface TokenResposta {
   funcao: UsuarioFuncao
   nome: string
 }
+
+export interface ChamadoCriar {
+  Fila: ChamadoFila
+  Categoria: string
+  Resumo?: string
+  Prioridade?: ChamadoPrioridade
+}

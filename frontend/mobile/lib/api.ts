@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store'
-import type { Chamado, Mensagem, TokenResposta, Usuario } from './types'
+import type { Chamado, ChamadoCriar, ChamadoStatus, Mensagem, TokenResposta, Usuario } from './types'
 
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8000'
 
@@ -39,8 +39,10 @@ export const api = {
 
   chamados: {
     listar: () => req<Chamado[]>('/chamados/'),
-    criar: (payload: object) =>
+    criar: (payload: ChamadoCriar) =>
       req<Chamado>('/chamados/', { method: 'POST', body: JSON.stringify(payload) }),
+    atualizarStatus: (id: string, status: ChamadoStatus) =>
+      req<Chamado>(`/chamados/${id}/status?status=${status}`, { method: 'PATCH' }),
   },
 
   mensagens: {
