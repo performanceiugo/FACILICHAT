@@ -6,19 +6,18 @@
 
 ```bash
 # 1. Subir o banco de dados
-docker-compose up -d
+docker compose up -d
 
 # 2. Instalar dependências Python
 cd backend
 pip install -r requirements.txt
 
 # 3. Criar arquivo .env (copiar do exemplo)
-cp app/.env.example app/.env
+cp .env.example .env
 # (editar os valores no .env)
 
-# 4. Rodar o servidor
-cd app
-uvicorn main:app --reload
+# 4. Rodar o servidor (a partir de backend/)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Acesse: `http://localhost:8000/docs` — documentação automática da API (Swagger UI)
@@ -125,5 +124,5 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 ---
 
-*Última atualização: 25 de junho de 2025*
+*Última atualização: 25 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

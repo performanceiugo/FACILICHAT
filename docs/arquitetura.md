@@ -141,7 +141,7 @@ FACILICHAT/
 
 ## Variáveis de ambiente necessárias
 
-### Backend (arquivo `backend/app/.env`)
+### Backend (arquivo `backend/.env`)
 ```
 DATABASE_URL=postgresql+asyncpg://facilichat:facilichat123@localhost:5432/facilichat_db
 JWT_SECRET=sua_chave_secreta_aqui
@@ -162,5 +162,5 @@ EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
 
 ---
 
-*Última atualização: 25 de junho de 2025*
+*Última atualização: 25 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

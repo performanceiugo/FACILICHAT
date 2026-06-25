@@ -132,12 +132,13 @@ frontend/mobile/
 | URL da API | `NEXT_PUBLIC_API_URL` | `EXPO_PUBLIC_API_URL` |
 | Navegação | `useRouter()` do Next.js | `useRouter()` do Expo Router |
 | Proteção de rota | `useEffect` no layout | `app/index.tsx` redireciona |
+| Funções de `auth` | Síncronas (`string \| null`) | Assíncronas (`Promise<string \| null>`) |
 
 ---
 
 ## Tipos compartilhados
 
-Os tipos TypeScript são **idênticos** nos dois frontends e espelham os modelos do backend:
+Os tipos TypeScript são **idênticos** nos dois frontends e espelham os modelos do backend. Qualquer alteração de modelo no backend deve ser replicada em `frontend/web/src/types/index.ts` **e** `frontend/mobile/lib/types.ts`.
 
 ```typescript
 // Enums
@@ -163,5 +164,5 @@ AutorTipo: 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Sistema'
 
 ---
 
-*Última atualização: 25 de junho de 2025*
+*Última atualização: 25 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*
