@@ -5,6 +5,14 @@
 
 ---
 
+## [0.4.0] — 26 de junho de 2026
+
+### Adicionado
+- **`docs/plano-implementacao.md`** — backlog completo de desenvolvimento organizado em 10 fases (Fase 0 a Fase 10), com status rastreável por item (`[ ]` na fila, `[~]` em andamento, `[x]` concluído). Inclui os tokens de design system, regras de negócio e notas de arquitetura para consulta rápida durante o desenvolvimento.
+- **`CLAUDE.md` atualizado** — adicionadas regras obrigatórias: (1) verificar `plano-implementacao.md` antes de qualquer implementação para evitar duplicações; (2) todo bloco de código deve ter comentário sem exceção; (3) atualizar o plano e o changelog ao concluir cada item. Adicionados também os tokens de design visual como referência permanente.
+
+---
+
 ## [0.3.3] — 26 de junho de 2026
 
 ### Melhorado
