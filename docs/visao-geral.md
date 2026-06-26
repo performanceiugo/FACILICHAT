@@ -74,6 +74,6 @@ O **FaciliChat** é uma plataforma digital de atendimento criada para a gestão 
 | Deploy / Publicação | Pendente |
 
 ---
-
+oi
 *Última atualização: 25 de junho de 2025*
 *Alterado por: Claude Code (agente de desenvolvimento)*

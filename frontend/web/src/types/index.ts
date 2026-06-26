@@ -1,9 +1,22 @@
+// Tipos TypeScript espelhando os modelos do backend (Python/FastAPI)
+// Manter sincronizados com os enums e schemas definidos em backend/app/modelos/
+
+// Perfis de acesso do sistema
 export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'Gerente'
+
+// Filas de atendimento dos chamados
 export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro'
+
+// Ciclo de vida de um chamado
 export type ChamadoStatus = 'Recebido' | 'EmAndamento' | 'Agendado' | 'Concluido' | 'Cancelado'
+
+// Nível de urgência do chamado
 export type ChamadoPrioridade = 'Baixa' | 'Media' | 'Alta' | 'Critica'
+
+// Tipo de autor de uma mensagem no chat do chamado
 export type AutorTipo = 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Sistema'
 
+// Dados públicos de um usuário retornados pela API
 export interface Usuario {
   ID: string
   Nome: string
@@ -13,6 +26,7 @@ export interface Usuario {
   Condominio: string | null
 }
 
+// Dados de um chamado retornados pela API
 export interface Chamado {
   ID: string
   ClienteID: string
@@ -21,19 +35,21 @@ export interface Chamado {
   Status: ChamadoStatus
   Prioridade: ChamadoPrioridade
   Resumo: string | null
-  Criacao: string
+  Criacao: string  // ISO 8601 — converter com new Date() antes de exibir
 }
 
+// Mensagem do chat interno de um chamado
 export interface Mensagem {
   ID: string
   ChamadoID: string
-  AutorID: string | null
+  AutorID: string | null  // Nulo quando AutorTipo é IA ou Sistema
   AutorTipo: AutorTipo
   Conteudo: string
-  Anexo: string | null
+  Anexo: string | null    // URL do arquivo anexado
   Criacao: string
 }
 
+// Resposta do endpoint de login — contém o token e dados básicos do usuário
 export interface TokenResposta {
   token_acesso: string
   tipo_token: string
@@ -41,6 +57,7 @@ export interface TokenResposta {
   nome: string
 }
 
+// Payload enviado ao criar um novo chamado
 export interface ChamadoCriar {
   Fila: ChamadoFila
   Categoria: string

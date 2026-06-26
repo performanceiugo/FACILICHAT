@@ -1,3 +1,6 @@
+// Tela de login do app mobile
+// Após autenticação bem-sucedida, redireciona para a aba de chamados
+
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -6,6 +9,8 @@ import { auth } from '@/lib/auth'
 
 export default function LoginScreen() {
   const router = useRouter()
+
+  // Estado dos campos e controle de carregamento/erro
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -15,6 +20,7 @@ export default function LoginScreen() {
     setErro('')
     setCarregando(true)
     try {
+      // Autentica com o backend e salva os dados no SecureStore
       const dados = await api.login(email, senha)
       await auth.salvar(dados)
       router.replace('/(tabs)/chamados')
@@ -30,6 +36,7 @@ export default function LoginScreen() {
       <Text style={s.titulo}>FaciliChat</Text>
       <Text style={s.subtitulo}>Acesse sua conta</Text>
 
+      {/* Campo de email com teclado específico e sem capitalização automática */}
       <TextInput
         style={s.input}
         placeholder="Email"
@@ -40,6 +47,7 @@ export default function LoginScreen() {
         autoComplete="email"
       />
 
+      {/* Campo de senha com entrada oculta */}
       <TextInput
         style={s.input}
         placeholder="Senha"
@@ -49,8 +57,10 @@ export default function LoginScreen() {
         autoComplete="current-password"
       />
 
+      {/* Exibe mensagem de erro apenas quando há falha */}
       {!!erro && <Text style={s.erro}>{erro}</Text>}
 
+      {/* Botão desabilitado durante o carregamento para evitar múltiplas requisições */}
       <TouchableOpacity style={s.botao} onPress={handleLogin} disabled={carregando}>
         {carregando
           ? <ActivityIndicator color="#fff" />
@@ -61,6 +71,7 @@ export default function LoginScreen() {
   )
 }
 
+// Estilos da tela de login
 const s = StyleSheet.create({
   container: {
     flex: 1,

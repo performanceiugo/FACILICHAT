@@ -1,8 +1,12 @@
+// Tela de listagem de chamados do app mobile
+// Suporta pull-to-refresh (puxar para atualizar) para recarregar a lista
+
 import { useEffect, useState } from 'react'
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { api } from '@/lib/api'
 import type { Chamado } from '@/lib/types'
 
+// Labels amigáveis para exibição dos status no card
 const STATUS_LABEL: Record<string, string> = {
   Recebido: 'Recebido',
   EmAndamento: 'Em Andamento',
@@ -11,18 +15,20 @@ const STATUS_LABEL: Record<string, string> = {
   Cancelado: 'Cancelado',
 }
 
+// Cores de destaque para cada nível de prioridade
 const PRIORIDADE_COR: Record<string, string> = {
-  Baixa: '#16a34a',
-  Media: '#d97706',
-  Alta: '#dc2626',
-  Critica: '#7c3aed',
+  Baixa: '#16a34a',   // verde
+  Media: '#d97706',   // amarelo
+  Alta: '#dc2626',    // vermelho
+  Critica: '#7c3aed', // roxo
 }
 
 export default function ChamadosScreen() {
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [carregando, setCarregando] = useState(true)
-  const [recarregando, setRecarregando] = useState(false)
+  const [recarregando, setRecarregando] = useState(false)  // true durante pull-to-refresh
 
+  // Busca os chamados da API — reutilizada tanto no mount quanto no pull-to-refresh
   async function carregar() {
     try {
       const dados = await api.chamados.listar()
@@ -33,8 +39,10 @@ export default function ChamadosScreen() {
     }
   }
 
+  // Carrega ao abrir a tela
   useEffect(() => { carregar() }, [])
 
+  // Spinner de carregamento inicial (tela cheia)
   if (carregando) {
     return (
       <View style={s.centro}>
@@ -48,6 +56,7 @@ export default function ChamadosScreen() {
       data={chamados}
       keyExtractor={item => item.ID}
       contentContainerStyle={s.lista}
+      // Pull-to-refresh: arrasta para baixo para recarregar a lista
       refreshControl={
         <RefreshControl
           refreshing={recarregando}
@@ -56,13 +65,16 @@ export default function ChamadosScreen() {
         />
       }
       ListEmptyComponent={<Text style={s.vazio}>Nenhum chamado encontrado.</Text>}
+      // Card de cada chamado na lista
       renderItem={({ item }) => (
         <View style={s.card}>
+          {/* Topo: categoria à esquerda, fila à direita */}
           <View style={s.cardTopo}>
             <Text style={s.categoria}>{item.Categoria}</Text>
             <Text style={s.fila}>{item.Fila}</Text>
           </View>
           {item.Resumo && <Text style={s.resumo}>{item.Resumo}</Text>}
+          {/* Rodapé: status e prioridade colorida */}
           <View style={s.cardRodape}>
             <Text style={s.status}>{STATUS_LABEL[item.Status]}</Text>
             <Text style={[s.prioridade, { color: PRIORIDADE_COR[item.Prioridade] }]}>
@@ -75,6 +87,7 @@ export default function ChamadosScreen() {
   )
 }
 
+// Estilos dos cards e da lista
 const s = StyleSheet.create({
   centro: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   lista: { padding: 16, gap: 10 },

@@ -5,6 +5,17 @@
 
 ---
 
+## [0.3.3] — 26 de junho de 2026
+
+### Melhorado
+- **Comentários em todo o código-fonte** — adicionados comentários explicativos em todos os 27 arquivos do projeto (10 Python no backend, 8 TypeScript/TSX no frontend web, 9 TypeScript/TSX no frontend mobile). Cada arquivo recebeu:
+  - Comentário de cabeçalho descrevendo a responsabilidade do arquivo
+  - Comentários inline em cada bloco lógico (enums, classes, funções, rotas, hooks, estados)
+  - Explicações de decisões não óbvias (ex: por que `expire_on_commit=False`, por que form-urlencoded no login, diferença SecureStore vs localStorage)
+  - Indicação de cores em constantes de estilo e valores de configuração
+
+---
+
 ## [0.3.2] — 25 de junho de 2026
 
 ### Corrigido

@@ -1,5 +1,8 @@
 'use client'
 
+// Tela de login do painel web
+// Após autenticação bem-sucedida, redireciona para /painel/chamados
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
@@ -8,6 +11,8 @@ import styles from './login.module.css'
 
 export default function LoginPage() {
   const router = useRouter()
+
+  // Estado dos campos do formulário e controle de carregamento/erro
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -18,6 +23,7 @@ export default function LoginPage() {
     setErro('')
     setCarregando(true)
     try {
+      // Autentica com o backend e salva token + dados no localStorage
       const dados = await api.login(email, senha)
       auth.salvar(dados)
       router.push('/painel/chamados')
@@ -35,6 +41,7 @@ export default function LoginPage() {
         <p className={styles.subtitulo}>Acesse sua conta</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
+          {/* Campo de email */}
           <div className={styles.campo}>
             <label htmlFor="email">Email</label>
             <input
@@ -48,6 +55,7 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Campo de senha */}
           <div className={styles.campo}>
             <label htmlFor="senha">Senha</label>
             <input
@@ -61,6 +69,7 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Mensagem de erro exibida quando login falha */}
           {erro && <p className={styles.erro}>{erro}</p>}
 
           <button type="submit" disabled={carregando} className={styles.botao}>

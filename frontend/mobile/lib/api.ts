@@ -1,12 +1,20 @@
+// Cliente HTTP centralizado para o app mobile (Expo React Native)
+// Idêntico ao web/src/lib/api.ts, mas usa SecureStore em vez de localStorage para o token
+// SecureStore é armazenamento criptografado no dispositivo (iOS Keychain / Android Keystore)
+
 import * as SecureStore from 'expo-secure-store'
 import type { Chamado, ChamadoCriar, ChamadoStatus, Mensagem, TokenResposta, Usuario } from './types'
 
+// URL base da API — 10.0.2.2 é o endereço do host no emulador Android
+// Para dispositivo físico, substituir pelo IP da máquina na rede local via EXPO_PUBLIC_API_URL
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:8000'
 
+// Lê o token JWT do SecureStore (operação assíncrona, diferente do localStorage síncrono do web)
 async function token(): Promise<string | null> {
   return SecureStore.getItemAsync('token')
 }
 
+// Função genérica de requisição HTTP com tipagem — injeta token e trata erros da API
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
   const t = await token()
   const headers: Record<string, string> = {
@@ -24,6 +32,7 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Login usa form-urlencoded conforme exigido pelo OAuth2PasswordRequestForm do FastAPI
   async login(email: string, senha: string): Promise<TokenResposta> {
     const form = new URLSearchParams({ username: email, password: senha })
     const res = await fetch(`${BASE}/autenticacao/login`, {
@@ -35,6 +44,7 @@ export const api = {
     return res.json() as Promise<TokenResposta>
   },
 
+  // Retorna os dados do usuário autenticado
   eu: () => req<Usuario>('/usuarios/eu'),
 
   chamados: {
