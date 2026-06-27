@@ -2,6 +2,49 @@
 
 ---
 
+## 🔒 TRAVA DE SEGURANÇA — invariantes do produto (LER ANTES DE TUDO)
+
+> Esta seção protege as decisões de produto **já fechadas com o comercial e o cliente**. Qualquer
+> pessoa que use o Claude Code neste repositório está sujeita a ela. O objetivo é impedir que uma
+> sessão futura altere — sem querer ou sem autorização — o que já foi definido.
+
+**Fonte da verdade do produto:** `docs/FaciliChat-Regras/` (apresentação, personas, design system,
+MVP02). É o material do comercial. **Nada implementado pode contrariá-lo.**
+
+### Antes de QUALQUER alteração de funcionamento ou de regra de negócio no código, você DEVE:
+1. **Ler** o item em `docs/plano-implementacao.md` e a regra correspondente em `docs/FaciliChat-Regras/`
+   (ou o resumo em `docs/arquitetura.md`).
+2. **Validar** que a mudança é coerente com os invariantes abaixo (pode rodar a skill `/validar-regras`).
+3. Se a mudança **contrariar ou alterar** um invariante, **PARE e peça confirmação explícita ao
+   usuário** antes de prosseguir. **Nunca** mude uma regra definida silenciosamente.
+
+> Mudanças puramente cosméticas / de refatoração que **não** tocam regra de negócio estão liberadas
+> (mas seguem as demais regras deste arquivo). Na dúvida, trate como alteração de regra e valide.
+
+### Invariantes que NÃO podem ser quebrados sem autorização explícita do usuário
+- **SaaS multi-tenant:** o tenant é a **Empresa** (conservadora/facilities); seus clientes são
+  **Condomínios**; a Iugo Performance é o **Superadmin**. Toda tabela tem `EmpresaID`, toda query é
+  escopada por ele, há **RLS** no Postgres e o tenant viaja no **JWT**. (Fundação: Fase 0.7.)
+- **7 perfis:** Cliente, Funcionário, Supervisor, RH, Financeiro, **Gestor** (não "Gerente"),
+  Superadmin. **Funcionário é perfil único** (sem subtipos). Papéis são por Empresa, não globais.
+- **IA (inegociável):** detecta intenção de compra mas **nunca inventa preço nem prazo**; só narra
+  campos estruturados (status, datas, responsável); **nunca** responde em nome de um supervisor.
+- **Chat é o palco, ticket é o bastidor.** Estados do ticket (MVP): Recebido, Em andamento,
+  Agendado, Concluído. Linguagem simples, sem jargão.
+- **Visita técnica** é entidade **irmã do ticket** (não um tipo de ticket): proativa
+  (supervisor→cliente), com tempo cronometrado; duração **derivada** (não armazenada); o cliente
+  **não aprova**, só recebe/consulta a prova.
+- **Tickets irmãos:** uma mensagem pode gerar mais de um chamado (ex.: atestado → RH + Supervisão).
+- **Design system fixo:** azul #148AF5, Ink, Figtree, Line Awesome, raios e espaçamentos definidos.
+  Interface discreta — ela hospeda a marca do cliente e nunca compete com ela.
+- **Anti-amnésia (tese central):** nada que o cliente pede pode se perder; tudo fica registrado e
+  rastreável.
+
+> Onde estamos no roadmap: ver o **Mapa das fases** em `docs/plano-implementacao.md`. A migração do
+> código para "Gestor"/7 perfis e a fundação multi-tenant são as Fases 0.6 e 0.7 (prioritárias).
+
+---
+
 ## LEIA PRIMEIRO — Verificação obrigatória antes de qualquer implementação
 
 **Antes de escrever qualquer código, leia `docs/plano-implementacao.md` na íntegra.**

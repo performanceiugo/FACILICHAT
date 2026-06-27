@@ -5,6 +5,14 @@
 
 ---
 
+## [0.6.2] — 27 de junho de 2026
+
+### Processo / governança
+- **Trava de segurança de produto** — adicionada a seção "🔒 TRAVA DE SEGURANÇA — invariantes do produto" no topo do `CLAUDE.md` (lida por qualquer sessão do Claude Code no repositório). Ela define a fonte da verdade (`docs/FaciliChat-Regras/`) e os invariantes que **não podem ser alterados sem confirmação explícita do usuário**: SaaS multi-tenant (Empresa/Condomínios/Superadmin), os 7 perfis, a regra da IA (nunca inventa preço/prazo), estados do ticket, visita técnica como entidade irmã, tickets irmãos, design system fixo e o princípio anti-amnésia. Antes de qualquer mudança de funcionamento/regra, é obrigatório validar contra esses invariantes.
+- **Nova skill `/validar-regras`** (`.claude/skills/validar-regras/SKILL.md`) — checklist invocável que percorre os invariantes acima e instrui a **parar e pedir confirmação** caso a mudança quebre alguma regra definida.
+
+---
+
 ## [0.6.1] — 27 de junho de 2026
 
 ### Revisão e alinhamento com o branding
