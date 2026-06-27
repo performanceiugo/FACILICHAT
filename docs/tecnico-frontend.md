@@ -153,8 +153,31 @@ AutorTipo: 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Sistema'
 
 ---
 
+## Multi-tenancy (SaaS) — impacto no frontend (Fase 0.7)
+
+O FaciliChat será um **SaaS multi-tenant**: cada **Empresa** (empresa cliente) tem dados
+isolados. O que muda nos frontends:
+
+- **O tenant vem do token, não do frontend.** O backend já filtra tudo por `EmpresaID` (lido
+  do JWT). Os frontends **não** enviam o tenant — apenas o `Authorization: Bearer <token>` de sempre.
+- **Exibir a Empresa atual** no cabeçalho/perfil (nome da empresa do usuário logado), para o
+  usuário saber em qual contexto está.
+- **Papéis são por empresa:** `auth.isGerente()`/`isSupervisor()` continuam valendo, mas
+  representam o papel **dentro** daquela Empresa. (O branding usa "Gestor" no lugar de "Gerente";
+  a renomeação `isGerente→isGestor` e os perfis RH/Financeiro/Superadmin estão na Fase 0.6 do plano.)
+- **Área de Superadmin (somente web):** um espaço separado do painel da empresa, para a Iugo
+  Performance (dona da plataforma) cadastrar/suspender Empresas — provável route group
+  `frontend/web/src/app/(plataforma)/...`.
+- **Tipos:** adicionar `Empresa` e o campo `EmpresaID` em `frontend/web/src/types/index.ts`
+  **e** `frontend/mobile/lib/types.ts`, mantendo a sincronia com o backend.
+
+> Detalhes e checklist em `docs/plano-implementacao.md` (Fase 0.7); arquitetura em `docs/arquitetura.md`.
+
+---
+
 ## Pendente de implementação
 
+- [ ] **Suporte multi-tenant no front (Fase 0.7):** exibir Empresa atual + área de Superadmin + tipos
 - [ ] Tela de chat/mensagens dentro de um chamado (web e mobile)
 - [ ] Tela de criação de chamado (formulário) no mobile
 - [ ] Tela de usuários no painel web (para Gerentes)
@@ -164,5 +187,5 @@ AutorTipo: 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Sistema'
 
 ---
 
-*Última atualização: 25 de junho de 2026*
+*Última atualização: 27 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

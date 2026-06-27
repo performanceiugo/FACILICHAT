@@ -7,18 +7,27 @@
 
 ## O que é o FaciliChat?
 
-O **FaciliChat** é uma plataforma digital de atendimento criada para a gestão de condomínios. O objetivo é centralizar toda a comunicação entre moradores, funcionários, supervisores e gerentes em um único lugar — eliminando o uso de WhatsApp, e-mail e papéis avulsos para registrar chamados e solicitações.
+O **FaciliChat** é uma plataforma digital de atendimento para **empresas de facilities (conservadoras)** — as que prestam limpeza, portaria, zeladoria e serviços para condomínios. O objetivo é centralizar a comunicação entre a empresa e os seus clientes (os condomínios, representados pelos síndicos), além da própria equipe (supervisores, funcionários, RH, financeiro e o gestor) — eliminando o WhatsApp solto, o e-mail e os papéis avulsos para registrar chamados e solicitações.
+
+> É vendido como **SaaS multi-tenant**: cada empresa cliente (a conservadora) tem seus dados totalmente isolados das demais. A própria Iugo Performance opera a plataforma como Superadmin.
 
 ---
 
 ## Para quem é o sistema?
 
+O branding define **7 perfis**:
+
 | Perfil | Quem é | O que faz no sistema |
 |---|---|---|
-| **Cliente** | Morador do condomínio | Abre chamados, acompanha o andamento, conversa pelo chat |
-| **Funcionário** | Equipe operacional, RH ou financeiro | Recebe e executa os chamados da sua fila |
-| **Supervisor** | Coordenador de área | Acompanha todos os chamados, atribui prioridades |
-| **Gerente** | Gestor geral | Visão completa de tudo, relatórios e controle |
+| **Cliente** | Síndico / representante do condomínio atendido | Abre chamados, acompanha o andamento, conversa pelo chat |
+| **Funcionário** | Equipe de campo (limpeza, portaria, zeladoria) — perfil único | Avisa faltas, envia atestado, pede materiais |
+| **Supervisor** | Coordenador de campo, na rua | Resolve e agenda as demandas pelo celular |
+| **RH** | Analista de RH | Trata atestados, documentos e pedidos de pessoal |
+| **Financeiro** | Analista financeiro / DP | Trata holerites, vales e pagamentos |
+| **Gestor** | Dono / diretor da empresa | Visão total, cobra a equipe com histórico, monta propostas |
+| **Superadmin** | Iugo Performance (plataforma) | Opera o sistema e cadastra as empresas clientes |
+
+> Nota: o código atual ainda implementa só 4 perfis (Cliente, Supervisor, Funcionário e "Gerente"); a migração para os 7 perfis acima está planejada (Fase 0.6).
 
 ---
 
@@ -47,13 +56,14 @@ O **FaciliChat** é uma plataforma digital de atendimento criada para a gestão 
 
 ### Aplicativo Mobile
 - Login pelo celular (Android e iOS)
-- Lista de chamados com atualização em tempo real (puxar para atualizar)
+- Lista de chamados com atualização ao puxar para baixo (pull-to-refresh)
 - Perfil do usuário com opção de sair
 
 ---
 
 ## O que está sendo desenvolvido (próximos passos)
 
+- **Plataforma multi-empresa (SaaS)** — o FaciliChat será oferecido para várias empresas de facilities (conservadoras), cada uma com seus dados totalmente separados e protegidos das demais. É a base para vender o sistema para vários clientes. *(prioridade técnica antes das demais funcionalidades)*
 - **Chat por chamado** — troca de mensagens dentro de cada solicitação, incluindo histórico completo
 - **Inteligência Artificial** — triagem automática e sugestões de resposta usando IA
 - **Configuração de migrações de banco** — controle de versão do banco de dados (Alembic)
@@ -74,6 +84,6 @@ O **FaciliChat** é uma plataforma digital de atendimento criada para a gestão 
 | Deploy / Publicação | Pendente |
 
 ---
-oi
-*Última atualização: 25 de junho de 2025*
+
+*Última atualização: 27 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

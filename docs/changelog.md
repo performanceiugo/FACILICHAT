@@ -5,6 +5,34 @@
 
 ---
 
+## [0.6.1] — 27 de junho de 2026
+
+### Revisão e alinhamento com o branding
+- **Revisão dos documentos comerciais** (`docs/FaciliChat-Regras/`: apresentação, personas, design system, MVP02) revelou divergências entre o código/docs e o produto definido pelo comercial. Correções de documentação:
+  - **Tenant renomeado de "Administradora" para "Empresa"** em todos os docs e na memória. O termo do branding para quem compra o sistema é a **conservadora/empresa de facilities** (ex.: "Cefram"); os clientes dela são os **Condomínios**. "Administradora" no branding é um papel de cliente, então o termo anterior conflitava.
+  - **Enquadramento do produto corrigido** em `visao-geral.md`: o FaciliChat é para **empresas de facilities atenderem seus clientes (condomínios)**, não para "gestão de condomínios".
+  - **Perfis alinhados ao branding (7):** Cliente, Funcionário, Supervisor, **RH**, **Financeiro**, **Gestor** (não "Gerente"), **Superadmin** (Iugo Performance). Tabela de perfis da `visao-geral.md` atualizada.
+- **`docs/plano-implementacao.md` — nova Fase 0.6 (Alinhamento de domínio com o branding)** com itens de migração de código: renomear `Gerente→Gestor`, adicionar `RH`/`Financeiro`/`Superadmin`, adicionar fila `Comercial`, "tickets irmãos" (uma mensagem → 2 chamados), Cliente = Condomínio/contrato, e refinos da Visita Técnica (duração derivada, `ticket_id` opcional, cliente não aprova).
+- **`docs/plano-implementacao.md` reorganizado** para melhor visão: adicionado um **🗺️ Mapa das fases** (status de cada fase de relance) e o conteúdo dividido em **Parte 1 — ✅ Concluído** (Fase 0 + correções já aplicadas) e **Parte 2 — 🚧 Em desenvolvimento** (na ordem recomendada). Apenas reorganização — itens e status preservados.
+- **Nota:** o código ainda usa "Gerente" e 4 perfis; as mudanças de código estão registradas como itens `[ ]` na Fase 0.6, não foram aplicadas nesta entrega (apenas documentação).
+
+---
+
+## [0.6.0] — 27 de junho de 2026
+
+### Decisão de arquitetura
+- **FaciliChat definido como SaaS multi-tenant** — o produto será vendido para várias **Empresas** (empresas que gerem condomínios), cada uma com dados totalmente isolados. Hierarquia: **Empresa (tenant) → Condomínios → Usuários/Chamados**. Estratégia escolhida: **banco compartilhado + coluna `EmpresaID` em todas as tabelas + Row-Level Security (RLS) no PostgreSQL + tenant no JWT**. Nenhuma mudança de código nesta entrega — apenas documentação do plano a partir de agora.
+
+### Documentação
+- **`docs/plano-implementacao.md`** — criada a **Fase 0.7 — Fundação SaaS Multi-Tenant** (prioritária, antes das features), com checklist de backend e frontend; a antiga "Fase 7 — Condomínios e multi-tenant" foi reescrita como "Gestão de Empresas e Condomínios (telas/CRUD)", dependente da 0.7; notas de arquitetura do rodapé atualizadas com o conceito de tenant/Superadmin.
+- **`docs/arquitetura.md`** — nova seção "Arquitetura Multi-Tenant (SaaS)" (hierarquia, estratégia de isolamento, RLS, regra de ouro); fluxo de autenticação atualizado para incluir o `EmpresaID` no JWT.
+- **`docs/tecnico-backend.md`** — nova seção "Multi-tenancy (SaaS)" com as convenções de `EmpresaID`, escopo por dependência, RLS, Superadmin e bootstrap; item adicionado em "Pendente".
+- **`docs/tecnico-frontend.md`** — nova seção sobre o impacto do multi-tenant no front (tenant vem do token, exibir Empresa atual, área de Superadmin, tipos a adicionar).
+- **`docs/setup.md`** — aviso de que o onboarding passará a criar Empresa + 1º Gerente juntos.
+- **`docs/visao-geral.md`** — adicionado o item "Plataforma multi-empresa (SaaS)" nos próximos passos. **D3 corrigido**: removido o texto espúrio "oi", data 2025→2026 e troca de "atualização em tempo real" por "pull-to-refresh".
+
+---
+
 ## [0.5.4] — 27 de junho de 2026
 
 ### Segurança

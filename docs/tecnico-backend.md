@@ -119,8 +119,38 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 ---
 
+## Multi-tenancy (SaaS) — a implementar (Fase 0.7, prioritária)
+
+O FaciliChat será um **SaaS multi-tenant**: cada **Empresa** (a conservadora/facilities cliente) tem
+seus dados isolados; os clientes de uma Empresa são os **Condomínios** que ela atende. Convenções que
+valerão para **todo** o backend a partir desta fase:
+
+- **Entidade `Empresa`** (o tenant), com `Nome`, `CNPJ`, `Status`.
+- **Coluna `EmpresaID`** (FK, `NOT NULL`) em **todas** as tabelas: `Usuario`, `Condominio`,
+  `Chamado`, `Mensagem` e qualquer modelo futuro.
+- **Tenant no JWT:** o `criarToken` passa a incluir o `EmpresaID`; a dependência
+  `obterTenantAtual` extrai esse valor do token e é injetada em todas as rotas.
+- **Escopo obrigatório:** **toda** query (`select`, `update`, `delete`) filtra por
+  `EmpresaID` do usuário logado. Nenhuma rota retorna dados de outro tenant.
+- **Row-Level Security (RLS)** no PostgreSQL como segunda trava (defesa em profundidade).
+- **Papéis por tenant:** `Gestor`/`Supervisor`/etc. valem dentro da sua Empresa.
+- **Superadmin da plataforma (Iugo Performance):** nível acima dos tenants (rotas em `Plataforma.py`)
+  para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. O bootstrap deixa de ser só
+  `criar_gerente.py` e passa a `criar_empresa.py` (Empresa + 1º Gestor juntos).
+
+> **Perfis (branding):** o produto define 7 perfis — Cliente, Funcionário, Supervisor, **RH**,
+> **Financeiro**, **Gestor**, **Superadmin**. O código atual tem 4 (Cliente, Supervisor, Funcionario,
+> **Gerente**); a renomeação `Gerente→Gestor` e a inclusão de RH/Financeiro/Superadmin estão na
+> **Fase 0.6** do plano. As tabelas de rotas abaixo refletem o estado **atual** do código.
+
+> Detalhamento e checklist completo em `docs/plano-implementacao.md` (Fase 0.7). Visão de
+> arquitetura em `docs/arquitetura.md` (seção "Arquitetura Multi-Tenant (SaaS)").
+
+---
+
 ## Pendente de implementação
 
+- [ ] **Fundação Multi-Tenant (Fase 0.7) — prioritária** (ver seção acima)
 - [ ] Rotas de Mensagens (`/mensagens/{chamadoID}`)
 - [ ] Integração com Anthropic (triagem automática de chamados por IA)
 - [ ] Configuração do Alembic para migrações versionadas

@@ -32,6 +32,45 @@
 
 ---
 
+## Arquitetura Multi-Tenant (SaaS)
+
+> **Decisão de 27/06/2026:** o FaciliChat é um **SaaS multi-tenant**. O produto é vendido para várias
+> **Empresas** (conservadoras/facilities, ex.: "Cefram"), e cada uma enxerga **apenas os seus próprios
+> dados**, isolada das demais. Os clientes de uma Empresa são os **Condomínios** que ela atende.
+
+### Hierarquia de dados
+
+```
+Superadmin da plataforma (Iugo Performance)
+   └── Empresa (TENANT)        ← a conservadora/facilities que assina o FaciliChat
+          └── Condomínios       ← os clientes da Empresa (cada um com um síndico)
+                 └── Usuários (Cliente/Funcionário/Supervisor/RH/Financeiro/Gestor) e Chamados
+```
+
+> Observação: o **código atual** ainda usa o perfil "Gerente" (em vez de "Gestor") e tem apenas 4
+> perfis; a migração para os 7 perfis do branding está na Fase 0.6 do `plano-implementacao.md`.
+
+### Estratégia de isolamento: banco compartilhado + `EmpresaID`
+
+- **Um único banco** PostgreSQL para todos os tenants (mais econômico de operar nesta fase).
+- **Toda tabela** tem a coluna `EmpresaID` (o "tenant_id"), FK e `NOT NULL`.
+- **Toda consulta** é filtrada por `EmpresaID` — implementado por uma dependência de escopo
+  no FastAPI (`obterTenantAtual`) injetada em todas as rotas.
+- **Row-Level Security (RLS)** do PostgreSQL como **segunda trava** (defesa em profundidade): mesmo
+  que uma query esqueça o filtro, o banco bloqueia o acesso cruzado entre tenants.
+- O **tenant viaja dentro do JWT** — não é enviado pelo frontend, evitando adulteração.
+- **Papéis são por tenant:** um `Gestor` é gestor *da sua* Empresa, nunca global.
+
+> Alternativas consideradas e descartadas por ora: **schema por tenant** e **banco por tenant** —
+> dão isolamento físico maior, mas custam mais e são mais complexas de migrar/manter.
+
+### Regra de ouro
+
+**Todo dado pertence a uma Empresa; toda leitura e escrita é escopada por ela.** Cada nova
+tabela/rota deve nascer com `EmpresaID` — ver `docs/plano-implementacao.md`, Fase 0.7.
+
+---
+
 ## Tecnologias utilizadas
 
 ### Backend
@@ -129,12 +168,15 @@ FACILICHAT/
 ```
 1. Usuário envia email + senha → POST /autenticacao/login
 2. Backend valida credenciais e retorna JWT (token)
+   → o token carrega: id do usuário (sub), função e, no modelo multi-tenant,
+     o EmpresaID (tenant) — usado para escopar todas as consultas
 3. Frontend armazena o token:
    - Web: localStorage do navegador
    - Mobile: expo-secure-store (armazenamento criptografado)
 4. Todas as requisições seguintes enviam o token no header:
    Authorization: Bearer <token>
-5. Token expira em 8 horas (configurável via JWT_EXPIRE_MINUTES)
+5. O backend extrai o tenant do token e filtra os dados por Empresa
+6. Token expira em 8 horas (configurável via JWT_EXPIRE_MINUTES)
 ```
 
 ---
@@ -162,5 +204,5 @@ EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
 
 ---
 
-*Última atualização: 25 de junho de 2026*
+*Última atualização: 27 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

@@ -22,7 +22,37 @@
 
 ---
 
-## Fase 0 — Infraestrutura e base (já concluída)
+## 🗺️ Mapa das fases (visão rápida)
+
+| Fase | Tema | Status |
+|------|------|--------|
+| 0 | Infraestrutura e base | ✅ Concluída |
+| 0.5 | Correções do levantamento (bugs e melhorias) | 🟡 Críticos concluídos; altos/médios/baixos/docs na fila |
+| 0.6 | Alinhamento de domínio com o branding | ⬜ Na fila · **PRIORITÁRIO** |
+| 0.7 | Fundação SaaS Multi-Tenant | ⬜ Na fila · **PRIORITÁRIO** |
+| 1 | Chat (base do produto) | ⬜ Na fila |
+| 2 | Criar chamado e detalhe (cliente) | ⬜ Na fila |
+| 3 | Fila e operação do supervisor (mobile) | ⬜ Na fila |
+| 4 | Dashboard do gestor (web) | ⬜ Na fila |
+| 5 | IA (classificação, roteamento e narração) | ⬜ Na fila |
+| 6 | Alertas comerciais e propostas | ⬜ Na fila |
+| 7 | Gestão de Empresas e Condomínios (telas/CRUD) | ⬜ Na fila |
+| 8 | MVP 02: Visitas Técnicas | ⬜ Na fila |
+| 9 | Upload de arquivos | ⬜ Na fila |
+| 10 | Notificações push | ⬜ Na fila |
+
+> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1–6 → 7 → 8–10**, encaixando as correções
+> pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são fundação e vêm antes
+> das features. O detalhe de cada fase está na Parte 2.
+
+---
+---
+
+# PARTE 1 — ✅ Concluído
+
+> Tudo o que já está implementado e funcionando. Não reimplementar; ler o código existente antes de mexer.
+
+## Fase 0 — Infraestrutura e base
 
 | Status | Item |
 |--------|------|
@@ -42,19 +72,12 @@
 | `[x]` | Comentários em todos os 27 arquivos existentes |
 | `[x]` | Documentação: `visao-geral.md`, `arquitetura.md`, `tecnico-backend.md`, `tecnico-frontend.md`, `setup.md`, `changelog.md` |
 
----
+## Fase 0.5 — Correções já aplicadas (do levantamento de 27/06/2026)
 
-## Fase 0.5 — Correções prioritárias (levantamento de bugs e melhorias)
+> Itens do levantamento técnico que já foram corrigidos. Os pendentes do mesmo levantamento estão na Parte 2.
 
-> **Origem:** levantamento técnico realizado em 27/06/2026 (análise completa de backend, web, mobile e docs).
-> **Como conduzir:** corrigir **um item por vez**, de cima para baixo. Ao iniciar um item, mudar `[ ]` → `[~]`;
-> ao concluir, `[~]` → `[x]` e registrar no `changelog.md`. Cada ID (ex: `C1`) serve para referência na conversa.
-> Os **Críticos** vêm primeiro porque, no estado atual, o app não sobe nem navega.
-
-### 🔴 Críticos — impedem o app de rodar
-
-| Status | ID | Problema | Correção | Arquivo(s) |
-|--------|----|----------|----------|-----------|
+| Status | ID | Problema | O que foi feito | Arquivo(s) |
+|--------|----|----------|-----------------|-----------|
 | `[x]` | C1 | Imports não batem com os nomes dos arquivos (`from BancoDados` vs `banco_dados.py`, `Modelos`, `Rotas`, `Configuracoes`) → `ModuleNotFoundError` | Padronizado: todos os imports qualificados pelo pacote (`from app.banco_dados import ...`) em 9 arquivos | `backend/app/main.py`, `banco_dados.py`, `modelos/*.py`, `rotas/*.py` |
 | `[x]` | C2 | Não é um pacote Python — falta `__init__.py`; `uvicorn app.main:app` falha | Criado `backend/app/__init__.py` (marcador de pacote) — habilita os imports qualificados do C1 | `backend/app/__init__.py` (novo) |
 | `[x]` | C3 | Rotas `/painel/*` retornam 404 (route group `(painel)` não entra na URL) | Route group `(painel)` renomeado para pasta real `painel/` (via `git mv`) — as URLs `/painel/...` que o código já usava passaram a existir; zero mudança de navegação | `frontend/web/src/app/painel/**` |
@@ -62,20 +85,32 @@
 | `[x]` | C5 | `app.json` referencia assets inexistentes (`icon.png`, `splash.png`, `adaptive-icon.png`) → build falha | Gerados placeholders branded (1024×1024, "F" branco na cor #148AF5) em `assets/`; `backgroundColor` do splash/adaptiveIcon corrigida `#1a56db`→`#148AF5`. Arte real pode substituir depois | `frontend/mobile/assets/*.png` (novos), `frontend/mobile/app.json` |
 | `[x]` | C6 | Escalonamento de privilégio: `POST /usuarios/` é público e aceita `Funcao` do corpo → qualquer um vira Gerente | Cadastro público agora força `Funcao = Cliente`; criação privilegiada movida para `POST /usuarios/equipe` (só Gerente). Bootstrap do 1º Gerente via `backend/scripts/criar_gerente.py` | `backend/app/rotas/Usuarios.py`, `backend/scripts/criar_gerente.py` (novo) |
 | `[x]` | C7 | `PATCH /chamados/{id}/status` sem autorização nem checagem de posse (IDOR) | Restrito a Supervisor/Gerente (403 caso contrário); chamado em estado terminal (Concluído/Cancelado) não pode ser reaberto (409) | `backend/app/rotas/Chamados.py` |
+| `[x]` | A2 | CORS não configurado → frontends no navegador não chamam a API | Adicionado `CORSMiddleware` com origens explícitas vindas de `CORS_ORIGINS` (config/.env); sem `"*"` junto de credenciais | `backend/app/main.py`, `configuracoes.py` |
+| `[x]` | A9 | Web: `next@15.3.4` afetado pela CVE-2025-66478 (RCE crítico no RSC, CVSS 10.0) — descoberto no `npm install` | Atualizado `next` e `eslint-config-next` para `15.3.6` (patch da linha 15.3.x); dev server reiniciado e validado | `frontend/web/package.json` |
+| `[x]` | D3 | Texto espúrio "oi" e "atualização em tempo real" enganoso | Removido "oi" e a data 2025→2026; texto ajustado para "pull-to-refresh" | `docs/visao-geral.md` |
+
+---
+---
+
+# PARTE 2 — 🚧 Em desenvolvimento (na ordem recomendada)
+
+## Fase 0.5 — Correções pendentes (do levantamento de 27/06/2026)
+
+> **Como conduzir:** corrigir **um item por vez**. Ao iniciar, mudar `[ ]` → `[~]`; ao concluir, `[~]` → `[x]`
+> (mover a linha para a Parte 1) e registrar no `changelog.md`. Cada ID (ex.: `A1`) serve de referência na conversa.
+> Os críticos (C1–C7) já estão concluídos (Parte 1).
 
 ### 🟠 Altos
 
 | Status | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----------|----------|-----------|
 | `[ ]` | A1 | `obterUsuarioAtual` retorna 500 (não 401) em token malformado (`uuid.UUID()` fora do try/except) | Mover conversão para dentro do try e capturar `(JWTError, ValueError)` | `backend/app/rotas/Autenticacao.py` |
-| `[x]` | A2 | CORS não configurado → frontends no navegador não chamam a API | Adicionado `CORSMiddleware` com origens explícitas vindas de `CORS_ORIGINS` (config/.env); sem `"*"` junto de credenciais | `backend/app/main.py`, `configuracoes.py` |
 | `[ ]` | A3 | Web e mobile sem tratamento de 401/token expirado (usuário fica preso) | No cliente HTTP, ao receber 401 → `auth.sair()` + redirecionar para login | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 | `[ ]` | A4 | Proteção de rota só client-side com flash de conteúdo (web) | Usar `middleware.ts` do Next; renderizar `null`/loader enquanto não autenticado | `frontend/web/src/middleware.ts` (novo), `(painel)/layout.tsx` |
 | `[ ]` | A5 | Design system violado: cor primária `#1a56db` (deveria `#148AF5`) e fonte Geist (deveria Figtree) | Substituir tokens de cor e trocar fonte para Figtree (web e mobile) | `frontend/web/src/app/layout.tsx`, `globals.css`; `frontend/mobile/app/**` |
 | `[ ]` | A6 | API de mensagens (`api.mensagens.*`) aponta para rota inexistente no backend | Alinhar com a Fase 1 (criar rota) ou marcar como código futuro até existir | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 | `[ ]` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/app/(painel)/layout.tsx` |
 | `[ ]` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5; adicionar `react-dom`/`react-native-web` | `frontend/mobile/package.json` |
-| `[x]` | A9 | Web: `next@15.3.4` afetado pela CVE-2025-66478 (RCE crítico no RSC, CVSS 10.0) — descoberto no `npm install` | Atualizado `next` e `eslint-config-next` para `15.3.6` (patch da linha 15.3.x); dev server reiniciado e validado | `frontend/web/package.json` |
 
 ### 🟡 Médios
 
@@ -110,14 +145,94 @@
 |--------|----|----------|----------|-----------|
 | `[ ]` | D1 | Divergência de enums: doc cita `AutorTipo: Humano/IA/Sistema` mas código usa `Cliente/Supervisor/Funcionario/IA/Sistema` | Padronizar doc com o código (ou vice-versa, definir fonte de verdade) | `plano-implementacao.md`, `tecnico-backend.md` |
 | `[ ]` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Padronizar para o calendário correto | `docs/changelog.md` |
-| `[ ]` | D3 | Texto espúrio "oi" e "atualização em tempo real" enganoso | Remover "oi"; ajustar texto para "pull-to-refresh" | `docs/visao-geral.md` |
 | `[ ]` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports (resolver junto de C1/C2) | Atualizar comando de execução após corrigir imports | `docs/tecnico-backend.md` |
+
+---
+
+## Fase 0.6 — Alinhamento de domínio com o branding 📐 [PRIORITÁRIO]
+
+> **Origem:** revisão dos documentos comerciais em `docs/FaciliChat-Regras/` (apresentação, personas,
+> design system, MVP02) em 27/06/2026. O modelo de domínio do código divergia do produto definido pelo
+> comercial. Estes itens alinham o domínio **antes** de construir as features. Termos canônicos do
+> branding: a empresa cliente que compra é a **Empresa** (conservadora/facilities, ex.: "Cefram"); os
+> clientes dela são **Condomínios** (representados por síndicos); a plataforma é operada pela Iugo
+> Performance como **Superadmin**.
+
+### Papéis de usuário — o branding define 7 perfis
+Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**). O branding define 7:
+**Cliente, Funcionário, Supervisor, RH, Financeiro, Gestor, Superadmin**.
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Renomear `Gerente` → **`Gestor`** no enum e em todo o código (rotas, comparações, claim do JWT, frontend `isGerente`→`isGestor`, scripts) | `backend/app/modelos/Usuarios.py`, `rotas/*.py`, `frontend/**` |
+| `[ ]` | Adicionar perfis **`RH`** e **`Financeiro`** ao `UsuarioFuncao` (back-office, com filas próprias) | `backend/app/modelos/Usuarios.py` + tipos do front |
+| `[ ]` | Adicionar **`Superadmin`** (a Iugo Performance, que opera a plataforma — ver Fase 0.7) | `backend/app/modelos/Usuarios.py` |
+| `[ ]` | Manter **`Funcionário` como perfil único** (sem subtipos: limpeza/portaria/zelador têm a mesma experiência) — decisão de produto do branding | — |
+
+### Filas / roteamento
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Adicionar fila **`Comercial`** (contratos/propostas, roteada ao Gestor) ao `ChamadoFila` | `backend/app/modelos/Chamados.py` + tipos do front |
+
+### Regras de negócio do branding a incorporar
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | **Tickets irmãos:** uma mensagem pode gerar 2 chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto), sem o usuário precisar saber das filas | modelo/serviço de chamados + IA |
+| `[ ]` | **Cliente = Condomínio/contrato** com um responsável (síndico): evoluir o campo texto `Condominio` para entidade (detalhado na Fase 7) | `backend/app/modelos/` |
+| `[ ]` | **IA detecta intenção de compra, nunca inventa preço/prazo** (invariante inegociável do branding) — já previsto na Fase 5; reforçar | `backend/app/servicos/ia.py` |
+
+### Refinos da Visita Técnica (MVP02) conforme o branding
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | `Duracao` **não é coluna** — derivar de `finalizada_em − iniciada_em` | `backend/app/modelos/VisitaTecnica.py` |
+| `[ ]` | Adicionar `ticket_id` **opcional** (vínculo a uma reclamação) | `backend/app/modelos/VisitaTecnica.py` |
+| `[ ]` | Cliente **não aprova** a visita (só recebe/consulta a prova) — diferente do chamado | rotas de visita |
+
+---
+
+## Fase 0.7 — Fundação SaaS Multi-Tenant 🏢 [PRIORITÁRIO — antes das features]
+
+> **Decisão de arquitetura (27/06/2026):** o FaciliChat será um **SaaS multi-tenant**. Cada cliente do
+> negócio é uma **Empresa** (conservadora/facilities que atende condomínios), e os dados de uma empresa
+> ficam **totalmente isolados** das demais. Hierarquia:
+> **Empresa (tenant) → Condomínios → Usuários e Chamados**.
+>
+> **Estratégia escolhida:** banco de dados **compartilhado** + coluna `EmpresaID` (o "tenant_id")
+> em **todas** as tabelas + **Row-Level Security (RLS)** do PostgreSQL como trava extra + o tenant viaja
+> dentro do **JWT**. É a abordagem mais econômica e simples de operar nesta fase (alternativas: schema
+> por tenant ou banco por tenant — mais caras/complexas, descartadas por ora).
+>
+> **Regra de ouro:** todo dado pertence a uma Empresa e **toda consulta é filtrada por ela**.
+> Por isso esta fundação vem **antes** das features grandes (Fases 1–6): cada nova tabela/rota já nasce
+> com o tenant correto, evitando retrabalho caro depois.
+
+### Backend
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Modelo `Empresa` (tenant): `Nome`, `CNPJ`, `Status` (Ativa/Suspensa), `Criacao` | `backend/app/modelos/Empresa.py` (novo) |
+| `[ ]` | Adicionar `EmpresaID` (FK, NOT NULL) em `Usuario`, `Condominio`, `Chamado`, `Mensagem` — e em **toda tabela futura** | `backend/app/modelos/*.py` |
+| `[ ]` | Incluir o `EmpresaID` no payload do JWT no login | `backend/app/rotas/Autenticacao.py` |
+| `[ ]` | Dependência `obterTenantAtual` — extrai o tenant do token; injetada em todas as rotas | `backend/app/rotas/Autenticacao.py` |
+| `[ ]` | **Todas** as queries filtram por `EmpresaID` do usuário logado (chamados, usuários, etc.) | `backend/app/rotas/*.py` |
+| `[ ]` | Row-Level Security (RLS) no PostgreSQL como segunda trava (defesa em profundidade) | migrações / `banco_dados.py` |
+| `[ ]` | Papéis por tenant (o **Gestor** é gestor **da sua** Empresa, não global) | `backend/app/rotas/*.py` |
+| `[ ]` | Nível **Superadmin da plataforma** (Iugo Performance): cadastrar/suspender Empresas e criar o 1º Gestor de cada uma | `backend/app/rotas/Plataforma.py` (novo) |
+| `[ ]` | `scripts/criar_empresa.py` — cria Empresa + 1º Gestor juntos (substitui/estende o `criar_gerente.py`) | `backend/scripts/` |
+
+### Frontend (web e mobile)
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Tenant vem do token (o front não envia); exibir a Empresa atual no cabeçalho | web e mobile |
+| `[ ]` | Área de **Superadmin** (web) para gerenciar Empresas (separada do painel da empresa) | `frontend/web/src/app/(plataforma)/...` (novo) |
+| `[ ]` | Tipos: adicionar `Empresa` e `EmpresaID` (web e mobile) | `frontend/web/src/types/index.ts`, `frontend/mobile/lib/types.ts` |
 
 ---
 
 ## Fase 1 — Chat (base do produto)
 
-> Desbloqueia o produto inteiro. Implementar antes de qualquer outra fase.
+> Desbloqueia o produto. Implementar **logo após** a Fundação Multi-Tenant (Fase 0.7).
 
 ### Backend
 
@@ -268,22 +383,27 @@
 
 ---
 
-## Fase 7 — Condomínios e multi-tenant
+## Fase 7 — Gestão de Empresas e Condomínios (telas/CRUD)
+
+> **Depende da Fase 0.7 (Fundação SaaS Multi-Tenant)**, que já cria a entidade `Empresa`, o
+> `EmpresaID` em todas as tabelas, o escopo por tenant, a RLS e o tenant no JWT. Esta fase
+> entrega as **telas e rotas de gestão** que usam aquela fundação. (O `CondominioID` em `Usuario`/
+> `Chamado` e o isolamento por tenant já terão sido feitos na 0.7.)
 
 ### Backend
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Modelo `Condominio`: nome, endereço, CNPJ | `backend/app/modelos/Condominio.py` (novo) |
-| `[ ]` | Adicionar `CondominioID` em `Usuario` e `Chamado` | `backend/app/modelos/Usuarios.py`, `Chamados.py` |
-| `[ ]` | Filtros de listagem respeitam `CondominioID` do usuário logado | `backend/app/rotas/Chamados.py` |
-| `[ ]` | Rotas de gestão de condomínios (CRUD básico para o Gerente) | `backend/app/rotas/Condominios.py` (novo) |
+| `[ ]` | Modelo `Condominio`: `Nome`, `Endereco`, `CNPJ`, **`EmpresaID`** | `backend/app/modelos/Condominio.py` (novo) |
+| `[ ]` | CRUD de condomínios — escopado à Empresa do Gestor | `backend/app/rotas/Condominios.py` (novo) |
+| `[ ]` | CRUD de Empresas — somente Superadmin da plataforma | `backend/app/rotas/Plataforma.py` |
 
 ### Frontend Web
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Página `cadastros` — listar/criar usuários e condomínios (só visível para Gerente) | `frontend/web/src/app/(painel)/cadastros/page.tsx` (novo) |
+| `[ ]` | Página `cadastros` — usuários e condomínios da empresa (só Gestor) | `frontend/web/src/app/painel/cadastros/page.tsx` (novo) |
+| `[ ]` | Área de plataforma — gerenciar Empresas (Superadmin) | `frontend/web/src/app/(plataforma)/...` (novo) |
 
 ---
 
@@ -295,7 +415,7 @@
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Modelo `VisitaTecnica`: SupervisorID, CondominioID, DataHoraAgendada, HoraChegada, HoraSaida, Duracao, Notas, Status (Agendada/EmAndamento/Finalizada/RelatorioEnviado) | `backend/app/modelos/VisitaTecnica.py` (novo) |
+| `[ ]` | Modelo `VisitaTecnica`: SupervisorID, CondominioID, EmpresaID, DataHoraAgendada, HoraChegada, HoraSaida, Notas, Status (Agendada/EmAndamento/Finalizada/RelatorioEnviado), `ticket_id` opcional. **Duração deriva** de HoraSaida−HoraChegada (não é coluna) | `backend/app/modelos/VisitaTecnica.py` (novo) |
 | `[ ]` | `POST /visitas/` — agendar visita | `backend/app/rotas/Visitas.py` (novo) |
 | `[ ]` | `PATCH /visitas/{id}/iniciar` — grava `HoraChegada` = agora | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `PATCH /visitas/{id}/finalizar` — grava `HoraSaida`, calcula `Duracao`, muda status para Finalizada | `backend/app/rotas/Visitas.py` |
@@ -324,7 +444,7 @@
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
 | `[ ]` | Página `visitas` no painel — tabela: cliente, supervisor, data, duração, status; filtro por supervisor; badge "Não realizada" em vermelho | `frontend/web/src/app/(painel)/visitas/page.tsx` (novo) |
-| `[ ]` | Adicionar "Visitas técnicas" no sidebar (visível para Gerente e Supervisor) | `frontend/web/src/app/(painel)/layout.tsx` |
+| `[ ]` | Adicionar "Visitas técnicas" no sidebar (visível para Gestor e Supervisor) | `frontend/web/src/app/painel/layout.tsx` |
 
 ---
 
@@ -365,7 +485,12 @@ Design tokens principais:
   Fonte:          Figtree (sans-serif geométrica)
   Ícones:         Line Awesome  (18–24px, estilo linha)
 
-Perfis de usuário:    Cliente | Supervisor | Funcionario | Gerente
+Multi-tenant (SaaS): Empresa (tenant) → Condomínios → Usuários/Chamados
+                     Toda tabela tem EmpresaID; toda query filtra por ele; RLS no Postgres.
+                     O tenant viaja no JWT. Papéis são por empresa (não globais).
+Superadmin:          Nível da plataforma (Iugo Performance) — cadastra/suspende Empresas.
+Perfis de usuário:    Cliente | Funcionário | Supervisor | RH | Financeiro | Gestor  (dentro de uma Empresa)
+                     [código atual ainda usa "Gerente" e só 4 perfis; migração na Fase 0.6]
 Filas de chamado:     Operacional | RH | Financeiro | Comercial
 Status de chamado:    Recebido | EmAndamento | Agendado | Concluido | Cancelado
 Prioridades:          Baixa | Media | Alta | Critica

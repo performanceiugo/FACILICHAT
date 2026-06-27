@@ -41,6 +41,12 @@ Acesse a documentação interativa em **`http://localhost:8000/docs`** (Swagger)
 docker compose exec backend python scripts/criar_gerente.py "Nome do Gestor" gestor@exemplo.com SenhaForte123
 ```
 
+> 🏢 **Mudança futura (SaaS multi-tenant — Fase 0.7):** quando a fundação multi-tenant entrar, o
+> primeiro acesso deixará de ser "só criar um Gerente". Passará a ser **criar uma Empresa
+> (tenant) + o seu primeiro Gestor juntos** — provavelmente via `scripts/criar_empresa.py`.
+> Cada Empresa terá seus próprios usuários/condomínios/chamados, isolados das demais. Detalhes
+> em `docs/plano-implementacao.md` (Fase 0.7) e `docs/arquitetura.md`.
+
 ### Comandos úteis do dia a dia (Docker)
 
 ```bash
