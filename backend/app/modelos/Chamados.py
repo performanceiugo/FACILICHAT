@@ -4,7 +4,7 @@
 from sqlalchemy import Column, String, Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from BancoDados import Base
+from app.banco_dados import Base
 import uuid
 import enum
 from datetime import datetime

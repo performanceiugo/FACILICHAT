@@ -12,6 +12,53 @@
 
 ---
 
+## Opção A (recomendada) — Rodar o backend com Docker
+
+Este é o caminho mais simples: **não precisa instalar Python nem as dependências** na sua máquina.
+Sobe a API + o banco juntos, em containers. Requer apenas o **Docker Desktop** rodando.
+
+```bash
+# 1. Na raiz do projeto, criar o .env do backend (uma vez)
+cp backend/.env.example backend/.env
+# edite backend/.env e gere um JWT_SECRET (pode deixar ANTHROPIC_API_KEY como placeholder)
+
+# 2. Subir API + banco (a primeira vez baixa a imagem e instala as dependências)
+docker compose up --build -d
+
+# 3. Conferir que está no ar
+docker compose ps                 # backend e db devem estar "Up"
+curl http://localhost:8000/        # -> {"mensagem":"FaciliChat online!"}
+```
+
+Acesse a documentação interativa em **`http://localhost:8000/docs`** (Swagger).
+
+> **DATABASE_URL no Docker:** dentro dos containers o host do banco é `db` (não `localhost`).
+> O `docker-compose.yml` já injeta a `DATABASE_URL` correta automaticamente — não precisa mexer no `.env`.
+
+### Criar o primeiro Gerente (rodando dentro do container)
+
+```bash
+docker compose exec backend python scripts/criar_gerente.py "Nome do Gestor" gestor@exemplo.com SenhaForte123
+```
+
+### Comandos úteis do dia a dia (Docker)
+
+```bash
+docker compose up -d        # subir
+docker compose logs -f backend   # acompanhar logs da API
+docker compose down         # parar (mantém os dados do banco no volume)
+docker compose up --build -d     # reconstruir após mudar dependências
+```
+
+> O código do backend é montado no container, então alterações em `.py` recarregam sozinhas (--reload).
+> O **frontend web** (Next.js) ainda roda fora do Docker — veja os passos 10 em diante (requer Node.js).
+
+---
+
+## Opção B — Ambiente local manual (sem Docker para o backend)
+
+Use esta opção se preferir rodar o Python direto no WSL.
+
 ## Passo 1 — Habilitar Docker no WSL 2
 
 O Docker precisa ser integrado ao WSL para funcionar no terminal Linux.
@@ -95,9 +142,24 @@ JWT_SECRET=coloque-aqui-uma-chave-aleatoria-longa
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=480
 ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
-> A `ANTHROPIC_API_KEY` é necessária para as funcionalidades de IA. Para rodar o sistema sem IA, use qualquer valor como placeholder.
+Detalhes de cada variável:
+
+| Variável | Para que serve | Observação |
+|---|---|---|
+| `DATABASE_URL` | Conexão com o Postgres | Em dev, use exatamente o valor acima (bate com o `docker-compose.yml`). Mantenha o driver `+asyncpg`. |
+| `JWT_SECRET` | Assina/valida os tokens de login | Gere uma chave aleatória forte (veja abaixo). **Nunca** commite. Se mudar, todos os logins caem. |
+| `JWT_EXPIRE_MINUTES` | Validade do token (minutos) | Padrão 480 (8h). |
+| `ANTHROPIC_API_KEY` | Funcionalidades de IA (Fase 5) | Ainda **não é usada** pelo código, mas é obrigatória para a app subir. Use um placeholder por enquanto. |
+| `CORS_ORIGINS` | Quais frontends podem chamar a API pelo navegador | Lista separada por vírgula. Em produção, troque pelos domínios reais. |
+
+Para gerar um `JWT_SECRET` forte (com o venv ativado):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ---
 
@@ -119,18 +181,12 @@ Você deve ver o container `facilichat_db` com status `Up`.
 
 ---
 
-## Passo 8 — Configurar e rodar as migrações (Alembic)
+## Passo 8 — Rodar o backend (cria as tabelas automaticamente)
 
-> **Atenção:** este passo cria as tabelas no banco. Execute apenas uma vez na primeira configuração, ou quando houver novas migrações.
-
-```bash
-cd backend
-alembic upgrade head
-```
-
----
-
-## Passo 9 — Rodar o backend
+> **Como as tabelas são criadas hoje:** o backend executa `Base.metadata.create_all` no startup,
+> ou seja, **as tabelas são criadas sozinhas na primeira vez que o servidor sobe**. Não há Alembic
+> configurado ainda (migrações estão no backlog — `plano-implementacao.md`). Por isso **não** rode
+> `alembic upgrade head`: o comando falharia, pois não existe configuração de Alembic no projeto.
 
 ```bash
 cd backend
@@ -142,6 +198,26 @@ O servidor estará disponível em:
 - API: `http://localhost:8000`
 - Documentação interativa (Swagger): `http://localhost:8000/docs`
 - Documentação alternativa (Redoc): `http://localhost:8000/redoc`
+
+> Na primeira execução, observe no log a mensagem "Banco de dados conectado!" — sinal de que as tabelas foram criadas.
+
+---
+
+## Passo 9 — Criar o primeiro usuário Gerente
+
+Por segurança, o cadastro público (`POST /usuarios/`) **sempre cria um Cliente**, e a criação de
+perfis privilegiados (`POST /usuarios/equipe`) exige um **Gerente já autenticado**. Logo, o primeiro
+Gerente precisa ser criado pelo script de bootstrap (rode uma única vez, com o backend já tendo subido
+ao menos uma vez para as tabelas existirem):
+
+```bash
+cd backend
+python scripts/criar_gerente.py "Nome do Gestor" gestor@exemplo.com SenhaForte123
+```
+
+Depois disso, faça login com esse Gerente para criar os demais usuários da equipe (Supervisores,
+Funcionários e outros Gerentes) via `POST /usuarios/equipe`. Clientes podem se cadastrar sozinhos
+pelo `POST /usuarios/`.
 
 ---
 

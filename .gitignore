@@ -22,5 +22,12 @@ node_modules/
 .next/
 .expo/
 
+# Next.js — arquivo de tipos gerado automaticamente (não editar / não versionar)
+next-env.d.ts
+*.tsbuildinfo
+
+# Claude Code — configurações locais da máquina (permissões); settings.json é versionado
+.claude/settings.local.json
+
 # Logs
 *.log

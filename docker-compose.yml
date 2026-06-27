@@ -10,6 +10,34 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Healthcheck: só libera o backend depois que o Postgres aceitar conexões
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facilichat -d facilichat_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # API FastAPI — construída a partir de backend/Dockerfile
+  backend:
+    build: ./backend
+    container_name: facilichat_backend
+    # Carrega JWT_SECRET, ANTHROPIC_API_KEY, CORS_ORIGINS etc. do .env do backend
+    env_file:
+      - ./backend/.env
+    environment:
+      # Dentro da rede do compose o host do banco é o serviço "db" (não "localhost").
+      # Esta variável sobrescreve a DATABASE_URL do .env, que aponta para localhost.
+      DATABASE_URL: postgresql+asyncpg://facilichat:facilichat123@db:5432/facilichat_db
+    ports:
+      - "8000:8000"
+    # Espera o banco ficar saudável antes de subir (evita erro de conexão no create_all)
+    depends_on:
+      db:
+        condition: service_healthy
+    # Monta o código local no container para refletir mudanças sem rebuild (--reload)
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   pgdata:

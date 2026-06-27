@@ -3,7 +3,7 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
-from Configuracoes import configuracoes
+from app.configuracoes import configuracoes
 
 # Engine assíncrono — echo=True imprime todas as queries SQL no console (útil em desenvolvimento)
 engine = create_async_engine(configuracoes.DATABASE_URL, echo=True)

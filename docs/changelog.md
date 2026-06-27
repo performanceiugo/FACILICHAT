@@ -5,6 +5,61 @@
 
 ---
 
+## [0.5.4] — 27 de junho de 2026
+
+### Segurança
+- **A9 — Next.js atualizado para corrigir a CVE-2025-66478** — o `npm install` da web acusou que `next@15.3.4` está afetado por uma vulnerabilidade crítica (RCE no protocolo RSC do App Router, CVSS 10.0). Atualizados `next` e `eslint-config-next` de `15.3.4` para `15.3.6` (patch da própria linha 15.3.x, mantém React 19). Dev server reiniciado e validado (`/login` e `/painel/chamados` → 200). A app nunca esteve online, então não foi necessário rotacionar segredos. Arquivo: `frontend/web/package.json`.
+
+### Corrigido
+- **C5 — Assets faltantes do mobile** — criados os arquivos `icon.png`, `splash.png` e `adaptive-icon.png` em `frontend/mobile/assets/` (1024×1024, "F" branco sobre a cor primária `#148AF5`), que o `app.json` referenciava mas não existiam — o build do Expo quebrava. As `backgroundColor` do splash e do adaptiveIcon também foram corrigidas de `#1a56db` para `#148AF5` (design system). Os placeholders podem ser substituídos pela arte final depois. Arquivos: `frontend/mobile/assets/*.png` (novos), `frontend/mobile/app.json`.
+
+---
+
+## [0.5.3] — 27 de junho de 2026
+
+### Corrigido
+- **C3 — Rotas `/painel/*` davam 404** — o route group `(painel)` (parênteses são omitidos da URL pelo Next.js) foi renomeado para a pasta real `painel/`. Agora as URLs `/painel/chamados` etc., que o código de navegação já usava, existem de fato. Login → painel funciona. Arquivos: `frontend/web/src/app/painel/**`.
+- **C4 — `auth.ts` quebrava no SSR** — adicionada guarda `typeof window !== 'undefined'` em todos os métodos que acessam `localStorage`. O `painel/layout.tsx` passou a ler a sessão via estado (`useEffect`) e só renderiza o painel após validar a autenticação, eliminando o "flash" de conteúdo protegido (melhora parcial do A4). Arquivos: `frontend/web/src/lib/auth.ts`, `frontend/web/src/app/painel/layout.tsx`.
+
+### Adicionado (infraestrutura)
+- **Backend conteinerizado** — novos `backend/Dockerfile` (Python 3.12-slim) e `backend/.dockerignore`; o `docker-compose.yml` ganhou o serviço `backend` (com `depends_on` + healthcheck do Postgres, volume do código para hot-reload e `DATABASE_URL` apontando para o serviço `db`). Agora `docker compose up --build` sobe API + banco juntos, sem instalar Python localmente. Validado de ponta a ponta: criação do 1º Gerente, cadastro público (vira Cliente), bloqueios 403 de C6/C7 e fluxo de chamado.
+- **`backend/scripts/criar_gerente.py`** — ajustado para inserir a raiz do backend no `sys.path`, permitindo rodar `python scripts/criar_gerente.py` direto (inclusive via `docker compose exec`).
+
+---
+
+## [0.5.2] — 27 de junho de 2026
+
+### Segurança
+- **C6 — Escalonamento de privilégio no cadastro corrigido** — `POST /usuarios/` (cadastro público) agora **sempre** cria usuário com função `Cliente`; o campo `Funcao` foi removido do schema público. A criação de perfis privilegiados passou para a nova rota protegida **`POST /usuarios/equipe`**, que exige um usuário autenticado com função `Gerente` (retorna 403 caso contrário). Arquivo: `backend/app/rotas/Usuarios.py`.
+- **C7 — Autorização no `PATCH /chamados/{id}/status` (IDOR) corrigida** — alterar status agora é permitido apenas a `Supervisor` e `Gerente` (403 para os demais), impedindo que um Cliente altere chamados de qualquer um. Adicionada também regra de negócio: chamado em estado terminal (`Concluido`/`Cancelado`) não pode ser reaberto (409). Arquivo: `backend/app/rotas/Chamados.py`.
+
+### Adicionado
+- **CORS (A2)** — registrado `CORSMiddleware` em `main.py` com origens explícitas (sem `"*"` junto de credenciais), configuráveis pela nova variável `CORS_ORIGINS` (padrão: `http://localhost:3000,http://127.0.0.1:3000`). Sem isso, os frontends no navegador não conseguiam chamar a API. Arquivos: `backend/app/main.py`, `backend/app/configuracoes.py`, `backend/.env.example`.
+- **`backend/scripts/criar_gerente.py` (novo)** — script de bootstrap para criar o primeiro usuário `Gerente`, necessário porque o cadastro público virou Cliente-only (C6). Uso: `python scripts/criar_gerente.py "Nome" email senha`.
+
+### Documentação
+- **`docs/setup.md` atualizado** — detalhada cada variável do `.env` (incluindo `CORS_ORIGINS` e como gerar `JWT_SECRET`); **corrigido** o passo de banco de dados, que mandava rodar `alembic upgrade head` (Alembic não está configurado) — as tabelas são criadas automaticamente no startup via `create_all`; adicionado passo para criar o primeiro Gerente.
+
+---
+
+## [0.5.1] — 27 de junho de 2026
+
+### Corrigido
+- **Imports do backend (C1 + C2)** — todos os imports dos 9 arquivos Python passaram a ser qualificados pelo pacote `app` (ex: `from app.banco_dados import Base`, `from app.modelos.Usuarios import Usuario`, `from app.rotas.Autenticacao import obterUsuarioAtual`). Antes usavam nomes que não correspondiam aos arquivos reais (`from BancoDados`, `from Modelos`, `from Rotas`, `from Configuracoes`), causando `ModuleNotFoundError` e impedindo a API de iniciar. Arquivos: `main.py`, `banco_dados.py`, `modelos/__init__.py`, `modelos/Usuarios.py`, `modelos/Chamados.py`, `modelos/Mensagens.py`, `rotas/Autenticacao.py`, `rotas/Usuarios.py`, `rotas/Chamados.py`.
+- **`backend/app/__init__.py` (novo)** — criado o marcador de pacote Python que faltava, permitindo executar a aplicação com `uvicorn app.main:app` a partir de `backend/` (conforme já documentado em `tecnico-backend.md`).
+
+---
+
+## [0.5.0] — 27 de junho de 2026
+
+### Adicionado
+- **`docs/plano-implementacao.md` — Fase 0.5 (Correções prioritárias)** — incorporado ao backlog o levantamento técnico completo realizado em 27/06/2026 (análise de backend, frontend web, mobile e documentação). A nova seção lista os problemas encontrados como itens rastreáveis e numerados por ID (C1–C7 críticos, A1–A8 altos, M1–M11 médios, B1–B6 baixos, D1–D4 de documentação), ordenados por severidade. Os críticos vêm primeiro porque, no estado atual, o app não sobe (imports do backend quebrados) nem navega (rotas `/painel/*` em 404). A correção será conduzida um item por vez.
+
+### Configuração
+- **`.claude/settings.json` (novo)** — definido o modelo padrão do projeto como Sonnet 4.6 (`"model": "sonnet"`), adequado a tarefas de rotina; a troca para Opus passa a ser feita manualmente por sessão quando necessário.
+
+---
+
 ## [0.4.0] — 26 de junho de 2026
 
 ### Adicionado

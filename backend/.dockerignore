@@ -1,0 +1,7 @@
+# Arquivos que NÃO devem entrar na imagem do backend
+# .env é injetado em runtime (env_file no compose) — nunca deve ser copiado para a imagem
+.env
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/

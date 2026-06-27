@@ -8,9 +8,9 @@ from sqlalchemy import select
 from jose import JWTError, jwt
 from pwdlib import PasswordHash
 from datetime import datetime, timedelta
-from BancoDados import obterBancoDados
-from Modelos.Usuarios import Usuario
-from Configuracoes import configuracoes
+from app.banco_dados import obterBancoDados
+from app.modelos.Usuarios import Usuario
+from app.configuracoes import configuracoes
 import uuid
 
 roteador = APIRouter(prefix="/autenticacao", tags=["Autenticacao"])

@@ -89,10 +89,13 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 ### Usuários — `/usuarios`
 
-| Método | Rota | Descrição | Autenticação |
-|---|---|---|---|
-| POST | `/usuarios/` | Criar novo usuário | Não |
-| GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim |
+| Método | Rota | Descrição | Autenticação | Permissão |
+|---|---|---|---|---|
+| POST | `/usuarios/` | Cadastro público — cria **sempre** um Cliente (campo `Funcao` não é aceito) | Não | Pública |
+| POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/Gerente) | Sim | Apenas Gerente (403 caso contrário) |
+| GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim | Qualquer perfil |
+
+> **Primeiro Gerente:** como o cadastro público é Cliente-only e `/usuarios/equipe` exige um Gerente, o primeiro Gerente é criado pelo script `backend/scripts/criar_gerente.py` (ver `docs/setup.md`).
 
 ### Chamados — `/chamados`
 
@@ -100,7 +103,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 |---|---|---|---|---|
 | POST | `/chamados/` | Abrir novo chamado | Sim | Qualquer perfil |
 | GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gerente vê todos |
-| PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Qualquer perfil autenticado |
+| PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gerente (403 caso contrário); chamado finalizado não reabre (409) |
 
 ---
 
@@ -110,6 +113,9 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - JWT assinado com `HS256` e chave secreta configurável
 - Token válido por **8 horas** (configurável via `JWT_EXPIRE_MINUTES`)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use
+- **CORS** restrito às origens em `CORS_ORIGINS` (config/.env) — sem `"*"` junto de credenciais
+- **Cadastro público é Cliente-only**; perfis privilegiados só via `/usuarios/equipe` (Gerente)
+- **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
 
 ---
 
@@ -124,5 +130,5 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 ---
 
-*Última atualização: 25 de junho de 2026*
+*Última atualização: 27 de junho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

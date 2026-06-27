@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
-from BancoDados import obterBancoDados
-from Modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
-from Modelos.Usuarios import Usuario
-from Rotas.Autenticacao import obterUsuarioAtual
+from app.banco_dados import obterBancoDados
+from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
+from app.modelos.Usuarios import Usuario, UsuarioFuncao
+from app.rotas.Autenticacao import obterUsuarioAtual
 from datetime import datetime
 import uuid
 
@@ -80,10 +80,19 @@ async def atualizarStatus(
     db: AsyncSession = Depends(obterBancoDados),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
+    # Autorização: mudar status é operação interna — só Supervisor e Gerente podem.
+    # Impede que um Cliente altere o status de qualquer chamado (falha de IDOR).
+    if usuarioAtual.Funcao not in (UsuarioFuncao.Supervisor, UsuarioFuncao.Gerente):
+        raise HTTPException(status_code=403, detail="Sem permissão para alterar o status do chamado")
+
     resultado = await db.execute(select(Chamado).where(Chamado.ID == chamadoID))
     chamado = resultado.scalar_one_or_none()
     if not chamado:
         raise HTTPException(status_code=404, detail="Chamado não encontrado")
+
+    # Regra de negócio: chamado em estado terminal (Concluído/Cancelado) não pode ser reaberto
+    if chamado.Status in (ChamadoStatus.Concluido, ChamadoStatus.Cancelado):
+        raise HTTPException(status_code=409, detail="Chamado finalizado não pode ter o status alterado")
 
     chamado.Status = status
     chamado.Atualizacao = datetime.utcnow()

@@ -3,7 +3,7 @@
 
 from sqlalchemy import Column, String, Enum as SAEnum, DateTime
 from sqlalchemy.dialects.postgresql import UUID
-from BancoDados import Base
+from app.banco_dados import Base
 import uuid
 import enum
 from datetime import datetime

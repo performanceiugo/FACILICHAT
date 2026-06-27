@@ -44,6 +44,77 @@
 
 ---
 
+## Fase 0.5 — Correções prioritárias (levantamento de bugs e melhorias)
+
+> **Origem:** levantamento técnico realizado em 27/06/2026 (análise completa de backend, web, mobile e docs).
+> **Como conduzir:** corrigir **um item por vez**, de cima para baixo. Ao iniciar um item, mudar `[ ]` → `[~]`;
+> ao concluir, `[~]` → `[x]` e registrar no `changelog.md`. Cada ID (ex: `C1`) serve para referência na conversa.
+> Os **Críticos** vêm primeiro porque, no estado atual, o app não sobe nem navega.
+
+### 🔴 Críticos — impedem o app de rodar
+
+| Status | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----------|----------|-----------|
+| `[x]` | C1 | Imports não batem com os nomes dos arquivos (`from BancoDados` vs `banco_dados.py`, `Modelos`, `Rotas`, `Configuracoes`) → `ModuleNotFoundError` | Padronizado: todos os imports qualificados pelo pacote (`from app.banco_dados import ...`) em 9 arquivos | `backend/app/main.py`, `banco_dados.py`, `modelos/*.py`, `rotas/*.py` |
+| `[x]` | C2 | Não é um pacote Python — falta `__init__.py`; `uvicorn app.main:app` falha | Criado `backend/app/__init__.py` (marcador de pacote) — habilita os imports qualificados do C1 | `backend/app/__init__.py` (novo) |
+| `[x]` | C3 | Rotas `/painel/*` retornam 404 (route group `(painel)` não entra na URL) | Route group `(painel)` renomeado para pasta real `painel/` (via `git mv`) — as URLs `/painel/...` que o código já usava passaram a existir; zero mudança de navegação | `frontend/web/src/app/painel/**` |
+| `[x]` | C4 | `auth.ts` acessa `localStorage` sem guarda de `window` → quebra no SSR / hydration mismatch | Adicionada guarda `typeof window !== 'undefined'` em todos os métodos; `painel/layout.tsx` agora lê a sessão via estado em `useEffect` e só renderiza após validar (remove flash — melhora parcial do A4) | `frontend/web/src/lib/auth.ts`, `frontend/web/src/app/painel/layout.tsx` |
+| `[x]` | C5 | `app.json` referencia assets inexistentes (`icon.png`, `splash.png`, `adaptive-icon.png`) → build falha | Gerados placeholders branded (1024×1024, "F" branco na cor #148AF5) em `assets/`; `backgroundColor` do splash/adaptiveIcon corrigida `#1a56db`→`#148AF5`. Arte real pode substituir depois | `frontend/mobile/assets/*.png` (novos), `frontend/mobile/app.json` |
+| `[x]` | C6 | Escalonamento de privilégio: `POST /usuarios/` é público e aceita `Funcao` do corpo → qualquer um vira Gerente | Cadastro público agora força `Funcao = Cliente`; criação privilegiada movida para `POST /usuarios/equipe` (só Gerente). Bootstrap do 1º Gerente via `backend/scripts/criar_gerente.py` | `backend/app/rotas/Usuarios.py`, `backend/scripts/criar_gerente.py` (novo) |
+| `[x]` | C7 | `PATCH /chamados/{id}/status` sem autorização nem checagem de posse (IDOR) | Restrito a Supervisor/Gerente (403 caso contrário); chamado em estado terminal (Concluído/Cancelado) não pode ser reaberto (409) | `backend/app/rotas/Chamados.py` |
+
+### 🟠 Altos
+
+| Status | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----------|----------|-----------|
+| `[ ]` | A1 | `obterUsuarioAtual` retorna 500 (não 401) em token malformado (`uuid.UUID()` fora do try/except) | Mover conversão para dentro do try e capturar `(JWTError, ValueError)` | `backend/app/rotas/Autenticacao.py` |
+| `[x]` | A2 | CORS não configurado → frontends no navegador não chamam a API | Adicionado `CORSMiddleware` com origens explícitas vindas de `CORS_ORIGINS` (config/.env); sem `"*"` junto de credenciais | `backend/app/main.py`, `configuracoes.py` |
+| `[ ]` | A3 | Web e mobile sem tratamento de 401/token expirado (usuário fica preso) | No cliente HTTP, ao receber 401 → `auth.sair()` + redirecionar para login | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
+| `[ ]` | A4 | Proteção de rota só client-side com flash de conteúdo (web) | Usar `middleware.ts` do Next; renderizar `null`/loader enquanto não autenticado | `frontend/web/src/middleware.ts` (novo), `(painel)/layout.tsx` |
+| `[ ]` | A5 | Design system violado: cor primária `#1a56db` (deveria `#148AF5`) e fonte Geist (deveria Figtree) | Substituir tokens de cor e trocar fonte para Figtree (web e mobile) | `frontend/web/src/app/layout.tsx`, `globals.css`; `frontend/mobile/app/**` |
+| `[ ]` | A6 | API de mensagens (`api.mensagens.*`) aponta para rota inexistente no backend | Alinhar com a Fase 1 (criar rota) ou marcar como código futuro até existir | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
+| `[ ]` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/app/(painel)/layout.tsx` |
+| `[ ]` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5; adicionar `react-dom`/`react-native-web` | `frontend/mobile/package.json` |
+| `[x]` | A9 | Web: `next@15.3.4` afetado pela CVE-2025-66478 (RCE crítico no RSC, CVSS 10.0) — descoberto no `npm install` | Atualizado `next` e `eslint-config-next` para `15.3.6` (patch da linha 15.3.x); dev server reiniciado e validado | `frontend/web/package.json` |
+
+### 🟡 Médios
+
+| Status | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----------|----------|-----------|
+| `[ ]` | M1 | Falta validação Pydantic de tamanho/força (senha sem `min_length`; campos sem `max_length` → 500 em overflow) | Adicionar `Field(max_length=...)` alinhado às colunas e `min_length` na senha | `backend/app/rotas/Usuarios.py`, `Chamados.py` |
+| `[ ]` | M2 | `IntegrityError` no cadastro não tratado (corrida TOCTOU no check de email) | Capturar `IntegrityError` e retornar 400, confiando na constraint `unique` | `backend/app/rotas/Usuarios.py` |
+| `[ ]` | M3 | Magic strings `"Gerente"/"Supervisor"` em vez do enum `UsuarioFuncao` | Comparar com `UsuarioFuncao.Gerente`/`.Supervisor` | `backend/app/rotas/Chamados.py` |
+| `[ ]` | M4 | `echo=True` fixo no engine (loga todo SQL em produção) | Tornar configurável via env (`echo=configuracoes.DEBUG`) | `backend/app/banco_dados.py` |
+| `[ ]` | M5 | `Config` (Pydantic v1), `datetime.utcnow` deprecado e colunas `DateTime` naive | Migrar para `ConfigDict`; usar `datetime.now(timezone.utc)` + `DateTime(timezone=True)` | `backend/app/modelos/*.py`, `rotas/*.py`, `configuracoes.py` |
+| `[ ]` | M6 | Web: rewrite/proxy em `next.config.ts` configurado mas nunca usado (depende de CORS aberto) | Escolher estratégia (usar `/api/...` via rewrite ou remover) e centralizar base URL | `frontend/web/next.config.ts`, `lib/api.ts` |
+| `[ ]` | M7 | Web: `Record<string,string>` em vez dos enums; `err: any` em catch; `erro.detail` não tipado (quebra em 422) | Tipar com `Record<ChamadoStatus, ...>`; normalizar `detail` array/string; `err instanceof Error` | `frontend/web/src/app/(painel)/chamados/page.tsx`, `lib/api.ts` |
+| `[ ]` | M8 | Web: `token()` duplicado entre `api.ts` e `auth.ts` (duas fontes de verdade) | `api.ts` importa e usa `auth.token()` | `frontend/web/src/lib/api.ts` |
+| `[ ]` | M9 | Web: arquivos CSS sem nenhum comentário (viola regra do `CLAUDE.md`) | Adicionar cabeçalho e comentar blocos (especialmente `:root` de tokens) | `frontend/web/src/app/**/*.css` |
+| `[ ]` | M10 | Mobile: `chamados.tsx`/`perfil.tsx` sem `catch` → erros engolidos silenciosamente | Adicionar `catch` com estado de erro e botão "Tentar novamente" | `frontend/mobile/app/(tabs)/chamados.tsx`, `perfil.tsx` |
+| `[ ]` | M11 | Mobile: paleta de cinzas/feedback fora dos tokens; Figtree não carregada | Substituir pelos tokens Ink; carregar Figtree via `expo-font` | `frontend/mobile/app/**` |
+
+### 🟢 Baixos
+
+| Status | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----------|----------|-----------|
+| `[ ]` | B1 | Raios de canto fora da escala (cards 10/12 em vez de 8; inputs 10) | Padronizar 8px em cards, conforme design system | web e mobile (CSS/estilos) |
+| `[ ]` | B2 | `useEffect` de fetch sem cleanup/AbortController (web e mobile) | Adicionar `AbortController`/flag de montagem no cleanup | `chamados/page.tsx` (web), telas mobile |
+| `[ ]` | B3 | Web: faltam `error.tsx` e `not-found.tsx` (sem fallback de erro) | Criar `app/error.tsx` e `app/not-found.tsx` | `frontend/web/src/app/` |
+| `[ ]` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
+| `[ ]` | B5 | A11y: foco de teclado removido (web); navegação sem `aria-label`/`aria-current`; estados sem `aria-live` | Usar `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
+| `[ ]` | B6 | Backend: JWT sem `iat/iss/aud`; hasher de senha duplicado; `@app.on_event` deprecado | Adicionar claims; centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
+
+### 📄 Documentação (divergências com o código real)
+
+| Status | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----------|----------|-----------|
+| `[ ]` | D1 | Divergência de enums: doc cita `AutorTipo: Humano/IA/Sistema` mas código usa `Cliente/Supervisor/Funcionario/IA/Sistema` | Padronizar doc com o código (ou vice-versa, definir fonte de verdade) | `plano-implementacao.md`, `tecnico-backend.md` |
+| `[ ]` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Padronizar para o calendário correto | `docs/changelog.md` |
+| `[ ]` | D3 | Texto espúrio "oi" e "atualização em tempo real" enganoso | Remover "oi"; ajustar texto para "pull-to-refresh" | `docs/visao-geral.md` |
+| `[ ]` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports (resolver junto de C1/C2) | Atualizar comando de execução após corrigir imports | `docs/tecnico-backend.md` |
+
+---
+
 ## Fase 1 — Chat (base do produto)
 
 > Desbloqueia o produto inteiro. Implementar antes de qualquer outra fase.
