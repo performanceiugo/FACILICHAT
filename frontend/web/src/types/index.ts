@@ -1,11 +1,11 @@
 // Tipos TypeScript espelhando os modelos do backend (Python/FastAPI)
 // Manter sincronizados com os enums e schemas definidos em backend/app/modelos/
 
-// Perfis de acesso do sistema
-export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'Gerente'
+// Perfis de acesso do sistema — os 7 perfis definidos pelo branding (docs/FaciliChat-Regras/)
+export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'RH' | 'Financeiro' | 'Gestor' | 'Superadmin'
 
 // Filas de atendimento dos chamados
-export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro'
+export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro' | 'Comercial'
 
 // Ciclo de vida de um chamado
 export type ChamadoStatus = 'Recebido' | 'EmAndamento' | 'Agendado' | 'Concluido' | 'Cancelado'
@@ -19,6 +19,7 @@ export type AutorTipo = 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Siste
 // Dados públicos de um usuário retornados pela API
 export interface Usuario {
   ID: string
+  EmpresaID: string  // Tenant ao qual o usuário pertence (Fase 0.7)
   Nome: string
   Email: string
   Funcao: UsuarioFuncao
@@ -29,6 +30,7 @@ export interface Usuario {
 // Dados de um chamado retornados pela API
 export interface Chamado {
   ID: string
+  EmpresaID: string  // Tenant do chamado (Fase 0.7)
   ClienteID: string
   Fila: ChamadoFila
   Categoria: string
@@ -49,12 +51,15 @@ export interface Mensagem {
   Criacao: string
 }
 
-// Resposta do endpoint de login — contém o token e dados básicos do usuário
+// Resposta do endpoint de login — contém o token e dados básicos do usuário.
+// O tenant (empresa_id) vem sempre do token/login — o frontend nunca escolhe ou envia a Empresa.
 export interface TokenResposta {
   token_acesso: string
   tipo_token: string
   funcao: UsuarioFuncao
   nome: string
+  empresa_id: string
+  empresa_nome: string | null
 }
 
 // Payload enviado ao criar um novo chamado

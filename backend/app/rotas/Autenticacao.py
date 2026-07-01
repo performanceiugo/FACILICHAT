@@ -4,12 +4,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from jose import JWTError, jwt
 from pwdlib import PasswordHash
 from datetime import datetime, timedelta
 from app.banco_dados import obterBancoDados
 from app.modelos.Usuarios import Usuario
+from app.modelos.Empresa import Empresa
 from app.configuracoes import configuracoes
 import uuid
 
@@ -21,12 +22,15 @@ pwd = PasswordHash.recommended()
 # Informa ao FastAPI onde está o endpoint de login para o fluxo OAuth2 (exibido no Swagger)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/autenticacao/login")
 
-# Gera um token JWT com o ID e função do usuário, válido pelo tempo configurado em JWT_EXPIRE_MINUTES
-def criarToken(usuarioID: str, funcao: str) -> str:
+# Gera um token JWT com o ID, função e tenant (Empresa) do usuário, válido pelo tempo configurado
+# em JWT_EXPIRE_MINUTES. O empresa_id viaja no token para que o front nunca precise informar o
+# tenant (regra da Fase 0.7 — "tenant vem do token").
+def criarToken(usuarioID: str, funcao: str, empresaID: str) -> str:
     expiracao = datetime.utcnow() + timedelta(minutes=configuracoes.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": usuarioID,  # subject: identificador único do usuário
         "funcao": funcao,
+        "empresa_id": empresaID,
         "exp": expiracao
     }
     return jwt.encode(payload, configuracoes.JWT_SECRET, algorithm=configuracoes.JWT_ALGORITHM)
@@ -51,6 +55,30 @@ async def obterUsuarioAtual(
         raise HTTPException(status_code=401, detail="Usuário não encontrado")
     return usuario
 
+# Dependência leve — extrai só o tenant (EmpresaID) do token, sem carregar o Usuario inteiro do banco.
+# Existe separada de obterUsuarioAtual para rotas/serviços que só precisam do escopo do tenant
+# (ex.: filtros de query), evitando um SELECT extra quando o usuário completo não é necessário.
+async def obterTenantAtual(token: str = Depends(oauth2_scheme)) -> uuid.UUID:
+    try:
+        payload = jwt.decode(token, configuracoes.JWT_SECRET, algorithms=[configuracoes.JWT_ALGORITHM])
+        empresaID = payload.get("empresa_id")
+        if not empresaID:
+            raise HTTPException(status_code=401, detail="Token sem tenant")
+        return uuid.UUID(empresaID)
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+
+# Dependência que entrega uma sessão de banco já escopada ao tenant via RLS (trava secundária,
+# ver backend/app/rls.sql): define a variável de sessão Postgres `app.empresa_id` a partir do
+# token ANTES de qualquer query da rota rodar. Rotas que leem/gravam dados sensíveis a tenant devem
+# preferir esta dependência a `obterBancoDados` puro sempre que praticável.
+async def obterBancoDadosComTenant(
+    empresaID: uuid.UUID = Depends(obterTenantAtual),
+    db: AsyncSession = Depends(obterBancoDados),
+):
+    await db.execute(text("SET LOCAL app.empresa_id = :empresa_id"), {"empresa_id": str(empresaID)})
+    yield db
+
 # POST /autenticacao/login — recebe email e senha, retorna o token JWT e dados básicos do usuário
 @roteador.post("/login")
 async def login(
@@ -64,10 +92,18 @@ async def login(
     if not usuario or not pwd.verify(formulario.password, usuario.SenhaHash):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
-    token = criarToken(str(usuario.ID), usuario.Funcao.value)
+    token = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
+
+    # Nome da Empresa vai junto na resposta do login (não no JWT) só para exibição na UI
+    # (ex.: "Admin · Cefram" no cabeçalho do painel) — o backend nunca confia nesse campo depois.
+    resultadoEmpresa = await db.execute(select(Empresa).where(Empresa.ID == usuario.EmpresaID))
+    empresa = resultadoEmpresa.scalar_one_or_none()
+
     return {
         "token_acesso": token,
         "tipo_token": "bearer",
         "funcao": usuario.Funcao.value,
-        "nome": usuario.Nome
+        "nome": usuario.Nome,
+        "empresa_id": str(usuario.EmpresaID),
+        "empresa_nome": empresa.Nome if empresa else None,
     }

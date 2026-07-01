@@ -118,7 +118,7 @@
 |--------|----|----------|----------|-----------|
 | `[ ]` | M1 | Falta validação Pydantic de tamanho/força (senha sem `min_length`; campos sem `max_length` → 500 em overflow) | Adicionar `Field(max_length=...)` alinhado às colunas e `min_length` na senha | `backend/app/rotas/Usuarios.py`, `Chamados.py` |
 | `[ ]` | M2 | `IntegrityError` no cadastro não tratado (corrida TOCTOU no check de email) | Capturar `IntegrityError` e retornar 400, confiando na constraint `unique` | `backend/app/rotas/Usuarios.py` |
-| `[ ]` | M3 | Magic strings `"Gerente"/"Supervisor"` em vez do enum `UsuarioFuncao` | Comparar com `UsuarioFuncao.Gerente`/`.Supervisor` | `backend/app/rotas/Chamados.py` |
+| `[x]` | M3 | Magic strings `"Gerente"/"Supervisor"` em vez do enum `UsuarioFuncao` | Comparar com `UsuarioFuncao.Gestor`/`.Supervisor` (corrigido junto da Fase 0.6, já usando o nome novo `Gestor`) | `backend/app/rotas/Chamados.py` |
 | `[ ]` | M4 | `echo=True` fixo no engine (loga todo SQL em produção) | Tornar configurável via env (`echo=configuracoes.DEBUG`) | `backend/app/banco_dados.py` |
 | `[ ]` | M5 | `Config` (Pydantic v1), `datetime.utcnow` deprecado e colunas `DateTime` naive | Migrar para `ConfigDict`; usar `datetime.now(timezone.utc)` + `DateTime(timezone=True)` | `backend/app/modelos/*.py`, `rotas/*.py`, `configuracoes.py` |
 | `[ ]` | M6 | Web: rewrite/proxy em `next.config.ts` configurado mas nunca usado (depende de CORS aberto) | Escolher estratégia (usar `/api/...` via rewrite ou remover) e centralizar base URL | `frontend/web/next.config.ts`, `lib/api.ts` |
@@ -138,6 +138,7 @@
 | `[ ]` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
 | `[ ]` | B5 | A11y: foco de teclado removido (web); navegação sem `aria-label`/`aria-current`; estados sem `aria-live` | Usar `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
 | `[ ]` | B6 | Backend: JWT sem `iat/iss/aud`; hasher de senha duplicado; `@app.on_event` deprecado | Adicionar claims; centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
+| `[ ]` | B7 | Painel web (Next.js, pensado para desktop do Gestor) ainda não foi validado em navegador mobile (breakpoints, sidebar, tabelas largas) | Analisar no futuro o enquadramento responsivo do painel web em telas de navegador mobile e ajustar CSS/layout onde necessário | `frontend/web/src/app/painel/**` |
 
 ### 📄 Documentação (divergências com o código real)
 
@@ -164,15 +165,15 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Renomear `Gerente` → **`Gestor`** no enum e em todo o código (rotas, comparações, claim do JWT, frontend `isGerente`→`isGestor`, scripts) | `backend/app/modelos/Usuarios.py`, `rotas/*.py`, `frontend/**` |
-| `[ ]` | Adicionar perfis **`RH`** e **`Financeiro`** ao `UsuarioFuncao` (back-office, com filas próprias) | `backend/app/modelos/Usuarios.py` + tipos do front |
-| `[ ]` | Adicionar **`Superadmin`** (a Iugo Performance, que opera a plataforma — ver Fase 0.7) | `backend/app/modelos/Usuarios.py` |
-| `[ ]` | Manter **`Funcionário` como perfil único** (sem subtipos: limpeza/portaria/zelador têm a mesma experiência) — decisão de produto do branding | — |
+| `[x]` | Renomear `Gerente` → **`Gestor`** no enum e em todo o código (rotas, comparações, claim do JWT, frontend `isGerente`→`isGestor`, scripts) | `backend/app/modelos/Usuarios.py`, `rotas/*.py`, `frontend/**` |
+| `[x]` | Adicionar perfis **`RH`** e **`Financeiro`** ao `UsuarioFuncao` (back-office, com filas próprias) | `backend/app/modelos/Usuarios.py` + tipos do front |
+| `[x]` | Adicionar **`Superadmin`** (a Iugo Performance, que opera a plataforma — ver Fase 0.7) | `backend/app/modelos/Usuarios.py` |
+| `[x]` | Manter **`Funcionário` como perfil único** (sem subtipos: limpeza/portaria/zelador têm a mesma experiência) — decisão de produto do branding | — |
 
 ### Filas / roteamento
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Adicionar fila **`Comercial`** (contratos/propostas, roteada ao Gestor) ao `ChamadoFila` | `backend/app/modelos/Chamados.py` + tipos do front |
+| `[x]` | Adicionar fila **`Comercial`** (contratos/propostas, roteada ao Gestor) ao `ChamadoFila` | `backend/app/modelos/Chamados.py` + tipos do front |
 
 ### Regras de negócio do branding a incorporar
 | Status | Item | Arquivo(s) |
@@ -210,23 +211,23 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Modelo `Empresa` (tenant): `Nome`, `CNPJ`, `Status` (Ativa/Suspensa), `Criacao` | `backend/app/modelos/Empresa.py` (novo) |
-| `[ ]` | Adicionar `EmpresaID` (FK, NOT NULL) em `Usuario`, `Condominio`, `Chamado`, `Mensagem` — e em **toda tabela futura** | `backend/app/modelos/*.py` |
-| `[ ]` | Incluir o `EmpresaID` no payload do JWT no login | `backend/app/rotas/Autenticacao.py` |
-| `[ ]` | Dependência `obterTenantAtual` — extrai o tenant do token; injetada em todas as rotas | `backend/app/rotas/Autenticacao.py` |
-| `[ ]` | **Todas** as queries filtram por `EmpresaID` do usuário logado (chamados, usuários, etc.) | `backend/app/rotas/*.py` |
-| `[ ]` | Row-Level Security (RLS) no PostgreSQL como segunda trava (defesa em profundidade) | migrações / `banco_dados.py` |
-| `[ ]` | Papéis por tenant (o **Gestor** é gestor **da sua** Empresa, não global) | `backend/app/rotas/*.py` |
-| `[ ]` | Nível **Superadmin da plataforma** (Iugo Performance): cadastrar/suspender Empresas e criar o 1º Gestor de cada uma | `backend/app/rotas/Plataforma.py` (novo) |
-| `[ ]` | `scripts/criar_empresa.py` — cria Empresa + 1º Gestor juntos (substitui/estende o `criar_gerente.py`) | `backend/scripts/` |
+| `[x]` | Modelo `Empresa` (tenant): `Nome`, `CNPJ`, `Status` (Ativa/Suspensa), `Criacao` | `backend/app/modelos/Empresa.py` (novo) |
+| `[x]` | Adicionar `EmpresaID` (FK, NOT NULL) em `Usuario`, `Chamado`, `Mensagem` — `Condominio` recebe o campo já ao nascer na Fase 7 | `backend/app/modelos/*.py` |
+| `[x]` | Incluir o `EmpresaID` no payload do JWT no login | `backend/app/rotas/Autenticacao.py` |
+| `[x]` | Dependência `obterTenantAtual` — extrai o tenant do token; e `obterBancoDadosComTenant` para RLS | `backend/app/rotas/Autenticacao.py` |
+| `[x]` | **Todas** as queries filtram por `EmpresaID` do usuário logado (chamados, usuários, etc.) | `backend/app/rotas/*.py` |
+| `[x]` | Row-Level Security (RLS) no PostgreSQL como segunda trava (defesa em profundidade) | `backend/app/rls.sql`, `backend/scripts/aplicar_rls.py` (novos) |
+| `[x]` | Papéis por tenant (o **Gestor** é gestor **da sua** Empresa, não global) | `backend/app/rotas/Usuarios.py`, `Chamados.py` |
+| `[ ]` | Nível **Superadmin da plataforma** (Iugo Performance): cadastrar/suspender Empresas e criar o 1º Gestor de cada uma | `backend/app/rotas/Plataforma.py` (novo) — **fora de escopo desta entrega** (script `criar_empresa.py` cobre o bootstrap; UI/rotas de Superadmin ficam para quando houver demanda) |
+| `[x]` | `scripts/criar_empresa.py` — cria Empresa + 1º Gestor juntos (substitui `criar_gerente.py`, removido) | `backend/scripts/` |
 
 ### Frontend (web e mobile)
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Tenant vem do token (o front não envia); exibir a Empresa atual no cabeçalho | web e mobile |
-| `[ ]` | Área de **Superadmin** (web) para gerenciar Empresas (separada do painel da empresa) | `frontend/web/src/app/(plataforma)/...` (novo) |
-| `[ ]` | Tipos: adicionar `Empresa` e `EmpresaID` (web e mobile) | `frontend/web/src/types/index.ts`, `frontend/mobile/lib/types.ts` |
+| `[x]` | Tenant vem do token (o front não envia); Empresa (ID e nome) guardados em `auth.ts`, exibição no cabeçalho fica para o `AdminShell` (painel do gestor) | `frontend/web/src/lib/auth.ts` |
+| `[ ]` | Área de **Superadmin** (web) para gerenciar Empresas (separada do painel da empresa) | `frontend/web/src/app/(plataforma)/...` (novo) — **fora de escopo desta entrega**, ver nota acima |
+| `[x]` | Tipos: `EmpresaID`/`empresa_nome` adicionados a `Usuario`/`Chamado`/`TokenResposta` (web). Mobile só sincronizou `UsuarioFuncao`/`ChamadoFila` (Fase 0.6) — sem UI multi-tenant no mobile, fora do escopo desta entrega | `frontend/web/src/types/index.ts` |
 
 ---
 

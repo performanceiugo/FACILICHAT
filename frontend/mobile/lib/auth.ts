@@ -30,13 +30,13 @@ export const auth = {
     await SecureStore.deleteItemAsync('nome')
   },
 
-  async isGerente(): Promise<boolean> {
-    return (await SecureStore.getItemAsync('funcao')) === 'Gerente'
+  async isGestor(): Promise<boolean> {
+    return (await SecureStore.getItemAsync('funcao')) === 'Gestor'
   },
 
-  // Supervisores e gerentes têm acesso às funcionalidades de supervisão
+  // Supervisores e gestores têm acesso às funcionalidades de supervisão
   async isSupervisor(): Promise<boolean> {
     const f = await SecureStore.getItemAsync('funcao')
-    return f === 'Supervisor' || f === 'Gerente'
+    return f === 'Supervisor' || f === 'Gestor'
   },
 }

@@ -5,6 +5,70 @@
 
 ---
 
+## [0.6.5] — 1 de julho de 2026
+
+### Domínio — Fase 0.7 aplicada (fundação SaaS multi-tenant)
+- **Modelo `Empresa`** (`backend/app/modelos/Empresa.py`, novo) — o tenant do SaaS (`Nome`, `CNPJ`,
+  `Status` Ativa/Suspensa).
+- **`EmpresaID` (FK NOT NULL)** adicionado a `Usuario`, `Chamado` e `Mensagem`. Toda rota que cria ou
+  lista esses registros agora escopa pelo `EmpresaID` do usuário autenticado — regra de ouro do
+  multi-tenant aplicada em `GET/POST/PATCH /chamados/*` e `POST /usuarios/*`.
+- **JWT carrega `empresa_id`** (`backend/app/rotas/Autenticacao.py`) — o frontend nunca escolhe nem
+  envia o tenant, só lê do token/login. Duas dependências novas: `obterTenantAtual` (extrai só o
+  tenant, sem carregar o `Usuario`) e `obterBancoDadosComTenant` (define `app.empresa_id` na sessão
+  do Postgres antes da rota rodar, para a RLS).
+- **Row-Level Security (RLS)** — `backend/app/rls.sql` (políticas `FORCE ROW LEVEL SECURITY` em
+  `Usuarios`/`Chamados`/`Mensagens`, usando `current_setting('app.empresa_id')`) e
+  `backend/scripts/aplicar_rls.py` para aplicar. Trava secundária — o filtro por aplicação continua
+  sendo a primeira linha de defesa.
+- **Bootstrap multi-tenant**: `backend/scripts/criar_empresa.py` (novo) substitui
+  `backend/scripts/criar_gerente.py` (removido) — cria a Empresa e o 1º Gestor numa transação só.
+  `backend/scripts/semear_chamados.py` atualizado para semear dados dentro da primeira Empresa
+  existente em vez de usuários "soltos".
+- **Frontend web**: `TokenResposta`/`Usuario`/`Chamado` ganham `EmpresaID`; `auth.ts` guarda
+  `empresaId`/`empresaNome` (exibição no cabeçalho do painel fica para a Milestone do `AdminShell`).
+- **Cadastro público (`POST /usuarios/`) precisa de `EmpresaID` explícito no payload** — paliativo
+  documentado no código: sem tenant no token (rota não autenticada), não há como resolver a Empresa
+  sozinho ainda; um fluxo real de convite/onboarding por Empresa é trabalho da Fase 7.
+- **Por quê:** fundação obrigatória (Fase 0.7, `PRIORITÁRIO`) antes de construir qualquer tela nova do
+  painel do gestor — evita criar tabelas (`Proposta`, `Condominio`) sem isolamento por tenant.
+- **Decisão operacional:** como o ambiente ainda não tem dado de produção, o banco de dev é
+  **resetado** (em vez de introduzir Alembic) para recriar o schema já com `EmpresaID NOT NULL` —
+  decisão confirmada com o usuário antes da implementação.
+
+---
+
+## [0.6.4] — 1 de julho de 2026
+
+### Domínio — Fase 0.6 aplicada em código (alinhamento com o branding)
+- **`UsuarioFuncao` migrado para os 7 perfis do branding**: `Gerente` renomeado para **`Gestor`**;
+  adicionados **`RH`**, **`Financeiro`** e **`Superadmin`**. Atualizado em
+  `backend/app/modelos/Usuarios.py`, nas checagens de autorização de `backend/app/rotas/Usuarios.py`
+  e `backend/app/rotas/Chamados.py`, nos tipos e no `auth.ts`/`isGestor()` do frontend web
+  (`frontend/web/src/types/index.ts`, `frontend/web/src/lib/auth.ts`) e do mobile
+  (`frontend/mobile/lib/types.ts`, `frontend/mobile/lib/auth.ts`) — contrato de JWT/tipos mantido
+  sincronizado nas duas pontas.
+- **Fila `Comercial` adicionada a `ChamadoFila`** (`backend/app/modelos/Chamados.py`) — chamados
+  roteados a essa fila alimentam a futura tela de Alertas comerciais/Propostas (Fase 6).
+- **Correção de segurança residual (item M3 da Fase 0.5)**: `GET /chamados/` comparava o papel do
+  usuário com string literal `"Gerente"` em vez do enum `UsuarioFuncao` — trocado para comparação
+  tipada `UsuarioFuncao.Gestor`/`.Supervisor`, eliminando o risco de digitação silenciosa.
+- **Por quê:** pré-requisito da Fase 0.7 (fundação multi-tenant) e das telas do "painel do dono", que
+  dependem dos perfis e da fila corretos existirem antes de construir a UI sobre eles — evita
+  retrabalho, conforme a ordem de prioridade definida em `docs/plano-implementacao.md`.
+- **Nota:** `backend/scripts/criar_gerente.py` ainda referencia `UsuarioFuncao.Gerente` e ficará
+  quebrado até ser substituído por `criar_empresa.py` na Fase 0.7 (próxima entrega desta mesma sessão).
+
+---
+
+## [0.6.3] — 1 de julho de 2026
+
+### Processo / DevX
+- **Nova skill `/subir-projeto`** (`.claude/skills/subir-projeto/SKILL.md`) — runbook que sobe o FaciliChat de ponta a ponta para análise em funcionamento: pré-voo do Docker Desktop, criação do `frontend/web/.env.local`, `docker compose up -d --build` (Postgres + API FastAPI com healthcheck e criação automática das tabelas), seed idempotente do primeiro Gestor via `scripts/criar_gerente.py` dentro do container, `npm run dev` do web e abertura no navegador (Swagger `/docs` + login do painel) para validação visual. Objetivo: o usuário só pede "suba o projeto" e o agente coloca tudo no ar. O mobile (Expo) fica fora do fluxo por exigir emulador/dispositivo.
+- **Novo script de seed de análise `backend/scripts/semear_chamados.py`** — popula o banco com dados realistas para inspeção do produto em funcionamento: 4 clientes de demonstração (cada um em um condomínio), 1 supervisor e 12 chamados cobrindo as 3 filas (Operacional/RH/Financeiro), todos os status (Recebido/EmAndamento/Agendado/Concluído/Cancelado) e as 4 prioridades, cada chamado com o histórico de chat (Mensagens) preenchido — Cliente, Supervisor e mensagens do Sistema narrando as mudanças de status. É idempotente (não duplica em reexecuções). Não altera nenhuma regra de negócio; apenas insere dados usando os modelos/enums existentes. Login dos clientes demo: `<nome>@demo.facilichat.dev` / `Senha123`.
+
+---
+
 ## [0.6.2] — 27 de junho de 2026
 
 ### Processo / governança

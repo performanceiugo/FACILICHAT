@@ -47,7 +47,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
 
         <nav className={styles.nav}>
           <Link href="/painel/chamados" className={styles.link}>Chamados</Link>
-          {/* Link "Usuários" visível apenas para Supervisor e Gerente */}
+          {/* Link "Usuários" visível apenas para Supervisor e Gestor */}
           {ehSupervisor && (
             <Link href="/painel/usuarios" className={styles.link}>Usuários</Link>
           )}

@@ -1,5 +1,5 @@
 # Rotas de gerenciamento de chamados (solicitações de serviço)
-# Clientes criam chamados; supervisores e gerentes visualizam todos; clientes veem apenas os seus
+# Clientes criam chamados; supervisores e gestores visualizam todos; clientes veem apenas os seus
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ class ChamadoCriar(BaseModel):
 # Schema de saída — campos retornados ao frontend após criar ou listar chamados
 class ChamadoSaida(BaseModel):
     ID: uuid.UUID
+    EmpresaID: uuid.UUID
     ClienteID: uuid.UUID
     Fila: ChamadoFila
     Categoria: str
@@ -43,6 +44,7 @@ async def criarChamado(
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
     chamado = Chamado(
+        EmpresaID=usuarioAtual.EmpresaID,  # regra de ouro do multi-tenant: nasce escopado ao tenant do criador
         ClienteID=usuarioAtual.ID,
         Fila=payload.Fila,
         Categoria=payload.Categoria,
@@ -54,19 +56,22 @@ async def criarChamado(
     await db.refresh(chamado)
     return chamado
 
-# GET /chamados/ — lista chamados; gerentes e supervisores veem todos, clientes veem apenas os seus
+# GET /chamados/ — lista chamados; gestores e supervisores veem todos, clientes veem apenas os seus
 @roteador.get("/", response_model=list[ChamadoSaida])
 async def listarChamados(
     db: AsyncSession = Depends(obterBancoDados),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
-    if usuarioAtual.Funcao.value in ("Gerente", "Supervisor"):
-        # Acesso total: retorna todos os chamados em ordem cronológica decrescente
-        resultado = await db.execute(select(Chamado).order_by(Chamado.Criacao.desc()))
+    # Regra de ouro do multi-tenant: toda consulta é filtrada pela Empresa do usuário logado,
+    # antes de qualquer outra regra de visibilidade por papel.
+    consulta = select(Chamado).where(Chamado.EmpresaID == usuarioAtual.EmpresaID)
+    if usuarioAtual.Funcao in (UsuarioFuncao.Gestor, UsuarioFuncao.Supervisor):
+        # Acesso total dentro da Empresa: retorna todos os chamados em ordem cronológica decrescente
+        resultado = await db.execute(consulta.order_by(Chamado.Criacao.desc()))
     else:
         # Acesso restrito: cliente vê apenas os chamados que ele mesmo abriu
         resultado = await db.execute(
-            select(Chamado)
+            consulta
             .where(Chamado.ClienteID == usuarioAtual.ID)
             .order_by(Chamado.Criacao.desc())
         )
@@ -80,12 +85,16 @@ async def atualizarStatus(
     db: AsyncSession = Depends(obterBancoDados),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
-    # Autorização: mudar status é operação interna — só Supervisor e Gerente podem.
+    # Autorização: mudar status é operação interna — só Supervisor e Gestor podem.
     # Impede que um Cliente altere o status de qualquer chamado (falha de IDOR).
-    if usuarioAtual.Funcao not in (UsuarioFuncao.Supervisor, UsuarioFuncao.Gerente):
+    if usuarioAtual.Funcao not in (UsuarioFuncao.Supervisor, UsuarioFuncao.Gestor):
         raise HTTPException(status_code=403, detail="Sem permissão para alterar o status do chamado")
 
-    resultado = await db.execute(select(Chamado).where(Chamado.ID == chamadoID))
+    # Filtra também por EmpresaID: impede que alguém altere um chamado de outro tenant só por
+    # adivinhar/enumerar o UUID (IDOR entre empresas).
+    resultado = await db.execute(
+        select(Chamado).where(Chamado.ID == chamadoID, Chamado.EmpresaID == usuarioAtual.EmpresaID)
+    )
     chamado = resultado.scalar_one_or_none()
     if not chamado:
         raise HTTPException(status_code=404, detail="Chamado não encontrado")

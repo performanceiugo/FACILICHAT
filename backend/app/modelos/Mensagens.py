@@ -23,6 +23,7 @@ class Mensagem(Base):
     __tablename__ = "Mensagens"
 
     ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    EmpresaID = Column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
     ChamadoID = Column(UUID(as_uuid=True), ForeignKey("Chamados.ID"), nullable=False)
     AutorID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True)  # Nulo quando AutorTipo é IA ou Sistema
     AutorTipo = Column(SAEnum(AutorTipo), nullable=False)

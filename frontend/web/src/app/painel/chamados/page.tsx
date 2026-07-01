@@ -1,7 +1,7 @@
 'use client'
 
 // Página de listagem de chamados do painel web
-// Gerentes e supervisores veem todos os chamados; clientes veem apenas os seus (filtro no backend)
+// Gestores e supervisores veem todos os chamados; clientes veem apenas os seus (filtro no backend)
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'

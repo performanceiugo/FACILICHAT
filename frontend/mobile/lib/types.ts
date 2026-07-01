@@ -1,11 +1,11 @@
 // Tipos TypeScript espelhando os modelos do backend (Python/FastAPI)
 // Arquivo idêntico ao web/src/types/index.ts — manter os dois sincronizados com o backend
 
-// Perfis de acesso do sistema
-export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'Gerente'
+// Perfis de acesso do sistema — os 7 perfis definidos pelo branding (docs/FaciliChat-Regras/)
+export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'RH' | 'Financeiro' | 'Gestor' | 'Superadmin'
 
 // Filas de atendimento dos chamados
-export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro'
+export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro' | 'Comercial'
 
 // Ciclo de vida de um chamado
 export type ChamadoStatus = 'Recebido' | 'EmAndamento' | 'Agendado' | 'Concluido' | 'Cancelado'

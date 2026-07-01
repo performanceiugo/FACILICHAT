@@ -9,11 +9,14 @@ import uuid
 import enum
 from datetime import datetime
 
-# Filas de atendimento — cada chamado é direcionado a uma das três equipes
+# Filas de atendimento — cada chamado é direcionado a uma das quatro equipes.
+# Nota: esta fila (roteamento do chamado) é um enum separado do UsuarioFuncao (perfil do usuário);
+# os nomes RH/Financeiro coincidem propositalmente, mas não são a mesma coisa.
 class ChamadoFila(str, enum.Enum):
     Operacional = "Operacional"  # Manutenção, limpeza, portaria, etc.
     RH = "RH"                   # Questões de pessoal e recursos humanos
     Financeiro = "Financeiro"    # Cobranças, pagamentos e taxas condominiais
+    Comercial = "Comercial"      # Oportunidade de venda/serviço extra — roteada ao Gestor
 
 # Ciclo de vida de um chamado: Recebido → Em Andamento → Agendado → Concluído / Cancelado
 class ChamadoStatus(str, enum.Enum):
@@ -35,6 +38,7 @@ class Chamado(Base):
     __tablename__ = "Chamados"
 
     ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    EmpresaID = Column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
     ClienteID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=False)   # Quem abriu o chamado
     SupervisorID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True) # Responsável atribuído (opcional)
     Fila = Column(SAEnum(ChamadoFila), nullable=False)
