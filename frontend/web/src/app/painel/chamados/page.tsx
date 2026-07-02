@@ -17,12 +17,14 @@ const STATUS_LABEL: Record<string, string> = {
   Cancelado: 'Cancelado',
 }
 
-// Cores de destaque para cada nível de prioridade
+// Cores de destaque para cada nível de prioridade — tokens do design system.
+// "Crítica" não tem roxo no DS: usa o vermelho mais intenso (danger-700) para se
+// distinguir de "Alta" (danger-500) mantendo-se dentro da paleta da marca.
 const PRIORIDADE_COR: Record<string, string> = {
-  Baixa: '#16a34a',   // verde
-  Media: '#d97706',   // amarelo
-  Alta: '#dc2626',    // vermelho
-  Critica: '#7c3aed', // roxo
+  Baixa: 'var(--success-500)',  // verde
+  Media: 'var(--warning-500)',  // âmbar
+  Alta: 'var(--danger-500)',    // vermelho
+  Critica: 'var(--danger-700)', // vermelho intenso
 }
 
 export default function ChamadosPage() {

@@ -62,7 +62,7 @@
 .botao {
   padding: .75rem;
   background: var(--primario);
-  color: #fff;
+  color: var(--text-onbrand);
   border: none;
   border-radius: 8px;
   font-size: 1rem;

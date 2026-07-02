@@ -1,0 +1,91 @@
+/* AdminShell.module.css — estilo da casca do painel (sidebar + conteúdo).
+   Ancorado nos tokens do design system (globals.css): cores, espaçamento --sp-*,
+   raio --r-*, tipografia. Visual da navegação segue o padrão .nav* do design system. */
+
+.wrapper {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar fixa à esquerda, largura do design system (264px no DS; mantém 240px do layout atual) */
+.sidebar {
+  width: 240px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-6) var(--sp-5);
+  gap: var(--sp-4);
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+}
+
+/* Marca no topo da sidebar */
+.logo {
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-bold);
+  color: var(--brand-blue);
+  padding: 0 var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1;
+}
+
+/* Item de menu — estado de repouso discreto, hover com fundo azul sutil do DS */
+.link {
+  padding: 9px var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.link:hover {
+  background: var(--blue-50);
+  color: var(--blue-700);
+}
+
+/* Rodapé com identificação do usuário e logout */
+.rodape {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--sp-4);
+}
+
+.nomeUsuario {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  padding: 0 var(--sp-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.botaoSair {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.botaoSair:hover { background: var(--bg-subtle); }
+
+/* Área de conteúdo, deslocada para não ficar sob a sidebar fixa */
+.conteudo {
+  margin-left: 240px;
+  padding: var(--sp-8);
+  flex: 1;
+}

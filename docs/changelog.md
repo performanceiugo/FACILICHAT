@@ -7,6 +7,27 @@
 
 ## [não versionado] — 2 de julho de 2026
 
+### Painel do gestor — Milestone 2: fundação visual (design system no web)
+- **Escopo:** portar o design system do comercial para o `frontend/web`, base para as 8 telas do painel
+  do Gestor (Milestone 3). Mudança cosmética/refatoração — não toca regra de negócio.
+- **Tokens (`frontend/web/src/app/globals.css`):** o `:root` (que tinha só 9 cores, com a primária
+  **errada** `#1a56db`) foi substituído pelo conjunto completo de `docs/FaciliChat-Regras/FaciliChat-Design-System.html`:
+  escalas azul (`--blue-*`, primária correta **#148AF5**) e ink, feedback, semânticos de
+  superfície/texto/borda, tipografia, espaçamento (`--sp-*`), raio (`--r-*`), sombras e motion. Os 9
+  nomes antigos viraram **aliases** para os novos tokens, mantendo as telas atuais funcionando.
+- **Fonte (`layout.tsx`):** **Geist → Figtree** via `next/font/google` (pesos 300–800), a fonte oficial
+  do design system, exposta como `--font-figtree`/`--font-sans`.
+- **Cores hardcoded corrigidas (teste de fumaça):** o mapa `PRIORIDADE_COR` em `chamados/page.tsx`
+  passou a usar tokens (Crítica usa `--danger-700`, já que o DS não tem roxo); `#fff` do botão de login
+  virou `--text-onbrand`.
+- **`AdminShell` (`frontend/web/src/components/painel/AdminShell.tsx` + `.module.css`, novos):** a
+  sidebar/navegação/guarda de sessão saiu de `painel/layout.tsx` para um componente reutilizável
+  (primeira peça de `src/components/`, que não existia); `painel.module.css` (órfão) foi removido.
+- **Verificação:** `next build` compila, tipos válidos, Figtree carrega e as 6 rotas geram; nenhuma
+  referência a `Geist` ou à cor antiga restante.
+- **Plano/ClickUp:** item **A5** → `[~]` (metade web feita; tokens/Figtree do **mobile** seguem
+  pendentes); subtarefa `868k60v2e` movida para `🚧 em andamento`.
+
 ### Integração do plano com o ClickUp (board como espelho vivo do roadmap)
 - **Só planejamento/infra de acompanhamento** — nenhuma linha de código de produto alterada.
 - **Board ClickUp "Roadmap de Implementação"** (`list_id 901114027434`, space "Operações Internas" ›

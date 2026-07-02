@@ -24,28 +24,43 @@ frontend/web/src/
 ├── lib/
 │   ├── api.ts              ← todas as chamadas para o backend
 │   └── auth.ts             ← leitura e gravação do token JWT
+├── components/
+│   └── painel/
+│       ├── AdminShell.tsx        ← casca do painel (sidebar + nav + guarda de sessão)
+│       └── AdminShell.module.css
 └── app/                    ← Next.js App Router
-    ├── layout.tsx           ← layout raiz (fonte, metadata)
-    ├── globals.css          ← variáveis CSS globais
+    ├── layout.tsx           ← layout raiz (fonte Figtree via next/font, metadata)
+    ├── globals.css          ← tokens do design system (:root) + reset
     ├── page.tsx             ← redireciona / → /login
     ├── (auth)/
     │   └── login/
     │       ├── page.tsx     ← tela de login
     │       └── login.module.css
-    └── (painel)/
-        ├── layout.tsx       ← sidebar + proteção de rota
-        ├── painel.module.css
+    └── painel/              ← pasta real (não route group), URLs /painel/*
+        ├── layout.tsx       ← delega para <AdminShell> (proteção de rota + sidebar)
         └── chamados/
             ├── page.tsx     ← listagem de chamados
             └── chamados.module.css
 ```
 
+### Design system (tokens)
+
+O `app/globals.css` contém o `:root` com o **design system do comercial** portado de
+`docs/FaciliChat-Regras/FaciliChat-Design-System.html` (fonte da verdade): escalas de cor
+(`--blue-*` com a primária **#148AF5**, `--ink-*`), feedback (`--success/warning/danger-*`),
+semânticos (`--bg-*`, `--text-*`, `--border-*`), tipografia (`--fs-*`, `--fw-*`), espaçamento
+(`--sp-*`, escala 4px), raio (`--r-*`), sombras (`--shadow-*`) e motion. **Use sempre esses
+tokens** em novos CSS Modules — nunca cores/medidas hardcoded. Há aliases de compatibilidade
+(`--primario`, `--fundo`, `--texto`…) apontando para os tokens novos, para código legado.
+A fonte **Figtree** (pesos 300–800) é carregada via `next/font/google` em `layout.tsx` e exposta
+como `--font-figtree`/`--font-sans`.
+
 ### Como adicionar uma nova tela no painel
 
-1. Criar pasta em `src/app/(painel)/nome-da-tela/`
+1. Criar pasta em `src/app/painel/nome-da-tela/`
 2. Criar `page.tsx` com `'use client'` se tiver interação
-3. A proteção de rota já é feita automaticamente pelo `layout.tsx` do painel
-4. Adicionar o link na sidebar em `(painel)/layout.tsx`
+3. A proteção de rota já é feita automaticamente pelo `AdminShell` (via `painel/layout.tsx`)
+4. Adicionar o link na sidebar dentro de `components/painel/AdminShell.tsx`
 
 ### Padrão do cliente HTTP (`lib/api.ts`)
 
@@ -187,5 +202,5 @@ isolados. O que muda nos frontends:
 
 ---
 
-*Última atualização: 27 de junho de 2026*
+*Última atualização: 2 de julho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*
