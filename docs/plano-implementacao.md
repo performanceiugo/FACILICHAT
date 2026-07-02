@@ -34,16 +34,29 @@
 | 2 | Criar chamado e detalhe (cliente) | ⬜ Na fila |
 | 3 | Fila e operação do supervisor (mobile) | ⬜ Na fila |
 | 4 | Dashboard do gestor (web) | ⬜ Na fila |
+| 4.5 | Catálogo de Serviços e Parceiros | ⬜ Na fila · **NOVA (discovery)** |
 | 5 | IA (classificação, roteamento e narração) | ⬜ Na fila |
+| 5.5 | Governança e guardrails da IA | ⬜ Na fila · **NOVA (discovery)** |
 | 6 | Alertas comerciais e propostas | ⬜ Na fila |
 | 7 | Gestão de Empresas e Condomínios (telas/CRUD) | ⬜ Na fila |
 | 8 | MVP 02: Visitas Técnicas | ⬜ Na fila |
 | 9 | Upload de arquivos | ⬜ Na fila |
 | 10 | Notificações push | ⬜ Na fila |
+| 11 | Experiência do Funcionário (canal único, voz/foto, sensor de campo) | ⬜ Na fila · **NOVA (discovery)** |
+| — | Adiados (pós-MVP): privacidade por tópico, integração ERP | ⬜ Registrado |
 
-> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1–6 → 7 → 8–10**, encaixando as correções
-> pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são fundação e vêm antes
-> das features. O detalhe de cada fase está na Parte 2.
+> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1–4 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
+> encaixando as correções pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são
+> fundação e vêm antes das features. As Fases 4.5, 5.5 e 11 saíram do material de discovery (jornadas +
+> How Might We + Governança de IA em `docs/FaciliChat-Regras/`) revisado em 02/07/2026. O detalhe de
+> cada fase está na Parte 2.
+
+> **⚠️ Convenção de nomes (ler antes de modelar qualquer coisa desta revisão):** os documentos de
+> discovery usam **personas e exemplos ilustrativos** (nomes de pessoas, de serviços, de parceiros,
+> valores). **Nada disso vira nome fixo, enum ou constante no código.** Personas mapeiam apenas aos 7
+> **perfis** já canônicos (`UsuarioFuncao`); serviços, parceiros, regras de RH/Financeiro, categorias e
+> similares são **dados configuráveis por Empresa, armazenados no banco** (linhas de tabela), nunca
+> hard-coded. Só são "fixos" no código os enums já definidos nos invariantes do `CLAUDE.md`.
 
 ---
 ---
@@ -178,7 +191,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 ### Regras de negócio do branding a incorporar
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | **Tickets irmãos:** uma mensagem pode gerar 2 chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto), sem o usuário precisar saber das filas | modelo/serviço de chamados + IA |
+| `[ ]` | **Tickets irmãos:** uma mensagem pode gerar 2+ chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto), sem o usuário precisar saber das filas | modelo/serviço de chamados + IA |
+| `[ ]` | **Modelar o vínculo dos tickets irmãos:** campo de agrupamento no `Chamado` (ex.: `GrupoOrigemID`/`AvisoOrigemID`) que liga chamados nascidos do mesmo aviso humano — permite a cada área ver só a sua fatia e o Gestor ver o conjunto | `backend/app/modelos/Chamados.py` |
 | `[ ]` | **Cliente = Condomínio/contrato** com um responsável (síndico): evoluir o campo texto `Condominio` para entidade (detalhado na Fase 7) | `backend/app/modelos/` |
 | `[ ]` | **IA detecta intenção de compra, nunca inventa preço/prazo** (invariante inegociável do branding) — já previsto na Fase 5; reforçar | `backend/app/servicos/ia.py` |
 
@@ -243,6 +257,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | Schemas Pydantic: `MensagemCriar` e `MensagemSaida` | `backend/app/rotas/Mensagens.py` |
 | `[ ]` | Registrar router `/mensagens` no `main.py` | `backend/app/main.py` |
 | `[ ]` | WebSocket por chamado: `GET /ws/chamados/{id}` — broadcast para participantes | `backend/app/rotas/WebSocket.py` (novo) |
+| `[ ]` | **Confirmação automática "Recebido"** ao abrir chamado — mensagem de sistema imediata (jornada do Cliente e do Funcionário: certeza de ter sido ouvido antes de qualquer atraso) | `backend/app/rotas/Chamados.py`/`Mensagens.py` |
+| `[ ]` | **Mensagens de voz e foto como primeira classe** — `Mensagem` aceita `Tipo` (Texto/Audio/Imagem) e conteúdo de mídia; entrada por voz/foto vale igual a texto (baixa intimidade digital do Funcionário). Storage detalhado na Fase 9 | `backend/app/modelos/Mensagens.py` + rotas |
 | `[ ]` | Atualizar `docs/tecnico-backend.md` com as novas rotas | `docs/tecnico-backend.md` |
 
 ### Frontend Web
@@ -303,6 +319,9 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `PATCH /chamados/{id}/agendar` — salvar executor, data/hora, observação ao cliente | `backend/app/rotas/Chamados.py` |
 | `[ ]` | Campo `NotaInterna` no modelo `Chamado` (nunca exposta ao cliente) | `backend/app/modelos/Chamados.py` |
 | `[ ]` | `PATCH /chamados/{id}/concluir` — transição para Concluido + dispara mensagem automática | `backend/app/rotas/Chamados.py` |
+| `[ ]` | **Fechamento em pouquíssimos toques** (jornada do Supervisor: "concluir precisa ser mais leve que mandar um WhatsApp") — revisar UX de conclusão para caber em 1–2 toques | `frontend/mobile/app/(supervisor)/**` |
+| `[ ]` | **Aprovação do cliente encerra o ticket** — o Cliente aprova a conclusão no chat (campo `AprovadoEm` no `Chamado`); distinto da Visita Técnica, que o cliente **não** aprova | `backend/app/modelos/Chamados.py`, rotas |
+| `[ ]` | **Agenda do dia com prioridade visual sobre a fila** — ao abrir o app, o Supervisor vê primeiro onde precisa estar (visitas de hoje) e depois o que precisa resolver (tickets) | `frontend/mobile/app/(supervisor)/**` |
 
 ### Frontend Mobile
 
@@ -326,6 +345,9 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `GET /relatorios/visao-geral` — retorna: total abertos, SLA estourado, 1ª resposta média, resolução média | `backend/app/rotas/Relatorios.py` (novo) |
 | `[ ]` | `GET /relatorios/supervisores` — lista supervisores com: abertos, atrasados, 1ª resposta média | `backend/app/rotas/Relatorios.py` |
 | `[ ]` | `GET /chamados/?supervisor_id={id}` — fila de um supervisor específico (para o gestor ver) | `backend/app/rotas/Chamados.py` |
+| `[ ]` | **Alerta de gargalo "parado há tempo demais"** — chamado sem movimentação acima de um limite (o limite é **configurável por Empresa**, ex.: guardado como campo/config do tenant; **não** hard-coded) sobe como alerta no painel do Gestor. "Tempo parado" é **derivado** de `Atualizacao`, não coluna | `backend/app/rotas/Relatorios.py` |
+| `[ ]` | **Alerta de cobertura descoberta** — posto/turno sem responsável confirmado vira alerta de atenção | `backend/app/rotas/Relatorios.py` |
+| `[ ]` | **Desempenho por supervisor com lastro** — métrica derivada do fechamento de chamados (recebidos/resolvidos/parados por supervisor e por fila), não de impressão | `backend/app/rotas/Relatorios.py` |
 
 ### Frontend Web
 
@@ -334,10 +356,39 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | Página `/painel` redirecionada para `/painel/visao-geral` | `frontend/web/src/app/(painel)/page.tsx` |
 | `[ ]` | Página `visao-geral` — cards de KPIs (abertos, SLA em risco, 1ª resposta, resolução) | `frontend/web/src/app/(painel)/visao-geral/page.tsx` (novo) |
 | `[ ]` | Seção "Desempenho por supervisor" — tabela com nome, abertos, 1ª resposta, estado (vermelho/verde) | (dentro de visao-geral) |
-| `[ ]` | Seção "Volume por categoria" — Limpeza, Portaria, Jardinagem, Serviço extra, Reclamação | (dentro de visao-geral) |
+| `[ ]` | Seção "Volume por categoria" — categorias vêm **dos dados** (agregação das categorias reais dos chamados da Empresa), não de uma lista fixa no código | (dentro de visao-geral) |
+| `[ ]` | **Hierarquia do painel: urgente → tendência → detalhe** — o que exige ação agora aparece primeiro; tendência em segundo nível; detalhe sob demanda (evita "parede de números") | (dentro de visao-geral) |
+| `[ ]` | **Painel "O que precisa da sua atenção"** — lista de alertas (crítico / atenção / oportunidade) com atalho do alerta direto para o chamado/conversa (sem garimpo) | (dentro de visao-geral) |
 | `[ ]` | Página `supervisores` — cards clicáveis; clique expande a fila daquele supervisor | `frontend/web/src/app/(painel)/supervisores/page.tsx` (novo) |
 | `[ ]` | Página `tickets` — tabela completa com filtros: período, supervisor, status, categoria; busca por cliente | `frontend/web/src/app/(painel)/tickets/page.tsx` (novo) |
 | `[ ]` | Adicionar links no sidebar: Visão geral / Supervisores / Todos os tickets / Alertas | `frontend/web/src/app/(painel)/layout.tsx` |
+
+---
+
+## Fase 4.5 — Catálogo de Serviços e Parceiros 🆕 [discovery: Governança de IA]
+
+> **Origem:** documento de Governança de IA em `docs/FaciliChat-Regras/`. O **catálogo é a fonte da
+> verdade comercial** de cada Empresa e o **portão obrigatório** que a IA consulta antes de sinalizar
+> qualquer oportunidade (Fase 5). Sem catálogo, a IA não tem o que oferecer.
+>
+> **Regra de modelagem:** serviços e parceiros são **dados por Empresa (linhas de tabela)**, nunca
+> nomes fixos no código. **Não há campo de preço** — preço é decisão humana do Gestor (invariante da IA).
+
+### Backend
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Modelo `Parceiro` (executor terceirizado): `EmpresaID`, `Nome`, `Contato` (opcional) | `backend/app/modelos/Parceiro.py` (novo) |
+| `[ ]` | Modelo `CatalogoServico`: `EmpresaID`, `Nome`, `Tipo` (Proprio/Parceria), `ParceiroID` (opcional, só se Parceria), `Oferece` (bool). **Sem campo de valor/preço** | `backend/app/modelos/CatalogoServico.py` (novo) |
+| `[ ]` | CRUD do catálogo e de parceiros — escopado à Empresa; edição só do **Gestor** (e Superadmin no onboarding) | `backend/app/rotas/Catalogo.py` (novo) |
+
+### Frontend Web (Gestor)
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Tela "Catálogo de serviços" — listar/adicionar/editar/ativar-desativar serviço (nome, tipo próprio/parceria, parceiro, oferece) | `frontend/web/src/app/painel/catalogo/page.tsx` (novo) |
+| `[ ]` | Tela "Parceiros" — listar/adicionar/editar parceiros | `frontend/web/src/app/painel/parceiros/page.tsx` (novo) |
+| `[ ]` | Tipos TS `CatalogoServico`/`Parceiro` sincronizados com o backend | `frontend/web/src/types/index.ts` |
 
 ---
 
@@ -353,8 +404,42 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | Ao criar chamado (`POST /chamados/`): chamar `ia_classificar` e preencher campos automaticamente | `backend/app/rotas/Chamados.py` |
 | `[ ]` | Serviço `ia_narrar_status(chamado)` — gera mensagem de sistema quando status muda | `backend/app/servicos/ia.py` |
 | `[ ]` | Ao atualizar status: criar `Mensagem` automática com `AutorTipo = IA` | `backend/app/rotas/Chamados.py` |
+| `[ ]` | **Roteamento por intenção → fila correta**, incluindo **tickets irmãos** (um aviso → N chamados em filas distintas) usando o vínculo de grupo da Fase 0.6 | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
 | `[ ]` | Serviço `ia_detectar_oportunidade(mensagem)` — detecta intenção de serviço extra | `backend/app/servicos/ia.py` |
-| `[ ]` | Se oportunidade detectada: criar alerta comercial (campo `AlertaComercial` no Chamado ou tabela separada) | `backend/app/modelos/` |
+| `[ ]` | **Portão do catálogo (obrigatório):** ao detectar intenção, a IA **consulta o `CatalogoServico` da Empresa** (Fase 4.5). Serviço no catálogo → registra oportunidade; **fora do catálogo → silêncio comercial** (registra só como observação operacional para a supervisão, não oferece nada ao cliente) | `backend/app/servicos/ia.py` |
+| `[ ]` | Modelo `Oportunidade` (entidade própria, não campo no Chamado): `EmpresaID`, `ChamadoID`, `ServicoID`, `Status` (Nova/Vista/PropostaConstruida/Rejeitada), `Criacao`. A IA **nunca cita preço** — só sinaliza | `backend/app/modelos/Oportunidade.py` (novo) |
+
+---
+
+## Fase 5.5 — Governança e guardrails da IA 🆕 [discovery: Governança de IA]
+
+> **Origem:** documento de Governança de IA em `docs/FaciliChat-Regras/`. Formaliza **o que a IA pode e
+> não pode fazer** — não como instrução solta no prompt, mas como **camada verificável** (guardrails +
+> validação de resposta + auditoria). Princípio fundador: **"geração ancorada"** — a IA só fala o que um
+> humano cadastrou (campo de ticket, regra na base, serviço no catálogo).
+
+### Backend — guardrails e validação
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | **Matriz de permissões por perfil** (7 perfis × pode/não-pode) traduzida em guardrails aplicados **antes** de gerar cada resposta | `backend/app/servicos/ia_governanca.py` (novo) |
+| `[ ]` | **Validação pós-geração** de toda resposta da IA antes de enviar: não contém preço? só cita serviço do catálogo? não promete prazo não registrado? não responde regra de RH/Financeiro não cadastrada? não fala em nome de humano? | `backend/app/servicos/ia_governanca.py` |
+| `[ ]` | **Log de auditoria de decisões da IA** — registra intenção detectada, consulta ao catálogo/base e ação tomada (rastreabilidade e confiança) | `backend/app/modelos/IaAuditoria.py` (novo) |
+| `[ ]` | Reforçar isolamento multi-tenant na IA — toda consulta da IA filtrada por `EmpresaID` (nunca cruza Empresas) | `backend/app/servicos/ia*.py` |
+
+### Backend — base de regras (RH / Financeiro)
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Modelo `BaseRegra`: `EmpresaID`, `Area` (RH/Financeiro), `Chave`/`Pergunta`, `Resposta` — conhecimento **cadastrado por Empresa**, nunca hard-coded | `backend/app/modelos/BaseRegra.py` (novo) |
+| `[ ]` | IA **responde dúvida recorrente** (ex.: 2ª via de holerite, vale) só a partir da `BaseRegra`; **regra ausente → encaminha** para a fila humana em vez de inventar | `backend/app/servicos/ia.py` |
+| `[ ]` | CRUD da base de regras — RH edita a sua, Financeiro a sua (escopado por Empresa e por área) | `backend/app/rotas/Regras.py` (novo) |
+
+### Frontend Web
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Tela de "Base de regras" (RH e Financeiro) — cadastrar/editar perguntas e respostas recorrentes | `frontend/web/src/app/painel/regras/page.tsx` (novo) |
 
 ---
 
@@ -364,8 +449,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 | Status | Item | Arquivo(s) |
 |--------|------|-----------|
-| `[ ]` | Modelo `Proposta`: campos ChamadoID, Titulo, Escopo, Prazo, Valor, Status (Rascunho/Enviada/Aprovada/Recusada) | `backend/app/modelos/Proposta.py` (novo) |
-| `[ ]` | `GET /propostas/alertas` — oportunidades detectadas aguardando proposta | `backend/app/rotas/Propostas.py` (novo) |
+| `[ ]` | Modelo `Proposta`: campos ChamadoID, `OportunidadeID` (vínculo à `Oportunidade` da Fase 5), Titulo, Escopo, Prazo, Valor, Status (Rascunho/Enviada/Aprovada/Recusada). **O `Valor` é preenchido pelo Gestor** — a IA nunca o gera | `backend/app/modelos/Proposta.py` (novo) |
+| `[ ]` | `GET /propostas/alertas` — lista as `Oportunidade`s (Status=Nova) aguardando decisão/proposta do Gestor | `backend/app/rotas/Propostas.py` (novo) |
 | `[ ]` | `POST /propostas/` — criar e enviar proposta no chat do cliente | `backend/app/rotas/Propostas.py` |
 | `[ ]` | `PATCH /propostas/{id}/status` — cliente aprova ou recusa | `backend/app/rotas/Propostas.py` |
 
@@ -471,6 +556,51 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 ---
 
+## Fase 11 — Experiência do Funcionário (canal único) 🆕 [discovery: Jornada do Funcionário]
+
+> **Origem:** jornada do Funcionário em `docs/FaciliChat-Regras/`. Hoje o perfil Funcionário quase não
+> existe no produto. A jornada exige um app **radicalmente simples** (celular simples, dados limitados,
+> preferência por voz/foto): "se for mais difícil que o WhatsApp, ele não usa".
+>
+> **Reaproveita:** roteamento por intenção e tickets irmãos (Fase 5), voz/foto no chat (Fases 1 e 9),
+> base de regras e resposta automática (Fase 5.5). Esta fase é a **experiência do Funcionário** montada
+> sobre essas fundações. **Funcionário é perfil único** (sem subtipos) — invariante do `CLAUDE.md`.
+
+### Frontend Mobile (Funcionário)
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | Canal único de comunicação com entrada mínima — um só campo que aceita **texto, voz e foto**; zero formulário obrigatório | `frontend/mobile/app/(funcionario)/**` (novo) |
+| `[ ]` | Confirmação "Recebido" visível imediatamente após enviar (reaproveita a Fase 1) | (dentro do canal) |
+| `[ ]` | Navegação por abas do funcionário (roteamento dinâmico por `Funcao`, como o supervisor na Fase 3) | `frontend/mobile/app/(funcionario)/_layout.tsx` (novo) |
+
+### Fluxos de aviso do Funcionário (backend + IA)
+
+| Status | Item | Arquivo(s) |
+|--------|------|-----------|
+| `[ ]` | **Atestado/falta → tickets irmãos** (RH valida + Supervisor cobre o posto) a partir de um único aviso | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
+| `[ ]` | **Sensor de campo** — observação do funcionário vira `Oportunidade` **via portão do catálogo** (Fase 5), sem transformar o funcionário em vendedor e sem preço | `backend/app/servicos/ia.py` |
+| `[ ]` | **Reposição de insumo** — aviso simples ("está acabando") vira chamado rastreável para a área responsável; detalhes (item/quantidade) estruturados nos bastidores, não pedidos ao funcionário. (Integração ERP fica adiada — ver "Adiados") | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
+| `[ ]` | **Dúvida pessoal** (holerite, vale) — roteada à fila individual correta; resposta automática pela `BaseRegra` (Fase 5.5) quando cadastrada | `backend/app/servicos/ia.py` |
+
+> **Nota de modelagem:** os "tipos de aviso" acima (atestado/falta, sensor de campo, reposição, dúvida
+> pessoal) são **classificações de intenção detectadas pela IA e/ou um campo `Tipo`/`Categoria` no
+> chamado**, não telas/rotas fixas nem nomes hard-coded. A rota de origem é sempre o mesmo canal único.
+
+---
+
+## Adiados (pós-MVP) — registrados para não se perder
+
+> Decisões conscientes de **não fazer agora**, tiradas do material de discovery. Ficam registradas para
+> não sumirem; **não** entram no MVP.
+
+| Status | Item | Origem |
+|--------|------|--------|
+| `[ ]` | **Isolamento de privacidade por tópico** — hoje o Supervisor/Gestor enxergam todas as conversas. Restringir conteúdo sensível (atestado, folha, salário) por área/papel é evolução futura, a validar com usuários reais | Jornadas Funcionário/Dono + HMW |
+| `[ ]` | **Integração com ERP** — a reposição de insumo (Fase 11) pode, no futuro, baixar estoque / gerar reposição / cobrança automaticamente. Modelar já pensando nisso, sem implementar | Jornada do Funcionário |
+
+---
+
 ## Notas de arquitetura para consulta rápida
 
 ```
@@ -497,9 +627,24 @@ Status de chamado:    Recebido | EmAndamento | Agendado | Concluido | Cancelado
 Prioridades:          Baixa | Media | Alta | Critica
 Status de visita:     Agendada | EmAndamento | Finalizada | RelatorioEnviado
 AutorTipo mensagem:   Humano | IA | Sistema
+Tipo de mensagem:     Texto | Audio | Imagem  (voz/foto valem igual a texto — Fases 1/9)
 
-Regra da IA: só narra campos estruturados já definidos (status, datas, responsável).
-             Nunca inventa prazos nem fala em nome de um supervisor.
+Entidades novas (discovery, ainda não implementadas):
+  CatalogoServico:   por Empresa — Nome, Tipo(Proprio/Parceria), ParceiroID, Oferece  (SEM preço)  [Fase 4.5]
+  Parceiro:          por Empresa — Nome, Contato                                                    [Fase 4.5]
+  Oportunidade:      por Empresa — ChamadoID, ServicoID, Status(Nova/Vista/PropostaConstruida/...)  [Fase 5]
+  BaseRegra:         por Empresa — Area(RH/Financeiro), Chave, Resposta                             [Fase 5.5]
+  IaAuditoria:       log de decisões da IA (intenção, consulta, ação)                               [Fase 5.5]
+  Proposta:          ChamadoID, OportunidadeID, ... , Valor (preenchido pelo Gestor)                [Fase 6]
+
+Regra da IA (geração ancorada — só fala o que um humano cadastrou):
+  - Nunca inventa preço nem prazo; só narra campos estruturados (status, datas, responsável).
+  - Nunca oferece serviço fora do catálogo da Empresa (portão obrigatório).
+  - Nunca responde regra de RH/Financeiro não cadastrada (encaminha em vez de inventar).
+  - Nunca fala em nome de um humano; nunca cruza dados entre Empresas.
+
+Nomes de personas/serviços/parceiros dos docs de discovery são EXEMPLOS — viram DADOS no banco,
+nunca nome fixo/enum/constante no código.
 ```
 
 ---

@@ -49,10 +49,27 @@ MVP02). É o material do comercial. **Nada implementado pode contrariá-lo.**
 
 **Antes de escrever qualquer código, leia `docs/plano-implementacao.md` na íntegra.**
 
+> ### 🚦 REGRA DE OURO DO FLUXO — nada é alterado sem estar no plano
+> **Nenhuma alteração de código pode ser feita se o item correspondente não estiver no
+> `docs/plano-implementacao.md`.** Esta verificação é **obrigatória e rotineira, a cada mudança** —
+> não é opcional nem "só na primeira vez".
+>
+> **Rotina obrigatória, toda vez que for mexer em algo:**
+> 1. **Abra `docs/plano-implementacao.md` e localize o item.** Se ele **não existe no plano, PARE.**
+>    Não implemente nada ainda.
+> 2. Se algo novo/necessário surgir (bug, refino, item descoberto), **primeiro adicione-o ao plano**
+>    (na fase certa, status `[ ]`) e **peça confirmação ao usuário** — só depois implemente.
+> 3. Só então siga o ciclo de status: `[ ]` → `[~]` ao iniciar → `[x]` ao concluir.
+>
+> O plano é a fonte da verdade da execução: **se não está no plano, não se faz.** A única exceção são
+> as mudanças puramente cosméticas/refatoração já previstas na Trava de Segurança acima (e mesmo essas
+> não podem contrariar um invariante).
+
 1. Verifique se o item que será implementado está listado e com status `[ ]` (na fila).
 2. Se estiver `[x]` (concluído), **não reimplemente** — leia o código existente antes de continuar.
 3. Se estiver `[~]` (em andamento), continue de onde parou — não crie duplicatas.
 4. Ao iniciar um item, mude seu status para `[~]`. Ao concluir, mude para `[x]`.
+5. Se o item **não estiver no plano**, adicione-o primeiro (com confirmação) — ver Regra de Ouro acima.
 
 ---
 

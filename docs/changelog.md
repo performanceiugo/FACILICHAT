@@ -5,6 +5,37 @@
 
 ---
 
+## [não versionado] — 2 de julho de 2026
+
+### Planejamento — incorporado o material de discovery (jornadas + How Might We + Governança de IA)
+- **Origem:** 7 documentos novos em `docs/FaciliChat-Regras/Novos arquivos/` (4 jornadas — Cliente,
+  Funcionário, Supervisor, Dono; 2 "How Might We"; 1 Governança de IA), material do Duplo Diamante
+  (fase Definir). Nenhum contraria os invariantes do `CLAUDE.md` — todos **reforçam** e **adicionam
+  escopo** antes ausente do plano.
+- **Só documentação/planejamento** — nenhuma linha de código alterada nesta entrega.
+- **`docs/plano-implementacao.md`:** adicionadas 3 fases novas e refinadas 5 existentes:
+  - **Fase 4.5 — Catálogo de Serviços e Parceiros** (novo): `CatalogoServico`/`Parceiro` por Empresa,
+    **sem campo de preço**; é o portão que a IA consulta antes de sinalizar oportunidade.
+  - **Fase 5.5 — Governança e guardrails da IA** (novo): matriz de 7 perfis (pode/não-pode) como camada
+    verificável, validação pós-geração, log de auditoria (`IaAuditoria`) e base de regras RH/Financeiro
+    (`BaseRegra`) para resposta automática de dúvidas recorrentes.
+  - **Fase 11 — Experiência do Funcionário** (novo): canal único com voz/foto, sensor de campo,
+    reposição de insumo e dúvida pessoal — perfil que quase não existia no plano.
+  - Refinos: Fase 0.6 (vínculo dos tickets irmãos), Fase 1 (confirmação "Recebido" + voz/foto como
+    primeira classe), Fase 3 (aprovação do cliente encerra o ticket, agenda com prioridade visual),
+    Fase 4 (alertas de gargalo/cobertura, desempenho por supervisor, hierarquia do painel), Fase 5
+    (portão do catálogo + entidade `Oportunidade`), Fase 6 (proposta ligada à `Oportunidade`).
+  - **Seção "Adiados (pós-MVP)"**: privacidade por tópico e integração ERP — registrados, fora do MVP.
+- **Convenção reforçada no plano:** personas e exemplos dos documentos (nomes de pessoas, serviços,
+  parceiros, valores) são **ilustrativos** — viram **dados configuráveis por Empresa no banco**, nunca
+  nome fixo/enum/constante no código. Só os enums já definidos nos invariantes são "fixos".
+- **Housekeeping:** removido `FaciliChat-Jornada-Dono_1.html` (duplicata idêntica, mesmo hash, de
+  `FaciliChat-Jornada-Dono.html`).
+- **Por quê:** deixar o backlog pronto e coerente com o material comercial **antes** de retomar código —
+  garante que cada nova tabela/rota já nasça com o escopo e o isolamento por tenant corretos.
+
+---
+
 ## [0.6.5] — 1 de julho de 2026
 
 ### Domínio — Fase 0.7 aplicada (fundação SaaS multi-tenant)
