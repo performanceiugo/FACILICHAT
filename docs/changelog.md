@@ -7,6 +7,26 @@
 
 ## [não versionado] — 2 de julho de 2026
 
+### Integração do plano com o ClickUp (board como espelho vivo do roadmap)
+- **Só planejamento/infra de acompanhamento** — nenhuma linha de código de produto alterada.
+- **Board ClickUp "Roadmap de Implementação"** (`list_id 901114027434`, space "Operações Internas" ›
+  folder "FaciliChat - Desenvolvimento") passou a refletir a realidade e ficou completo:
+  - **Progresso sincronizado:** as subtarefas já concluídas em código das Fases **0.6** (7 perfis, fila
+    Comercial) e **0.7** (fundação multi-tenant) e o item **M3** foram movidos para `✅ concluída`; as
+    tarefas-pai 0.6/0.7 ficaram `🚧 em andamento` (ainda têm itens `[ ]` de escopo futuro).
+  - **Fases de discovery criadas no board:** **4.5** (Catálogo), **5.5** (Governança de IA), **11**
+    (Experiência do Funcionário) e a seção **Adiados**, além de 14 itens extras de discovery espalhados
+    nas Fases 0.6/1/3/4/5 e do item **B7** (responsivo do painel web) que faltava.
+- **Fonte única do plano:** os `CU:` (IDs de subtarefa) foram embutidos em cada item do
+  `docs/plano-implementacao.md` (nova coluna **CU** nas tabelas e o `CU:` da pai em cada título de fase),
+  e o arquivo-espelho `docs/plano-implementacao_1_clickup.md` foi **removido** — agora há uma única
+  fonte da verdade dos IDs.
+- **Hook ativado:** `.claude/hooks/plano-clickup-reminder.js` simplificado (sem depender do
+  `clickup-sync-map.json` inexistente, que foi descartado) e **registrado** em `.claude/settings.json`
+  como `PostToolUse` (matcher `Edit|Write`) — a cada edição do plano, lembra de sincronizar o ClickUp.
+- **Por quê:** dar ao acompanhamento uma barra de progresso automática e confiável, sem duplicidade de
+  arquivos, para que fechar um item no código e no board seja um passo só.
+
 ### Planejamento — incorporado o material de discovery (jornadas + How Might We + Governança de IA)
 - **Origem:** 7 documentos novos em `docs/FaciliChat-Regras/Novos arquivos/` (4 jornadas — Cliente,
   Funcionário, Supervisor, Dono; 2 "How Might We"; 1 Governança de IA), material do Duplo Diamante
