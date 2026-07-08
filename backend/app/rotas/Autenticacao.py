@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 from pwdlib import PasswordHash
 from datetime import datetime, timedelta
 from app.banco_dados import obterBancoDados
@@ -46,10 +47,11 @@ async def obterUsuarioAtual(
         usuarioID = payload.get("sub")
         if not usuarioID:
             raise HTTPException(status_code=401, detail="Token inválido")
-    except JWTError:
+        usuarioUUID = uuid.UUID(usuarioID)
+    except (PyJWTError, ValueError):
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
-    resultado = await db.execute(select(Usuario).where(Usuario.ID == uuid.UUID(usuarioID)))
+    resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioUUID))
     usuario = resultado.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuário não encontrado")
@@ -65,7 +67,7 @@ async def obterTenantAtual(token: str = Depends(oauth2_scheme)) -> uuid.UUID:
         if not empresaID:
             raise HTTPException(status_code=401, detail="Token sem tenant")
         return uuid.UUID(empresaID)
-    except (JWTError, ValueError):
+    except (PyJWTError, ValueError):
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
 # Dependência que entrega uma sessão de banco já escopada ao tenant via RLS (trava secundária,

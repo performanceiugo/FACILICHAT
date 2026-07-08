@@ -7,6 +7,23 @@
 
 ## [não versionado] — 8 de julho de 2026
 
+### Segurança — auditoria Python e JWT
+- **Backend auditado com `pip-audit`** — o baseline local encontrou `ecdsa==0.19.2`
+  (`PYSEC-2026-1325` / `CVE-2024-23342`), trazido pelo ecossistema do `python-jose`.
+- **JWT migrado de `python-jose` para `PyJWT`** — como o backend usa JWT simétrico `HS256`,
+  removemos `python-jose`, `ecdsa`, `rsa` e `pyasn1` de `backend/requirements.txt` e passamos a usar
+  `PyJWT==2.13.0`.
+- **Auditoria final limpa** — após a troca, `python -m pip_audit -r backend/requirements.txt`
+  retornou `No known vulnerabilities found`.
+- **A1 corrigido** — `obterUsuarioAtual` agora converte o `sub` do token dentro do `try` e captura
+  `PyJWTError`/`ValueError`, retornando 401 para token malformado em vez de 500.
+- **`JWT_SECRET` endurecido** — a configuração agora recusa segredo curto ou placeholder na
+  inicialização; `.env.example` e `docs/setup.md` documentam a geração com `secrets.token_urlsafe(32)`.
+- **`.env` tolerante a BOM no Windows** — `backend/app/configuracoes.py` lê o arquivo como
+  `utf-8-sig`, evitando falha de inicialização quando editores/PowerShell salvam o `.env` com BOM.
+- **S5 corrigido: Postgres preso ao localhost** - `docker-compose.yml` agora publica o banco em
+  `127.0.0.1:5432:5432`, mantendo acesso local de desenvolvimento sem abrir o Postgres na rede.
+
 ### Planejamento — revisão de segurança e validação contra branding
 - **Só documentação/planejamento** — nenhuma linha de código de produto alterada.
 - **`docs/plano-implementacao.md`:** os achados da revisão de segurança foram convertidos em itens

@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: facilichat123
       POSTGRES_DB: facilichat_db
     ports:
-      - "5432:5432"
+      # Exposto apenas para localhost em dev; os containers usam a rede interna do Compose.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     # Healthcheck: só libera o backend depois que o Postgres aceitar conexões

@@ -81,7 +81,7 @@ tabela/rota deve nascer com `EmpresaID` — ver `docs/plano-implementacao.md`, F
 | SQLAlchemy | 2.0 | ORM assíncrono (banco de dados) |
 | asyncpg | 0.31 | Driver PostgreSQL assíncrono |
 | Alembic | 1.18 | Migrações de banco de dados |
-| python-jose | 3.5 | Geração e validação de JWT |
+| PyJWT | 2.13 | Geração e validação de JWT HS256 |
 | pwdlib | 0.3 | Hash de senhas (argon2) |
 | Anthropic SDK | 0.111 | Integração com IA da Anthropic |
 | pydantic-settings | 2.14 | Configuração via variáveis de ambiente |

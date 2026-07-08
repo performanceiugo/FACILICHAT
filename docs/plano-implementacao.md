@@ -156,7 +156,7 @@
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
-| `[ ]` | `868k60v1q` | A1 | `obterUsuarioAtual` retorna 500 (não 401) em token malformado | Mover conversão para dentro do try e capturar `(JWTError, ValueError)` | `backend/app/rotas/Autenticacao.py` |
+| `[x]` | `868k60v1q` | A1 | `obterUsuarioAtual` retorna 500 (não 401) em token malformado | Conversão de UUID dentro do try e captura `(PyJWTError, ValueError)` | `backend/app/rotas/Autenticacao.py` |
 | `[ ]` | `868k60v1x` | A3 | Web e mobile sem tratamento de 401/token expirado | No cliente HTTP, ao receber 401 → `auth.sair()` + redirecionar para login | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 | `[ ]` | `868k60v29` | A4 | Proteção de rota só client-side com flash de conteúdo (web) | Usar `middleware.ts` do Next; renderizar `null`/loader enquanto não autenticado | `frontend/web/src/middleware.ts` (novo), `(painel)/layout.tsx` |
 | `[~]` | `868k60v2e` | A5 | Design system violado: cor `#1a56db` (deveria `#148AF5`) e fonte Geist (deveria Figtree) | **Web feito** (tokens completos do DS em `globals.css` + Figtree via `next/font`); **mobile pendente** | `frontend/web/src/app/layout.tsx`, `globals.css`; `frontend/mobile/app/**` (mobile ainda) |
@@ -176,14 +176,14 @@
 | `[ ]` | `a-criar` | S2 | RLS existe, mas as rotas usam `obterBancoDados` puro; `SET LOCAL app.empresa_id` não é aplicado nas consultas normais | Migrar rotas sensíveis para `obterBancoDadosComTenant` ou fazer a sessão tenant-aware ser padrão; adicionar teste de isolamento entre Empresas | `backend/app/rotas/*.py`, `backend/app/rls.sql` |
 | `[ ]` | `a-criar` | S3 | Cadastro público permite escolher qualquer `EmpresaID` no payload | Substituir por convite/onboarding por Empresa; enquanto não houver convite, restringir ou desabilitar cadastro público em produção | `backend/app/rotas/Usuarios.py` |
 | `[ ]` | `a-criar` | S4 | Credenciais do Postgres fixas no `docker-compose.yml` e na `DATABASE_URL` do serviço backend | Mover credenciais para `.env`/`.env.example`, rotacionar senha local e documentar separação dev/staging/prod | `docker-compose.yml`, `docs/setup.md` |
-| `[ ]` | `a-criar` | S5 | Postgres publicado em `5432:5432`, abrindo o banco para o host/rede local | Remover publicação da porta ou prender em `127.0.0.1:5432:5432`; documentar exceção apenas para dev | `docker-compose.yml` |
+| `[x]` | `a-criar` | S5 | Postgres publicado em `5432:5432`, abrindo o banco para o host/rede local | Porta presa em `127.0.0.1:5432:5432` para manter acesso local de dev sem expor o banco na rede | `docker-compose.yml`, `docs/setup.md` |
 | `[ ]` | `a-criar` | S6 | JWT web armazenado em `localStorage`, aumentando impacto de XSS | Planejar migração para cookie `HttpOnly`, `Secure`, `SameSite` com estratégia de CSRF; manter `SecureStore` no mobile | `frontend/web/src/lib/auth.ts`, `frontend/web/src/lib/api.ts`, `backend/app/rotas/Autenticacao.py` |
 | `[ ]` | `a-criar` | S7 | Login e cadastro não têm rate limit, lockout ou atraso progressivo | Adicionar rate limiting por IP/email e resposta uniforme para credenciais inválidas; cobrir login e signup público/convite | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py` |
 | `[ ]` | `a-criar` | S8 | FastAPI expõe `/docs`, `/redoc` e `/openapi.json` por padrão | Tornar docs configuráveis por ambiente; desabilitar ou proteger em produção | `backend/app/main.py`, `backend/app/configuracoes.py` |
 | `[ ]` | `a-criar` | S9 | Ambiente Docker roda backend com `--reload`, volume de código e configuração de dev | Separar compose de dev e produção; produção sem reload, sem bind mount e com usuário/processo endurecido | `docker-compose.yml`, `backend/Dockerfile`, `docs/setup.md` |
 | `[ ]` | `a-criar` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Garantir que seed não rode em produção; exigir flag explícita de ambiente dev e registrar limpeza/rotação de dados demo | `backend/scripts/semear_chamados.py` |
 | `[ ]` | `a-criar` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
-| `[ ]` | `a-criar` | S12 | Dependências Python não têm auditoria automatizada no projeto | Adicionar `pip-audit`/equivalente ao fluxo local/CI e registrar baseline inicial | `backend/requirements.txt`, CI/docs |
+| `[~]` | `a-criar` | S12 | Dependências Python não têm auditoria automatizada no projeto | Baseline local executado com `pip-audit`; falta automatizar em CI/docs | `backend/requirements.txt`, CI/docs |
 
 ### 🟡 Médios
 

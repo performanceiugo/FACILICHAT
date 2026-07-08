@@ -34,6 +34,8 @@ Acesse a documentação interativa em **`http://localhost:8000/docs`** (Swagger)
 
 > **DATABASE_URL no Docker:** dentro dos containers o host do banco é `db` (não `localhost`).
 > O `docker-compose.yml` já injeta a `DATABASE_URL` correta automaticamente — não precisa mexer no `.env`.
+> A porta do Postgres fica exposta apenas em `127.0.0.1:5432` para ferramentas locais de desenvolvimento;
+> ela não deve ficar aberta em `0.0.0.0` na rede.
 
 ### Criar o primeiro Gerente (rodando dentro do container)
 
@@ -166,6 +168,10 @@ Para gerar um `JWT_SECRET` forte (com o venv ativado):
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
+
+O backend recusa `JWT_SECRET` curto, previsível ou placeholder na inicialização. Para HS256, use
+um valor aleatório com pelo menos 32 bytes por ambiente; se ele mudar, todos os tokens existentes
+deixam de ser válidos e os usuários precisam entrar novamente.
 
 ---
 
