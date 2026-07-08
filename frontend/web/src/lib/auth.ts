@@ -2,6 +2,7 @@
 // Armazena token, função, nome e o tenant (EmpresaID) no localStorage do navegador
 
 import type { TokenResposta, UsuarioFuncao } from '@/types'
+import { serializarCookie, serializarRemocaoCookie } from '@/lib/auth-storage'
 
 // Chaves usadas no localStorage — centralizadas para evitar erros de digitação
 const TOKEN_KEY = 'token'
@@ -14,6 +15,16 @@ const EMPRESA_NOME_KEY = 'empresaNome'  // Nome da Empresa, só para exibição 
 // No SSR do Next.js (servidor) o objeto `window` não existe, e acessar localStorage lançaria erro.
 const noNavegador = () => typeof window !== 'undefined'
 
+function salvarCookie(chave: string, valor: string) {
+  if (!noNavegador()) return
+  document.cookie = serializarCookie(chave, valor)
+}
+
+function removerCookie(chave: string) {
+  if (!noNavegador()) return
+  document.cookie = serializarRemocaoCookie(chave)
+}
+
 export const auth = {
   // Salva os dados de sessão após login bem-sucedido
   salvar(dados: TokenResposta) {
@@ -23,6 +34,8 @@ export const auth = {
     localStorage.setItem(NOME_KEY, dados.nome)
     localStorage.setItem(EMPRESA_ID_KEY, dados.empresa_id)
     localStorage.setItem(EMPRESA_NOME_KEY, dados.empresa_nome ?? '')
+    salvarCookie(TOKEN_KEY, dados.token_acesso)
+    salvarCookie(FUNCAO_KEY, dados.funcao)
   },
 
   token(): string | null {
@@ -66,6 +79,8 @@ export const auth = {
     localStorage.removeItem(NOME_KEY)
     localStorage.removeItem(EMPRESA_ID_KEY)
     localStorage.removeItem(EMPRESA_NOME_KEY)
+    removerCookie(TOKEN_KEY)
+    removerCookie(FUNCAO_KEY)
   },
 
   isGestor(): boolean {

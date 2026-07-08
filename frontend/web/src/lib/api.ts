@@ -14,19 +14,21 @@ import type {
   TokenResposta,
   Usuario,
 } from '@/types'
+import { auth } from '@/lib/auth'
 
 // URL base da API — configurada via variável de ambiente, com fallback para desenvolvimento local
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
-// Lê o token JWT salvo no localStorage (retorna null no servidor — Next.js SSR não tem window)
-function token(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('token')
+function redirecionarParaLoginPorSessaoExpirada() {
+  auth.sair()
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    window.location.assign('/login')
+  }
 }
 
 // Função genérica de requisição HTTP com tipagem — injeta token e trata erros da API
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const t = token()
+  const t = auth.token()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
@@ -34,6 +36,10 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
   if (t) headers['Authorization'] = `Bearer ${t}`
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    redirecionarParaLoginPorSessaoExpirada()
+    throw new Error('Sessao expirada. Faca login novamente.')
+  }
   if (!res.ok) {
     const erro = await res.json().catch(() => ({ detail: 'Erro desconhecido' }))
     throw new Error(erro.detail ?? 'Erro na requisição')

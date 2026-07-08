@@ -7,6 +7,23 @@
 
 ## [não versionado] — 8 de julho de 2026
 
+### Infraestrutura de acompanhamento — Sincronização do board ClickUp com o plano
+- **Board reconciliado com o `plano-implementacao.md`** — comparado o status de cada subtarefa do
+  ClickUp (`list_id 901114027434`) com o status esperado (`[x]`/`[~]`/`[ ]`) do plano; corrigidas 3
+  divergências onde o ClickUp estava atrás do código: `868k60v1q` (A1, já corrigido) e `868k60veu`
+  (Cliente = Condomínio/contrato) movidos para "✅ concluída", e a tarefa-pai da Fase 0.6
+  (`868k60vdy`) também movida para "✅ concluída" (todos os itens da fase já estavam feitos).
+- **Subtarefas de segurança e documentação criadas** — os itens `S1`–`S12` (revisão de segurança de
+  08/07/2026) e `D5`–`D8` (divergências de documentação) ainda não tinham subtarefa no ClickUp;
+  criadas todas como filhas de `868k60v1m` (Fase 0.5 pendente), com `S5` já como "✅ concluída" e
+  `S12` como "🚧 em andamento" (refletindo o estado real descrito no plano), as demais em
+  "📋 backlog". Os novos `CU:` foram gravados no `plano-implementacao.md` no lugar de `a-criar`.
+- **Anomalia encontrada (não corrigida)** — a tarefa `868k60w3y` ("Criar alerta comercial ao detectar
+  oportunidade") existe no board com status "📦 arquivada" mas não corresponde a nenhum item do
+  plano atual; mantida como está para o usuário decidir (arquivar de vez ou reaproveitar).
+- Motivação: manter o board como espelho fiel do plano (regra de ouro do `CLAUDE.md`), sem alterar
+  nenhum código de produto.
+
 ### Fase 0.6 — Tickets irmãos
 - **Vínculo de origem em chamados** — `Chamado` agora tem `GrupoOrigemID` opcional para ligar tickets
   nascidos do mesmo aviso/mensagem.
@@ -211,6 +228,35 @@
   `868k60vf7`, `868k60vfc` e `868k60vfg` foram movidos para a **Fase 8 — MVP 02: Visitas Técnicas**,
   onde essas capacidades serão implementadas de fato. A Fase 0.6 deixa de carregar pendências que
   dependem de fases posteriores para existir.
+
+---
+
+## [0.5.11] — 8 de julho de 2026
+
+### Frontend — tratamento de sessão expirada (A3)
+- **Web e mobile passaram a tratar `401/token expirado` no cliente HTTP centralizado**: ao receber
+  `401` em rotas autenticadas, ambos agora limpam a sessão local via `auth.sair()` e redirecionam o
+  usuário para a tela de login, evitando ficar preso em estado inválido com token vencido.
+- **Web:** `frontend/web/src/lib/api.ts` passou a reutilizar `auth.token()` e, em `401`, limpar a
+  sessão e redirecionar para `/login`.
+- **Mobile:** `frontend/mobile/lib/api.ts` passou a reutilizar `auth.token()` e, em `401`, limpar o
+  `SecureStore` e redirecionar para `/(auth)/login` via `expo-router`.
+
+---
+
+## [0.5.12] — 8 de julho de 2026
+
+### Frontend web — proteção de rota no servidor (A4)
+- **Rotas protegidas do web deixaram de depender só de guarda client-side**: foi adicionado
+  `frontend/web/src/middleware.ts` para interceptar `/painel/*`, `/plataforma/*` e `/login` antes do
+  render, evitando o flash de conteúdo protegido durante a hidratação.
+- **Sessão web passou a espelhar `token` e `funcao` em cookies legíveis pelo middleware**:
+  `frontend/web/src/lib/auth.ts` continua salvando no `localStorage`, mas agora também sincroniza esses
+  dois campos em cookie no login e os remove no logout.
+- **Regras aplicadas no middleware**:
+  `/painel/*` exige sessão e bloqueia `Superadmin` fora da área de plataforma;
+  `/plataforma/*` exige sessão de `Superadmin`;
+  `/login` redireciona usuários já autenticados para a área correta.
 
 ---
 
