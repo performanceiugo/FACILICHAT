@@ -69,7 +69,7 @@
 | 0 | Infraestrutura e base | `868k60uxe` | ✅ Concluída |
 | 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos concluídos; altos/médios/baixos/docs na fila; segurança 08/07 na fila |
 | 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo (7 perfis/fila) concluído; regras/refinos na fila · **PRIORITÁRIO** |
-| 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | 🟡 Fundação concluída; Superadmin da plataforma na fila · **PRIORITÁRIO** |
+| 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | ✅ Concluída |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
 | 2 | Criar chamado e detalhe (cliente) | `868k60vvt` | ⬜ Na fila |
 | 3 | Fila e operação do supervisor (mobile) | `868k60vx4` | ⬜ Na fila |
@@ -184,6 +184,7 @@
 | `[ ]` | `a-criar` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Garantir que seed não rode em produção; exigir flag explícita de ambiente dev e registrar limpeza/rotação de dados demo | `backend/scripts/semear_chamados.py` |
 | `[ ]` | `a-criar` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 | `[~]` | `a-criar` | S12 | Dependências Python não têm auditoria automatizada no projeto | Baseline local executado com `pip-audit`; falta automatizar em CI/docs | `backend/requirements.txt`, CI/docs |
+| `[x]` | `868ka61e5` | S13 | Faltava guia de produção para o `JWT_SECRET` (como gerar por ambiente e cadastrar como secret no provedor/CI, sem passar pelo Git) | Seção "Produção — JWT_SECRET e secrets por ambiente" adicionada ao `docs/setup.md` (geração PowerShell/Python/openssl, cadastro em VPS/provedor gerenciado/GitHub Actions, aviso de rotação) | `docs/setup.md` |
 
 ### 🟡 Médios
 
@@ -285,7 +286,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[x]` | `868k60vjt` | **Todas** as queries filtram por `EmpresaID` do usuário logado | `backend/app/rotas/*.py` |
 | `[x]` | `868k60vjw` | Row-Level Security (RLS) no PostgreSQL (defesa em profundidade) | `backend/app/rls.sql`, `backend/scripts/aplicar_rls.py` (novos) |
 | `[x]` | `868k60vk6` | Papéis por tenant (o **Gestor** é gestor **da sua** Empresa, não global) | `backend/app/rotas/Usuarios.py`, `Chamados.py` |
-| `[ ]` | `868k60vkz` | Nível **Superadmin da plataforma** (Iugo): cadastrar/suspender Empresas e criar o 1º Gestor — **fora de escopo desta entrega** (bootstrap via `criar_empresa.py`) | `backend/app/rotas/Plataforma.py` (novo) |
+| `[x]` | `868k60vkz` | Nível **Superadmin da plataforma** (Iugo): cadastrar/suspender Empresas e criar o 1º Gestor | `backend/app/rotas/Plataforma.py` (novo) |
 | `[x]` | `868k60vn1` | `scripts/criar_empresa.py` — cria Empresa + 1º Gestor juntos (substitui `criar_gerente.py`, removido) | `backend/scripts/` |
 
 ### Frontend (web e mobile)
@@ -293,7 +294,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[x]` | `868k60vn7` | Tenant vem do token; Empresa (ID e nome) guardados em `auth.ts`; exibição no cabeçalho fica para o `AdminShell` | `frontend/web/src/lib/auth.ts` |
-| `[ ]` | `868k60vnh` | Área de **Superadmin** (web) para gerenciar Empresas — **fora de escopo desta entrega** | `frontend/web/src/app/(plataforma)/...` (novo) |
+| `[x]` | `868k60vnh` | Área de **Superadmin** (web) para gerenciar Empresas | `frontend/web/src/app/plataforma/empresas/page.tsx` (novo) |
 | `[x]` | `868k60vnp` | Tipos: `EmpresaID`/`empresa_nome` em `Usuario`/`Chamado`/`TokenResposta` (web); mobile só sincronizou `UsuarioFuncao`/`ChamadoFila` | `frontend/web/src/types/index.ts` |
 
 ---

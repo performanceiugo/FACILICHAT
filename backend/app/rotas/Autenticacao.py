@@ -11,7 +11,7 @@ from pwdlib import PasswordHash
 from datetime import datetime, timedelta
 from app.banco_dados import obterBancoDados
 from app.modelos.Usuarios import Usuario
-from app.modelos.Empresa import Empresa
+from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.configuracoes import configuracoes
 import uuid
 
@@ -55,6 +55,10 @@ async def obterUsuarioAtual(
     usuario = resultado.scalar_one_or_none()
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    resultadoEmpresa = await db.execute(select(Empresa).where(Empresa.ID == usuario.EmpresaID))
+    empresa = resultadoEmpresa.scalar_one_or_none()
+    if not empresa or empresa.Status == EmpresaStatus.Suspensa:
+        raise HTTPException(status_code=403, detail="Empresa suspensa")
     return usuario
 
 # Dependência leve — extrai só o tenant (EmpresaID) do token, sem carregar o Usuario inteiro do banco.
@@ -94,12 +98,14 @@ async def login(
     if not usuario or not pwd.verify(formulario.password, usuario.SenhaHash):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
-    token = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
-
     # Nome da Empresa vai junto na resposta do login (não no JWT) só para exibição na UI
     # (ex.: "Admin · Cefram" no cabeçalho do painel) — o backend nunca confia nesse campo depois.
     resultadoEmpresa = await db.execute(select(Empresa).where(Empresa.ID == usuario.EmpresaID))
     empresa = resultadoEmpresa.scalar_one_or_none()
+    if not empresa or empresa.Status == EmpresaStatus.Suspensa:
+        raise HTTPException(status_code=403, detail="Empresa suspensa")
+
+    token = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
 
     return {
         "token_acesso": token,

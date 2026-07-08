@@ -1,7 +1,18 @@
 // Cliente HTTP centralizado para comunicação com o backend FastAPI
 // Todas as chamadas de API passam por aqui — adiciona token de autenticação automaticamente
 
-import type { Chamado, ChamadoCriar, ChamadoStatus, Mensagem, TokenResposta, Usuario } from '@/types'
+import type {
+  Chamado,
+  ChamadoCriar,
+  ChamadoStatus,
+  Empresa,
+  EmpresaCriadaResposta,
+  EmpresaCriar,
+  EmpresaStatus,
+  Mensagem,
+  TokenResposta,
+  Usuario,
+} from '@/types'
 
 // URL base da API — configurada via variável de ambiente, com fallback para desenvolvimento local
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -39,7 +50,10 @@ export const api = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     })
-    if (!res.ok) throw new Error('Email ou senha incorretos')
+    if (!res.ok) {
+      const erro = await res.json().catch(() => ({ detail: 'Email ou senha incorretos' }))
+      throw new Error(erro.detail ?? 'Email ou senha incorretos')
+    }
     return res.json() as Promise<TokenResposta>
   },
 
@@ -60,6 +74,20 @@ export const api = {
       req<Mensagem>(`/mensagens/${chamadoID}`, {
         method: 'POST',
         body: JSON.stringify({ Conteudo: conteudo }),
+      }),
+  },
+
+  plataforma: {
+    listarEmpresas: () => req<Empresa[]>('/plataforma/empresas'),
+    criarEmpresa: (payload: EmpresaCriar) =>
+      req<EmpresaCriadaResposta>('/plataforma/empresas', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    atualizarStatusEmpresa: (id: string, status: EmpresaStatus) =>
+      req<Empresa>(`/plataforma/empresas/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ Status: status }),
       }),
   },
 }

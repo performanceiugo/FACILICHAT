@@ -4,6 +4,8 @@
 // Perfis de acesso do sistema — os 7 perfis definidos pelo branding (docs/FaciliChat-Regras/)
 export type UsuarioFuncao = 'Cliente' | 'Supervisor' | 'Funcionario' | 'RH' | 'Financeiro' | 'Gestor' | 'Superadmin'
 
+export type EmpresaStatus = 'Ativa' | 'Suspensa'
+
 // Filas de atendimento dos chamados
 export type ChamadoFila = 'Operacional' | 'RH' | 'Financeiro' | 'Comercial'
 
@@ -60,6 +62,30 @@ export interface TokenResposta {
   nome: string
   empresa_id: string
   empresa_nome: string | null
+}
+
+export interface Empresa {
+  ID: string
+  Nome: string
+  CNPJ: string
+  Status: EmpresaStatus
+  Criacao: string
+}
+
+export interface EmpresaCriar {
+  Nome: string
+  CNPJ: string
+  Gestor: {
+    Nome: string
+    Email: string
+    Senha: string
+    Telefone?: string
+  }
+}
+
+export interface EmpresaCriadaResposta {
+  Empresa: Empresa
+  GestorID: string
 }
 
 // Payload enviado ao criar um novo chamado

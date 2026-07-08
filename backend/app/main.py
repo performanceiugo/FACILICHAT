@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.banco_dados import engine, Base
 from app.configuracoes import configuracoes
 from app import modelos  # importação necessária para que o SQLAlchemy reconheça os modelos antes do create_all
-from app.rotas import Autenticacao, Usuarios, Chamados
+from app.rotas import Autenticacao, Usuarios, Chamados, Plataforma
 
 # Instância principal da aplicação — título e versão aparecem no Swagger (/docs)
 app = FastAPI(
@@ -36,6 +36,7 @@ async def startup():
 app.include_router(Autenticacao.roteador)  # /autenticacao/...
 app.include_router(Usuarios.roteador)       # /usuarios/...
 app.include_router(Chamados.roteador)       # /chamados/...
+app.include_router(Plataforma.roteador)     # /plataforma/...
 
 # Rota de verificação de saúde da API
 @app.get("/")

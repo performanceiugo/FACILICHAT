@@ -72,6 +72,10 @@ export const auth = {
     return this.funcao() === 'Gestor'
   },
 
+  isSuperadmin(): boolean {
+    return this.funcao() === 'Superadmin'
+  },
+
   // Supervisores e gestores têm acesso às funcionalidades de supervisão
   isSupervisor(): boolean {
     const f = this.funcao()

@@ -285,6 +285,63 @@ cd backend && uvicorn app.main:app --reload
 
 ---
 
+## Produção — `JWT_SECRET` e secrets por ambiente
+
+> Guia para quando o app for publicado (staging/produção). Em dev, o `backend/.env` local já resolve.
+> **Regra central: o segredo nunca entra no código nem no Git** — ele vive apenas no `.env` local
+> (dev) e no cofre de variáveis do ambiente onde a API roda (produção). Colar a chave em
+> `configuracoes.py` ou em qualquer arquivo versionado é vazamento: se acontecer, gere outra.
+
+### 1. Gerar uma chave forte (uma por ambiente)
+
+Cada ambiente (dev, staging, produção) deve ter **sua própria chave** — assim, o vazamento de uma
+não compromete as outras. Qualquer um dos comandos abaixo serve; copie a saída direto para o destino:
+
+```powershell
+# PowerShell (Windows, sem dependências)
+$bytes = New-Object byte[] 64
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+```bash
+# Python
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+
+# openssl (Linux/Mac/Git Bash)
+openssl rand -base64 64
+```
+
+O backend valida na inicialização: recusa segredo com menos de 32 bytes ou igual aos placeholders
+conhecidos (ver `backend/app/configuracoes.py`).
+
+### 2. Cadastrar como secret no ambiente de produção
+
+"Cadastrar como secret" = informar o par `JWT_SECRET=<valor>` na área de variáveis de ambiente do
+lugar onde a API vai rodar. O provedor injeta a variável no processo quando a API sobe — o valor
+nunca passa pelo repositório.
+
+| Onde a API roda | Como cadastrar |
+|---|---|
+| **VPS próprio com Docker Compose** (DigitalOcean, Hostinger, etc.) | Via SSH, criar `backend/.env` direto no servidor com a chave de produção e restringir leitura: `chmod 600 backend/.env`. O `env_file` do compose carrega igual ao dev. |
+| **Render** | Painel do serviço → aba **Environment** → *Add Environment Variable* → `JWT_SECRET` + valor → Save. |
+| **Railway** | Painel do serviço → aba **Variables** → *New Variable*. |
+| **Fly.io** | Terminal: `fly secrets set JWT_SECRET=<valor>` (criptografa e reinicia o app). |
+| **CI (GitHub Actions)** | Repositório → **Settings → Secrets and variables → Actions → New repository secret**. No workflow, usar `${{ secrets.JWT_SECRET }}` (o GitHub mascara o valor nos logs). |
+
+> **Docker Desktop não é provedor de produção.** Ele roda containers **na sua máquina** (dev). A
+> conta Docker (Docker Hub) serve para publicar **imagens** — e imagem também não pode conter
+> secret, pois quem baixa a imagem enxerga tudo que foi copiado para dentro dela. Em produção, a
+> imagem roda em um servidor/provedor, e é **lá** que o secret é cadastrado.
+
+### 3. Rotação (trocar a chave)
+
+Trocar o `JWT_SECRET` **invalida todos os tokens já emitidos** — todos os usuários logados caem e
+precisam entrar de novo. Em produção, rotacione em horário de baixo uso. Rotacione imediatamente
+sempre que houver suspeita de exposição (chave commitada, colada em chat, etc.).
+
+---
+
 ## Solução de problemas comuns
 
 | Problema | Causa | Solução |

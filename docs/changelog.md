@@ -7,6 +7,15 @@
 
 ## [não versionado] — 8 de julho de 2026
 
+### Fase 0.7 — Fundação SaaS Multi-Tenant concluída
+- **Superadmin da plataforma implementado** — novas rotas `/plataforma/empresas` para listar Empresas,
+  criar tenant com primeiro Gestor e alternar status `Ativa`/`Suspensa`, restritas a `Funcao=Superadmin`.
+- **Suspensão com efeito real** — Empresa `Suspensa` passa a bloquear login e uso de tokens já emitidos.
+- **Área web de plataforma** — nova tela `/plataforma/empresas` para onboarding e suspensão/reativação
+  de Empresas, com redirecionamento automático do login quando o usuário é Superadmin.
+- **Plano atualizado** — itens `868k60vkz` e `868k60vnh` marcados como concluídos; fase `868k60vfm`
+  passa para `✅ Concluída`.
+
 ### Segurança — auditoria Python e JWT
 - **Backend auditado com `pip-audit`** — o baseline local encontrou `ecdsa==0.19.2`
   (`PYSEC-2026-1325` / `CVE-2024-23342`), trazido pelo ecossistema do `python-jose`.
@@ -23,6 +32,15 @@
   `utf-8-sig`, evitando falha de inicialização quando editores/PowerShell salvam o `.env` com BOM.
 - **S5 corrigido: Postgres preso ao localhost** - `docker-compose.yml` agora publica o banco em
   `127.0.0.1:5432:5432`, mantendo acesso local de desenvolvimento sem abrir o Postgres na rede.
+- **S13: guia de produção para o `JWT_SECRET`** — nova seção "Produção — `JWT_SECRET` e secrets por
+  ambiente" no `docs/setup.md`: como gerar a chave (PowerShell/Python/openssl, uma por ambiente) e
+  como cadastrá-la como secret no destino (VPS com Docker Compose, Render/Railway/Fly.io, GitHub
+  Actions), com aviso de que Docker Desktop/Docker Hub não guardam secrets e de que rotacionar a
+  chave derruba todos os logins. Item espelhado no ClickUp (`868ka61e5`).
+- **Chave removida do código-fonte** — uma chave gerada havia sido colada por engano na lista de
+  placeholders de `backend/app/configuracoes.py` (lista de valores *proibidos*, não de chaves
+  válidas). O texto de exemplo foi restaurado antes de qualquer commit; a chave real do
+  `backend/.env` é outra e permanece secreta, sem necessidade de rotação.
 
 ### Planejamento — revisão de segurança e validação contra branding
 - **Só documentação/planejamento** — nenhuma linha de código de produto alterada.
