@@ -3,7 +3,7 @@
 
 from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
 import uuid
 import enum
@@ -34,5 +34,11 @@ class Usuario(Base):
     SenhaHash: Mapped[str] = mapped_column(String(255), nullable=False)  # Senha armazenada como hash argon2 (nunca texto puro)
     Funcao: Mapped[UsuarioFuncao] = mapped_column(SAEnum(UsuarioFuncao), nullable=False)
     Telefone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Campo legado mantido temporariamente para compatibilidade com clientes antigos.
     Condominio: Mapped[str | None] = mapped_column(String(120), nullable=True)  # Condomínio ao qual o usuário pertence
+    # Novo vinculo estruturado com a entidade Condominio.
+    CondominioID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Condominios.ID"), nullable=True)
     Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relacionamento ORM opcional para navegar ate a entidade de condominio.
+    CondominioRef = relationship("Condominio", foreign_keys=[CondominioID])

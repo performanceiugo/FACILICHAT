@@ -186,6 +186,34 @@
 
 ---
 
+## [0.6.5] — 8 de julho de 2026
+
+### Domínio — fechamento do fluxo de Condomínio na Fase 0.6
+- **`Cliente = Condomínio/contrato` passou a ser regra efetiva de cadastro**: `POST /usuarios/` e
+  `POST /usuarios/equipe` agora exigem `Condominio` quando a função criada é `Cliente`, impedindo
+  o estado inconsistente de um síndico/responsável sem contrato vinculado. Implementado em
+  `backend/app/rotas/Usuarios.py`.
+- **Resolução de condomínio normalizada e case-insensitive**: o backend reaproveita a mesma entidade
+  `Condominio` do tenant mesmo quando o nome chega com variação de caixa (`"Cond. X"` vs
+  `"cond. x"`), evitando duplicatas acidentais e mantendo estável o `CondominioID`.
+- **Hardening do backfill da Fase 0.6**: `backend/scripts/aplicar_fase_06_condominios.py` agora cria
+  também um índice único por `EmpresaID + lower(Nome)`, reforçando no banco a unicidade lógica do
+  condomínio dentro do tenant.
+- **Seed alinhado ao modelo estruturado**: `backend/scripts/semear_chamados.py` deixou de criar
+  clientes demo apenas com o campo textual legado e passou a criar/reaproveitar a entidade
+  `Condominio`, preenchendo `CondominioID` já na origem. O campo textual `Condominio` permanece por
+  compatibilidade de contrato com os frontends atuais.
+- **Validação manual do fluxo**: confirmado em ambiente local que cadastro de `Cliente` sem
+  condomínio retorna `400`, e que um cadastro interno com `Condominio` em caixa diferente reaproveita
+  o mesmo `CondominioID` existente.
+- **Reclassificação das pendências remanescentes da 0.6 no plano**: o item de IA
+  `868k60vf2` foi movido para a **Fase 5 — IA**, e os refinamentos de Visita Técnica
+  `868k60vf7`, `868k60vfc` e `868k60vfg` foram movidos para a **Fase 8 — MVP 02: Visitas Técnicas**,
+  onde essas capacidades serão implementadas de fato. A Fase 0.6 deixa de carregar pendências que
+  dependem de fases posteriores para existir.
+
+---
+
 ## [0.6.4] — 1 de julho de 2026
 
 ### Domínio — Fase 0.6 aplicada em código (alinhamento com o branding)

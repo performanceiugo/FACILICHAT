@@ -11,6 +11,7 @@
 import os
 import sys
 import asyncio
+import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,7 +26,8 @@ async def main():
 
     async with engine.begin() as conn:
         # Cada comando é executado separadamente — asyncpg não aceita múltiplos statements numa só chamada
-        for comando in [c.strip() for c in script_sql.split(";") if c.strip() and not c.strip().startswith("--")]:
+        script_sql_sem_comentarios = re.sub(r"(?m)^\s*--.*$", "", script_sql)
+        for comando in [c.strip() for c in script_sql_sem_comentarios.split(";") if c.strip()]:
             await conn.execute(text(comando))
 
     print("Políticas de RLS aplicadas com sucesso.")

@@ -256,15 +256,11 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 |--------|----|------|-----------|
 | `[x]` | `868k60vem` | **Tickets irmãos:** uma mensagem pode gerar 2+ chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto) | `backend/app/rotas/Chamados.py`, `backend/app/servicos/chamados.py` |
 | `[x]` | `868k7vrt2` | **Modelar o vínculo dos tickets irmãos:** campo de agrupamento no `Chamado` (`GrupoOrigemID`) que liga chamados nascidos do mesmo aviso | `backend/app/modelos/Chamados.py` |
-| `[ ]` | `868k60veu` | **Cliente = Condomínio/contrato** com um responsável (síndico): evoluir campo texto `Condominio` para entidade (Fase 7) | `backend/app/modelos/` |
-| `[ ]` | `868k60vf2` | **IA detecta intenção de compra, nunca inventa preço/prazo** (invariante) — reforçar | `backend/app/servicos/ia.py` |
+| `[x]` | `868k60veu` | **Cliente = Condomínio/contrato** com um responsável (síndico): evoluir campo texto `Condominio` para entidade (Fase 7) | `backend/app/modelos/`, `backend/app/rotas/Usuarios.py`, `backend/scripts/aplicar_fase_06_condominios.py`, `backend/scripts/semear_chamados.py` |
 
 ### Refinos da Visita Técnica (MVP02) conforme o branding
-| Status | CU | Item | Arquivo(s) |
-|--------|----|------|-----------|
-| `[ ]` | `868k60vf7` | `Duracao` **não é coluna** — derivar de `finalizada_em − iniciada_em` | `backend/app/modelos/VisitaTecnica.py` |
-| `[ ]` | `868k60vfc` | Adicionar `ticket_id` **opcional** (vínculo a uma reclamação) | `backend/app/modelos/VisitaTecnica.py` |
-| `[ ]` | `868k60vfg` | Cliente **não aprova** a visita (só recebe/consulta a prova) | rotas de visita |
+> Refinos reclassificados para a **Fase 8 — MVP 02: Visitas Técnicas**, onde a entidade/rotas de
+> visita serão implementadas de fato.
 
 ---
 
@@ -458,6 +454,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60w3h` | Ao atualizar status: criar `Mensagem` automática com `AutorTipo = IA` | `backend/app/rotas/Chamados.py` |
 | `[ ]` | `868k7vrxw` | **Roteamento por intenção → fila correta**, incluindo **tickets irmãos** (um aviso → N chamados) usando o vínculo de grupo da Fase 0.6 | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
 | `[ ]` | `868k60w3m` | Serviço `ia_detectar_oportunidade(mensagem)` — detecta intenção de serviço extra | `backend/app/servicos/ia.py` |
+| `[ ]` | `868k60vf2` | **Reforço do invariante da Fase 0.6:** IA detecta intenção de compra, mas **nunca inventa preço/prazo**; só sinaliza oportunidade ancorada em dados reais | `backend/app/servicos/ia.py` |
 | `[ ]` | `868k7vryf` | **Portão do catálogo (obrigatório):** ao detectar intenção, consultar o `CatalogoServico` da Empresa. No catálogo → registra oportunidade; **fora → silêncio comercial** (só observação operacional) | `backend/app/servicos/ia.py` |
 | `[ ]` | `868k7vryy` | Modelo `Oportunidade` (entidade própria): `EmpresaID`, `ChamadoID`, `ServicoID`, `Status` (Nova/Vista/PropostaConstruida/Rejeitada), `Criacao`. A IA **nunca cita preço** | `backend/app/modelos/Oportunidade.py` (novo) |
 
@@ -551,6 +548,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[ ]` | `868k60wj5` | Modelo `VisitaTecnica`: SupervisorID, CondominioID, EmpresaID, DataHoraAgendada, HoraChegada, HoraSaida, Notas, Status, `ticket_id` opcional. **Duração deriva** de HoraSaida−HoraChegada | `backend/app/modelos/VisitaTecnica.py` (novo) |
+| `[ ]` | `868k60vf7` | **Refino herdado da Fase 0.6:** `Duracao` **não é coluna** — derivar de `HoraSaida − HoraChegada` | `backend/app/modelos/VisitaTecnica.py` |
+| `[ ]` | `868k60vfc` | **Refino herdado da Fase 0.6:** adicionar `ticket_id` **opcional** (vínculo a uma reclamação) | `backend/app/modelos/VisitaTecnica.py` |
 | `[ ]` | `868k60wjj` | `POST /visitas/` — agendar visita | `backend/app/rotas/Visitas.py` (novo) |
 | `[ ]` | `868k60wjq` | `PATCH /visitas/{id}/iniciar` — grava `HoraChegada` = agora | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wjv` | `PATCH /visitas/{id}/finalizar` — grava `HoraSaida`, muda status para Finalizada | `backend/app/rotas/Visitas.py` |
@@ -558,6 +557,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60wk9` | Upload de fotos da visita | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkf` | `GET /visitas/?condominio_id=` — histórico para o cliente | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkn` | `GET /visitas/?supervisor_id=me` — agenda do supervisor | `backend/app/rotas/Visitas.py` |
+| `[ ]` | `868k60vfg` | **Refino herdado da Fase 0.6:** cliente **não aprova** a visita; só recebe/consulta as evidências e o relatório | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkq` | IA detecta acordo de visita no chat e cria visita agendada automaticamente | `backend/app/servicos/ia.py` |
 
 ### Frontend Mobile (Supervisor)

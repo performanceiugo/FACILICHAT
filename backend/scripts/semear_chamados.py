@@ -25,6 +25,7 @@ from sqlalchemy import select, func
 from pwdlib import PasswordHash
 
 from app.banco_dados import engine, Base, AsyncSessionLocal
+from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
@@ -187,18 +188,52 @@ CHAMADOS = [
 
 
 # Busca um usuário pelo e-mail ou o cria com a função indicada (idempotente por e-mail único).
+def normalizar_condominio(nome: str | None) -> str | None:
+    if not nome:
+        return None
+
+    nome_normalizado = nome.strip()
+    if not nome_normalizado:
+        return None
+
+    return nome_normalizado
+
+
+async def obter_ou_criar_condominio(db, empresa_id, nome):
+    nome_normalizado = normalizar_condominio(nome)
+    if not nome_normalizado:
+        return None
+
+    resultado = await db.execute(
+        select(Condominio).where(
+            Condominio.EmpresaID == empresa_id,
+            func.lower(Condominio.Nome) == nome_normalizado.lower(),
+        )
+    )
+    condominio = resultado.scalar_one_or_none()
+    if condominio:
+        return condominio
+
+    condominio = Condominio(EmpresaID=empresa_id, Nome=nome_normalizado)
+    db.add(condominio)
+    await db.flush()
+    return condominio
+
+
 async def obter_ou_criar_usuario(db, empresa_id, nome, email, funcao, condominio=None):
     resultado = await db.execute(select(Usuario).where(Usuario.Email == email))
     usuario = resultado.scalar_one_or_none()
     if usuario:
         return usuario
+    condominio_ref = await obter_ou_criar_condominio(db, empresa_id, condominio)
     usuario = Usuario(
         EmpresaID=empresa_id,
         Nome=nome,
         Email=email,
         SenhaHash=pwd.hash(SENHA_PADRAO),
         Funcao=funcao,
-        Condominio=condominio,
+        Condominio=condominio_ref.Nome if condominio_ref else None,
+        CondominioID=condominio_ref.ID if condominio_ref else None,
     )
     db.add(usuario)
     await db.flush()  # garante que o ID já esteja disponível para vincular aos chamados

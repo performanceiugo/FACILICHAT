@@ -24,6 +24,7 @@ export interface Usuario {
   Email: string
   Funcao: UsuarioFuncao
   Telefone: string | null
+  CondominioID: string | null
   Condominio: string | null
 }
 
