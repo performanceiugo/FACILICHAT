@@ -5,6 +5,22 @@
 
 ---
 
+## [não versionado] — 8 de julho de 2026
+
+### Planejamento — revisão de segurança e validação contra branding
+- **Só documentação/planejamento** — nenhuma linha de código de produto alterada.
+- **`docs/plano-implementacao.md`:** os achados da revisão de segurança foram convertidos em itens
+  rastreáveis `S1`–`S12`, para execução por partes. Inclui atualização segura do Next/PostCSS, RLS
+  realmente tenant-aware nas rotas, fechamento do cadastro público por `EmpresaID`, hardening do
+  Docker/dev mode, rate limit, docs Swagger por ambiente, lockfile/audit do mobile e auditoria Python.
+- **Validação dos HTMLs de branding:** os documentos em `docs/FaciliChat-Regras/` reforçam seis
+  invariantes: design discreto com azul `#148AF5`/Figtree, chat como palco e ticket como bastidor,
+  anti-amnésia, SaaS multi-tenant Empresa→Condomínios com Iugo como Superadmin, IA ancorada em fatos
+  configurados por Empresa e visita técnica como entidade irmã do ticket.
+- **Divergências documentais registradas:** adicionados `D5`–`D8` para corrigir `visao-geral.md`,
+  `arquitetura.md` e notas rápidas do plano, que ainda têm trechos defasados em relação ao código
+  atual ou ao branding.
+
 ## [não versionado] — 2 de julho de 2026
 
 ### Painel do gestor — Milestone 2: fundação visual (design system no web)

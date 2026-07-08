@@ -67,7 +67,7 @@
 | Fase | Tema | Tarefa-pai (CU) | Status |
 |------|------|-----------------|--------|
 | 0 | Infraestrutura e base | `868k60uxe` | ✅ Concluída |
-| 0.5 | Correções do levantamento (bugs e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos concluídos; altos/médios/baixos/docs na fila |
+| 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos concluídos; altos/médios/baixos/docs na fila; segurança 08/07 na fila |
 | 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo (7 perfis/fila) concluído; regras/refinos na fila · **PRIORITÁRIO** |
 | 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | 🟡 Fundação concluída; Superadmin da plataforma na fila · **PRIORITÁRIO** |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
@@ -164,6 +164,27 @@
 | `[ ]` | `868k60v2k` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/app/(painel)/layout.tsx` |
 | `[ ]` | `868k60v2r` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5 | `frontend/mobile/package.json` |
 
+### 🔐 Segurança (levantamento de 08/07/2026)
+
+> Itens convertidos da revisão de segurança feita sobre backend, web, mobile, Docker e dependências.
+> Como conduzir: corrigir **um `S*` por vez**, começando por `S1` e `S2`. `CU: a-criar` significa que a
+> subtarefa ainda precisa ser criada no ClickUp antes de iniciar a implementação.
+
+| Status | CU | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----|----------|----------|-----------|
+| `[ ]` | `a-criar` | S1 | `npm audit` reportou vulnerabilidades atuais em `next@15.3.6` e `postcss` transitivo | Atualizar Next/ESLint config para versão segura da linha suportada; rodar `npm audit` e build após o update | `frontend/web/package.json`, `package-lock.json` |
+| `[ ]` | `a-criar` | S2 | RLS existe, mas as rotas usam `obterBancoDados` puro; `SET LOCAL app.empresa_id` não é aplicado nas consultas normais | Migrar rotas sensíveis para `obterBancoDadosComTenant` ou fazer a sessão tenant-aware ser padrão; adicionar teste de isolamento entre Empresas | `backend/app/rotas/*.py`, `backend/app/rls.sql` |
+| `[ ]` | `a-criar` | S3 | Cadastro público permite escolher qualquer `EmpresaID` no payload | Substituir por convite/onboarding por Empresa; enquanto não houver convite, restringir ou desabilitar cadastro público em produção | `backend/app/rotas/Usuarios.py` |
+| `[ ]` | `a-criar` | S4 | Credenciais do Postgres fixas no `docker-compose.yml` e na `DATABASE_URL` do serviço backend | Mover credenciais para `.env`/`.env.example`, rotacionar senha local e documentar separação dev/staging/prod | `docker-compose.yml`, `docs/setup.md` |
+| `[ ]` | `a-criar` | S5 | Postgres publicado em `5432:5432`, abrindo o banco para o host/rede local | Remover publicação da porta ou prender em `127.0.0.1:5432:5432`; documentar exceção apenas para dev | `docker-compose.yml` |
+| `[ ]` | `a-criar` | S6 | JWT web armazenado em `localStorage`, aumentando impacto de XSS | Planejar migração para cookie `HttpOnly`, `Secure`, `SameSite` com estratégia de CSRF; manter `SecureStore` no mobile | `frontend/web/src/lib/auth.ts`, `frontend/web/src/lib/api.ts`, `backend/app/rotas/Autenticacao.py` |
+| `[ ]` | `a-criar` | S7 | Login e cadastro não têm rate limit, lockout ou atraso progressivo | Adicionar rate limiting por IP/email e resposta uniforme para credenciais inválidas; cobrir login e signup público/convite | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py` |
+| `[ ]` | `a-criar` | S8 | FastAPI expõe `/docs`, `/redoc` e `/openapi.json` por padrão | Tornar docs configuráveis por ambiente; desabilitar ou proteger em produção | `backend/app/main.py`, `backend/app/configuracoes.py` |
+| `[ ]` | `a-criar` | S9 | Ambiente Docker roda backend com `--reload`, volume de código e configuração de dev | Separar compose de dev e produção; produção sem reload, sem bind mount e com usuário/processo endurecido | `docker-compose.yml`, `backend/Dockerfile`, `docs/setup.md` |
+| `[ ]` | `a-criar` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Garantir que seed não rode em produção; exigir flag explícita de ambiente dev e registrar limpeza/rotação de dados demo | `backend/scripts/semear_chamados.py` |
+| `[ ]` | `a-criar` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
+| `[ ]` | `a-criar` | S12 | Dependências Python não têm auditoria automatizada no projeto | Adicionar `pip-audit`/equivalente ao fluxo local/CI e registrar baseline inicial | `backend/requirements.txt`, CI/docs |
+
 ### 🟡 Médios
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
@@ -199,6 +220,10 @@
 | `[ ]` | `868k60vdg` | D1 | Divergência de enums: doc cita `AutorTipo: Humano/IA/Sistema` mas código usa `Cliente/Supervisor/Funcionario/IA/Sistema` | Padronizar doc com o código | `plano-implementacao.md`, `tecnico-backend.md` |
 | `[ ]` | `868k60vdm` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Padronizar para o calendário correto | `docs/changelog.md` |
 | `[ ]` | `868k60vdp` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports | Atualizar comando de execução após corrigir imports | `docs/tecnico-backend.md` |
+| `[ ]` | `a-criar` | D5 | `visao-geral.md` está desatualizado: diz que o código ainda tem 4 perfis/"Gerente" e só 3 filas, mas o código já tem 7 perfis e fila `Comercial` | Atualizar visão geral para refletir o estado atual e separar "feito" de "planejado" | `docs/visao-geral.md` |
+| `[ ]` | `a-criar` | D6 | `arquitetura.md` afirma que `obterTenantAtual` é injetada em todas as rotas, mas a revisão mostrou rotas usando `obterBancoDados` puro | Corrigir a documentação junto do item `S2`, deixando claro o estado real até a correção | `docs/arquitetura.md`, `backend/app/rotas/*.py` |
+| `[ ]` | `a-criar` | D7 | Notas rápidas do plano mantêm `AutorTipo mensagem: Humano/IA/Sistema`, divergindo do código atual (`Cliente/Supervisor/Funcionario/IA/Sistema`) | Sincronizar notas de arquitetura com enums reais ou ajustar o código se a regra canônica for outra | `docs/plano-implementacao.md`, `docs/tecnico-backend.md` |
+| `[ ]` | `a-criar` | D8 | Resultado da validação dos HTMLs de branding ainda não existe como checklist explícito de aceite | Criar checklist de aceite por eixo: design system, anti-amnésia, multi-tenant, IA ancorada, visita técnica e jornadas | `docs/plano-implementacao.md`, `docs/arquitetura.md` |
 
 ---
 
@@ -639,7 +664,7 @@ Multi-tenant (SaaS): Empresa (tenant) → Condomínios → Usuários/Chamados
                      Toda tabela tem EmpresaID; toda query filtra por ele; RLS no Postgres.
                      O tenant viaja no JWT. Papéis são por empresa (não globais).
 Superadmin:          Nível da plataforma (Iugo Performance) — cadastra/suspende Empresas.
-Perfis de usuário:    Cliente | Funcionário | Supervisor | RH | Financeiro | Gestor  (dentro de uma Empresa)
+Perfis de usuário:    Cliente | Funcionário | Supervisor | RH | Financeiro | Gestor | Superadmin
 Filas de chamado:     Operacional | RH | Financeiro | Comercial
 Status de chamado:    Recebido | EmAndamento | Agendado | Concluido | Cancelado
 Prioridades:          Baixa | Media | Alta | Critica
