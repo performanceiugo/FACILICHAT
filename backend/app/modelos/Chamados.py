@@ -1,9 +1,9 @@
 # Modelo ORM da tabela Chamados (solicitações de serviço)
 # Um chamado é criado pelo Cliente e percorre um fluxo de status até ser concluído ou cancelado
 
-from sqlalchemy import Column, String, Enum as SAEnum, DateTime, ForeignKey, Text
+from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
 import uuid
 import enum
@@ -37,18 +37,19 @@ class ChamadoPrioridade(str, enum.Enum):
 class Chamado(Base):
     __tablename__ = "Chamados"
 
-    ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    EmpresaID = Column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
-    ClienteID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=False)   # Quem abriu o chamado
-    SupervisorID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True) # Responsável atribuído (opcional)
-    Fila = Column(SAEnum(ChamadoFila), nullable=False)
-    Categoria = Column(String(80), nullable=False)           # Ex: "Elétrica", "Hidráulica", "Segurança"
-    Status = Column(SAEnum(ChamadoStatus), default=ChamadoStatus.Recebido)
-    Prioridade = Column(SAEnum(ChamadoPrioridade), default=ChamadoPrioridade.Media)
-    Resumo = Column(Text, nullable=True)                     # Descrição livre do problema
-    PrazoSLA = Column(DateTime, nullable=True)               # Prazo de atendimento conforme acordo de nível de serviço
-    Criacao = Column(DateTime, default=datetime.utcnow)
-    Atualizacao = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    EmpresaID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
+    ClienteID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=False)   # Quem abriu o chamado
+    GrupoOrigemID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)       # Tickets irmãos do mesmo aviso
+    SupervisorID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True) # Responsável atribuído (opcional)
+    Fila: Mapped[ChamadoFila] = mapped_column(SAEnum(ChamadoFila), nullable=False)
+    Categoria: Mapped[str] = mapped_column(String(80), nullable=False)           # Ex: "Elétrica", "Hidráulica", "Segurança"
+    Status: Mapped[ChamadoStatus | None] = mapped_column(SAEnum(ChamadoStatus), default=ChamadoStatus.Recebido)
+    Prioridade: Mapped[ChamadoPrioridade | None] = mapped_column(SAEnum(ChamadoPrioridade), default=ChamadoPrioridade.Media)
+    Resumo: Mapped[str | None] = mapped_column(Text, nullable=True)                     # Descrição livre do problema
+    PrazoSLA: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)          # Prazo de atendimento conforme acordo de nível de serviço
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    Atualizacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relacionamentos ORM — permitem acessar chamado.Cliente, chamado.Mensagens, etc.
     Cliente = relationship("Usuario", foreign_keys=[ClienteID])

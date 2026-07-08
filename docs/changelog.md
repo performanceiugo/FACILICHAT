@@ -7,6 +7,31 @@
 
 ## [não versionado] — 8 de julho de 2026
 
+### Fase 0.6 — Tickets irmãos
+- **Vínculo de origem em chamados** — `Chamado` agora tem `GrupoOrigemID` opcional para ligar tickets
+  nascidos do mesmo aviso/mensagem.
+- **Criação simultânea de tickets irmãos** — novo endpoint `POST /chamados/irmaos` cria 2+ chamados
+  em uma única operação, todos escopados à `EmpresaID` do usuário e com o mesmo `GrupoOrigemID`.
+- **Clientes web/mobile sincronizados** — tipos e APIs passam a expor `GrupoOrigemID` e
+  `chamados.criarIrmaos(...)`.
+- **Banco existente em dev** — adicionado script idempotente
+  `backend/scripts/aplicar_fase_06_tickets_irmaos.py` para criar a coluna/índice sem recriar tabelas.
+- **Plano atualizado** — itens `868k60vem` e `868k7vrt2` marcados como concluídos.
+
+### Modernização SQLAlchemy 2.0 / Pydantic v2 (refatoração, sem mudança de regra de negócio)
+- **Modelos ORM** (`Chamados.py`, `Empresa.py`, `Mensagens.py`, `Usuarios.py`) migrados do estilo
+  legado `Column(...)` para `mapped_column()` + anotações `Mapped[...]`, o padrão atual do
+  SQLAlchemy 2.0. Nulabilidade de cada coluna foi conferida e preservada exatamente como antes
+  (validado por import real dos modelos e inspeção de `__table__.columns`).
+- **Fábrica de sessões assíncronas** (`banco_dados.py`) trocada de
+  `sessionmaker(engine, class_=AsyncSession, ...)` para `async_sessionmaker(engine, ...)`, a fábrica
+  dedicada recomendada pela doc atual do SQLAlchemy para asyncio.
+- **Schemas de saída Pydantic** (`Chamados.py`, `Usuarios.py`, `Plataforma.py`) trocaram o
+  `class Config: from_attributes = True` (estilo Pydantic v1, oficialmente deprecated) por
+  `model_config = ConfigDict(from_attributes = True)`.
+- Motivação: verificação feita via Context7 (doc oficial atualizada) a pedido do usuário, comparando
+  o código com os padrões atuais de FastAPI/SQLAlchemy/Pydantic.
+
 ### Fase 0.7 — Fundação SaaS Multi-Tenant concluída
 - **Superadmin da plataforma implementado** — novas rotas `/plataforma/empresas` para listar Empresas,
   criar tenant com primeiro Gestor e alternar status `Ativa`/`Suspensa`, restritas a `Funcao=Superadmin`.

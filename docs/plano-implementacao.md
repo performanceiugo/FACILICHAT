@@ -68,7 +68,7 @@
 |------|------|-----------------|--------|
 | 0 | Infraestrutura e base | `868k60uxe` | ✅ Concluída |
 | 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos concluídos; altos/médios/baixos/docs na fila; segurança 08/07 na fila |
-| 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo (7 perfis/fila) concluído; regras/refinos na fila · **PRIORITÁRIO** |
+| 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo e tickets irmãos concluídos; regras/refinos na fila · **PRIORITÁRIO** |
 | 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | ✅ Concluída |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
 | 2 | Criar chamado e detalhe (cliente) | `868k60vvt` | ⬜ Na fila |
@@ -254,8 +254,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 ### Regras de negócio do branding a incorporar
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
-| `[ ]` | `868k60vem` | **Tickets irmãos:** uma mensagem pode gerar 2+ chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto) | modelo/serviço de chamados + IA |
-| `[ ]` | `868k7vrt2` | **Modelar o vínculo dos tickets irmãos:** campo de agrupamento no `Chamado` (`GrupoOrigemID`/`AvisoOrigemID`) que liga chamados nascidos do mesmo aviso | `backend/app/modelos/Chamados.py` |
+| `[x]` | `868k60vem` | **Tickets irmãos:** uma mensagem pode gerar 2+ chamados simultâneos (ex.: atestado → RH valida + Supervisor cobre o posto) | `backend/app/rotas/Chamados.py`, `backend/app/servicos/chamados.py` |
+| `[x]` | `868k7vrt2` | **Modelar o vínculo dos tickets irmãos:** campo de agrupamento no `Chamado` (`GrupoOrigemID`) que liga chamados nascidos do mesmo aviso | `backend/app/modelos/Chamados.py` |
 | `[ ]` | `868k60veu` | **Cliente = Condomínio/contrato** com um responsável (síndico): evoluir campo texto `Condominio` para entidade (Fase 7) | `backend/app/modelos/` |
 | `[ ]` | `868k60vf2` | **IA detecta intenção de compra, nunca inventa preço/prazo** (invariante) — reforçar | `backend/app/servicos/ia.py` |
 

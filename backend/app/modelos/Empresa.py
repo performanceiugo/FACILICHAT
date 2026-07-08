@@ -3,8 +3,9 @@
 # o FaciliChat para atender os Condomínios dela. Todo dado do sistema pertence a uma Empresa
 # (ver docs/plano-implementacao.md — Fase 0.7, Fundação SaaS Multi-Tenant).
 
-from sqlalchemy import Column, String, Enum as SAEnum, DateTime
+from sqlalchemy import String, Enum as SAEnum, DateTime
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 from app.banco_dados import Base
 import uuid
 import enum
@@ -19,8 +20,8 @@ class EmpresaStatus(str, enum.Enum):
 class Empresa(Base):
     __tablename__ = "Empresas"
 
-    ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    Nome = Column(String(150), nullable=False)
-    CNPJ = Column(String(20), unique=True, nullable=False)
-    Status = Column(SAEnum(EmpresaStatus), default=EmpresaStatus.Ativa, nullable=False)
-    Criacao = Column(DateTime, default=datetime.utcnow)
+    ID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    Nome: Mapped[str] = mapped_column(String(150), nullable=False)
+    CNPJ: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    Status: Mapped[EmpresaStatus] = mapped_column(SAEnum(EmpresaStatus), default=EmpresaStatus.Ativa, nullable=False)
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)

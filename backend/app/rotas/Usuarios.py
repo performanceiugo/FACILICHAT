@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from pwdlib import PasswordHash
 from app.banco_dados import obterBancoDados
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
@@ -45,8 +45,7 @@ class UsuarioSaida(BaseModel):
     Telefone: str | None
     Condominio: str | None
 
-    class Config:
-        from_attributes = True  # Permite serializar objetos ORM diretamente
+    model_config = ConfigDict(from_attributes=True)  # Permite serializar objetos ORM diretamente
 
 # Função interna que persiste um usuário com uma Funcao e EmpresaID já decididos pelo servidor.
 # Centraliza a checagem de email duplicado e a gravação, evitando duplicação entre as duas rotas.

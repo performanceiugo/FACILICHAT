@@ -2,9 +2,9 @@
 # Armazena o histórico do chat interno de cada chamado
 # Mensagens podem ser enviadas por humanos ou geradas pela IA do sistema
 
-from sqlalchemy import Column, String, Enum as SAEnum, DateTime, ForeignKey, Text
+from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
 import uuid
 import enum
@@ -22,14 +22,14 @@ class AutorTipo(str, enum.Enum):
 class Mensagem(Base):
     __tablename__ = "Mensagens"
 
-    ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    EmpresaID = Column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
-    ChamadoID = Column(UUID(as_uuid=True), ForeignKey("Chamados.ID"), nullable=False)
-    AutorID = Column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True)  # Nulo quando AutorTipo é IA ou Sistema
-    AutorTipo = Column(SAEnum(AutorTipo), nullable=False)
-    Conteudo = Column(Text, nullable=False)
-    Anexo = Column(String(500), nullable=True)  # URL de arquivo ou imagem anexada
-    Criacao = Column(DateTime, default=datetime.utcnow)
+    ID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    EmpresaID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)  # Tenant (Fase 0.7)
+    ChamadoID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Chamados.ID"), nullable=False)
+    AutorID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True)  # Nulo quando AutorTipo é IA ou Sistema
+    AutorTipo: Mapped[AutorTipo] = mapped_column(SAEnum(AutorTipo), nullable=False)
+    Conteudo: Mapped[str] = mapped_column(Text, nullable=False)
+    Anexo: Mapped[str | None] = mapped_column(String(500), nullable=True)  # URL de arquivo ou imagem anexada
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relacionamentos ORM
     Chamado = relationship("Chamado", back_populates="Mensagens")

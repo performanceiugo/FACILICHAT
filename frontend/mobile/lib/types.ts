@@ -18,6 +18,7 @@ export type AutorTipo = 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Siste
 
 // Dados públicos de um usuário retornados pela API
 export interface Usuario {
+  EmpresaID: string
   ID: string
   Nome: string
   Email: string
@@ -29,7 +30,9 @@ export interface Usuario {
 // Dados de um chamado retornados pela API
 export interface Chamado {
   ID: string
+  EmpresaID: string
   ClienteID: string
+  GrupoOrigemID: string | null
   Fila: ChamadoFila
   Categoria: string
   Status: ChamadoStatus
@@ -55,6 +58,8 @@ export interface TokenResposta {
   tipo_token: string
   funcao: UsuarioFuncao
   nome: string
+  empresa_id: string
+  empresa_nome: string | null
 }
 
 // Payload enviado ao criar um novo chamado
@@ -63,4 +68,8 @@ export interface ChamadoCriar {
   Categoria: string
   Resumo?: string
   Prioridade?: ChamadoPrioridade
+}
+
+export interface ChamadosIrmaosCriar {
+  Chamados: ChamadoCriar[]
 }

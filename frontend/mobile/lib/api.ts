@@ -3,7 +3,15 @@
 // SecureStore é armazenamento criptografado no dispositivo (iOS Keychain / Android Keystore)
 
 import * as SecureStore from 'expo-secure-store'
-import type { Chamado, ChamadoCriar, ChamadoStatus, Mensagem, TokenResposta, Usuario } from './types'
+import type {
+  Chamado,
+  ChamadoCriar,
+  ChamadosIrmaosCriar,
+  ChamadoStatus,
+  Mensagem,
+  TokenResposta,
+  Usuario,
+} from './types'
 
 // URL base da API — 10.0.2.2 é o endereço do host no emulador Android
 // Para dispositivo físico, substituir pelo IP da máquina na rede local via EXPO_PUBLIC_API_URL
@@ -51,6 +59,8 @@ export const api = {
     listar: () => req<Chamado[]>('/chamados/'),
     criar: (payload: ChamadoCriar) =>
       req<Chamado>('/chamados/', { method: 'POST', body: JSON.stringify(payload) }),
+    criarIrmaos: (payload: ChamadosIrmaosCriar) =>
+      req<Chamado[]>('/chamados/irmaos', { method: 'POST', body: JSON.stringify(payload) }),
     atualizarStatus: (id: string, status: ChamadoStatus) =>
       req<Chamado>(`/chamados/${id}/status?status=${status}`, { method: 'PATCH' }),
   },

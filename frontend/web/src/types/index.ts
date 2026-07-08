@@ -34,6 +34,7 @@ export interface Chamado {
   ID: string
   EmpresaID: string  // Tenant do chamado (Fase 0.7)
   ClienteID: string
+  GrupoOrigemID: string | null
   Fila: ChamadoFila
   Categoria: string
   Status: ChamadoStatus
@@ -94,4 +95,8 @@ export interface ChamadoCriar {
   Categoria: string
   Resumo?: string
   Prioridade?: ChamadoPrioridade
+}
+
+export interface ChamadosIrmaosCriar {
+  Chamados: ChamadoCriar[]
 }

@@ -1,8 +1,9 @@
 # Modelo ORM da tabela Usuarios
 # Representa todos os perfis de usuário do sistema: moradores, funcionários, supervisores, back-office e gestores
 
-from sqlalchemy import Column, String, Enum as SAEnum, DateTime, ForeignKey
+from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 from app.banco_dados import Base
 import uuid
 import enum
@@ -23,15 +24,15 @@ class UsuarioFuncao(str, enum.Enum):
 class Usuario(Base):
     __tablename__ = "Usuarios"
 
-    ID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Tenant do usuário (regra de ouro da Fase 0.7: toda tabela pertence a uma Empresa).
     # Nota: hoje todo Usuario — inclusive Superadmin — precisa de uma Empresa; um Superadmin
     # "sem empresa" fica fora do escopo desta entrega (não há UI/rota que crie esse caso).
-    EmpresaID = Column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)
-    Nome = Column(String(120), nullable=False)
-    Email = Column(String(120), unique=True, nullable=False)
-    SenhaHash = Column(String(255), nullable=False)  # Senha armazenada como hash argon2 (nunca texto puro)
-    Funcao = Column(SAEnum(UsuarioFuncao), nullable=False)
-    Telefone = Column(String(20), nullable=True)
-    Condominio = Column(String(120), nullable=True)  # Condomínio ao qual o usuário pertence
-    Criacao = Column(DateTime, default=datetime.utcnow)
+    EmpresaID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("Empresas.ID"), nullable=False)
+    Nome: Mapped[str] = mapped_column(String(120), nullable=False)
+    Email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    SenhaHash: Mapped[str] = mapped_column(String(255), nullable=False)  # Senha armazenada como hash argon2 (nunca texto puro)
+    Funcao: Mapped[UsuarioFuncao] = mapped_column(SAEnum(UsuarioFuncao), nullable=False)
+    Telefone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    Condominio: Mapped[str | None] = mapped_column(String(120), nullable=True)  # Condomínio ao qual o usuário pertence
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)

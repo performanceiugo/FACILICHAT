@@ -44,9 +44,11 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Coluna | Tipo | Descrição |
 |---|---|---|
 | ID | UUID | Identificador único |
+| EmpresaID | UUID → Empresas | Tenant do chamado |
 | ClienteID | UUID → Usuarios | Quem abriu o chamado |
+| GrupoOrigemID | UUID | Opcional; agrupa tickets irmãos nascidos do mesmo aviso/mensagem |
 | SupervisorID | UUID → Usuarios | Supervisor atribuído (opcional) |
-| Fila | Enum | Operacional / RH / Financeiro |
+| Fila | Enum | Operacional / RH / Financeiro / Comercial |
 | Categoria | String(80) | Ex: "Vazamento", "Folha de Pagamento" |
 | Status | Enum | Recebido / EmAndamento / Agendado / Concluido / Cancelado |
 | Prioridade | Enum | Baixa / Media / Alta / Critica |
@@ -102,8 +104,12 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Método | Rota | Descrição | Autenticação | Permissão |
 |---|---|---|---|---|
 | POST | `/chamados/` | Abrir novo chamado | Sim | Qualquer perfil |
+| POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
 | GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gerente vê todos |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gerente (403 caso contrário); chamado finalizado não reabre (409) |
+
+> Banco de dev já existente: rode `python scripts/aplicar_fase_06_tickets_irmaos.py` a partir de
+> `backend/` para adicionar `Chamados.GrupoOrigemID` sem recriar tabelas.
 
 ---
 

@@ -4,6 +4,7 @@
 import type {
   Chamado,
   ChamadoCriar,
+  ChamadosIrmaosCriar,
   ChamadoStatus,
   Empresa,
   EmpresaCriadaResposta,
@@ -64,6 +65,8 @@ export const api = {
     listar: () => req<Chamado[]>('/chamados/'),
     criar: (payload: ChamadoCriar) =>
       req<Chamado>('/chamados/', { method: 'POST', body: JSON.stringify(payload) }),
+    criarIrmaos: (payload: ChamadosIrmaosCriar) =>
+      req<Chamado[]>('/chamados/irmaos', { method: 'POST', body: JSON.stringify(payload) }),
     atualizarStatus: (id: string, status: ChamadoStatus) =>
       req<Chamado>(`/chamados/${id}/status?status=${status}`, { method: 'PATCH' }),
   },

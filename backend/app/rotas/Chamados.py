@@ -4,11 +4,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.banco_dados import obterBancoDados
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterUsuarioAtual
+from app.servicos.chamados import montarChamadosIrmaos
 from datetime import datetime
 import uuid
 
@@ -21,11 +22,15 @@ class ChamadoCriar(BaseModel):
     Resumo: str | None = None
     Prioridade: ChamadoPrioridade = ChamadoPrioridade.Media
 
+class ChamadosIrmaosCriar(BaseModel):
+    Chamados: list[ChamadoCriar]
+
 # Schema de saída — campos retornados ao frontend após criar ou listar chamados
 class ChamadoSaida(BaseModel):
     ID: uuid.UUID
     EmpresaID: uuid.UUID
     ClienteID: uuid.UUID
+    GrupoOrigemID: uuid.UUID | None
     Fila: ChamadoFila
     Categoria: str
     Status: ChamadoStatus
@@ -33,8 +38,7 @@ class ChamadoSaida(BaseModel):
     Resumo: str | None
     Criacao: datetime
 
-    class Config:
-        from_attributes = True  # Permite serializar objetos ORM diretamente
+    model_config = ConfigDict(from_attributes=True)  # Permite serializar objetos ORM diretamente
 
 # POST /chamados/ — cria um novo chamado vinculado ao usuário autenticado
 @roteador.post("/", response_model=ChamadoSaida)
@@ -55,6 +59,23 @@ async def criarChamado(
     await db.commit()
     await db.refresh(chamado)
     return chamado
+
+# POST /chamados/irmaos — cria 2+ chamados ligados pelo mesmo GrupoOrigemID
+@roteador.post("/irmaos", response_model=list[ChamadoSaida])
+async def criarChamadosIrmaos(
+    payload: ChamadosIrmaosCriar,
+    db: AsyncSession = Depends(obterBancoDados),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual)
+):
+    if len(payload.Chamados) < 2:
+        raise HTTPException(status_code=400, detail="Tickets irmãos exigem pelo menos 2 chamados")
+
+    chamados = montarChamadosIrmaos(payload.Chamados, usuarioAtual)
+    db.add_all(chamados)
+    await db.commit()
+    for chamado in chamados:
+        await db.refresh(chamado)
+    return chamados
 
 # GET /chamados/ — lista chamados; gestores e supervisores veem todos, clientes veem apenas os seus
 @roteador.get("/", response_model=list[ChamadoSaida])
