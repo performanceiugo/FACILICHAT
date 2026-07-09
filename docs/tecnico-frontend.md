@@ -23,7 +23,7 @@ frontend/web/src/
 │   └── index.ts            ← todos os tipos TypeScript do projeto
 ├── lib/
 │   ├── api.ts              ← todas as chamadas para o backend
-│   └── auth.ts             ← leitura e gravação do token JWT
+│   └── auth.ts             ← dados de exibição da sessão (o token fica em cookie HttpOnly)
 ├── components/
 │   └── painel/
 │       ├── AdminShell.tsx        ← casca do painel (sidebar + nav + guarda de sessão)
@@ -65,9 +65,16 @@ como `--font-figtree`/`--font-sans`.
 ### Padrão do cliente HTTP (`lib/api.ts`)
 
 Toda chamada ao backend passa pela função `req<T>()` que:
-- Lê o token do `localStorage` automaticamente
-- Adiciona o header `Authorization: Bearer <token>`
-- Lança erro com a mensagem do backend em caso de falha
+- Usa a base `/api` — o **proxy do Next** (`rewrites` no `next.config.ts`), nunca a API direto.
+  Mesma origem ⇒ o cookie de sessão é first-party e a CSP fecha em `connect-src 'self'` (S6/M6).
+- **Não** injeta credencial: o navegador envia sozinho o cookie `sessao` (`HttpOnly`).
+- Anexa o header `X-CSRF-Token` (lido do cookie `csrf_token`) em `POST`/`PUT`/`PATCH`/`DELETE`.
+- Lança erro com a mensagem do backend em caso de falha; em `401`, limpa o local e vai ao login.
+
+> **Cuidado ao mexer no proxy:** as rotas do backend terminam em barra (`/chamados/`). O Next
+> redirecionaria (308) e, depois, o FastAPI devolveria um 307 apontando para a **origem da API** —
+> o `fetch` sairia do proxy. Por isso existem `skipTrailingSlashRedirect: true` e uma regra de
+> rewrite que preserva a barra final. Não remova nenhum dos dois.
 
 Para adicionar um novo endpoint:
 ```typescript
@@ -80,15 +87,19 @@ chamados: {
 
 ### Gerenciamento de sessão (`lib/auth.ts`)
 
+Depois do item **S6**, o token **não passa mais pelo JavaScript**: ele vive no cookie `sessao`
+(`HttpOnly`), emitido pelo backend no login. Um XSS no painel não consegue lê-lo. O `localStorage`
+guarda apenas dados de **exibição** (nome, empresa). Não existe mais `auth.token()`.
+
 | Função | O que faz |
 |---|---|
-| `auth.salvar(dados)` | Salva token, funcao e nome no localStorage |
-| `auth.token()` | Retorna o token atual |
-| `auth.funcao()` | Retorna a função do usuário logado |
-| `auth.autenticado()` | Retorna `true` se há token salvo |
-| `auth.sair()` | Remove todos os dados de sessão |
-| `auth.isSupervisor()` | Retorna `true` para Supervisor ou Gerente |
-| `auth.isGerente()` | Retorna `true` apenas para Gerente |
+| `auth.salvar(dados)` | Salva **só** nome/empresa no localStorage (os cookies vêm no `Set-Cookie`) |
+| `auth.funcao()` | Lê o cookie legível `funcao` (usado para escolher a tela; forjável, não autoriza nada) |
+| `auth.autenticado()` | `true` se o cookie `funcao` existe — dica de interface; quem decide é o backend (401) |
+| `auth.limparLocal()` | Remove os dados locais de exibição. **Não** apaga cookies |
+| `api.logout()` | Encerra a sessão de verdade: só o backend apaga um cookie `HttpOnly` |
+| `auth.isSupervisor()` | Retorna `true` para Supervisor ou Gestor |
+| `auth.isGestor()` | Retorna `true` apenas para Gestor |
 
 ### Headers de segurança (`next.config.ts`) — item S16
 
@@ -97,7 +108,7 @@ Todas as respostas do painel saem com headers de segurança definidos em `header
 
 | Header | Valor / propósito |
 |---|---|
-| `Content-Security-Policy-Report-Only` | CSP em fase de observação: o navegador só registra violações no console, sem bloquear. Promover a `Content-Security-Policy` (enforce) após período sem violações — passos em `docs/setup.md` |
+| `Content-Security-Policy-Report-Only` | CSP em fase de observação: o navegador só registra violações no console, sem bloquear. Promover a `Content-Security-Policy` (enforce) após período sem violações — passos em `docs/deploy-producao.md` |
 | `X-Content-Type-Options` | `nosniff` — impede sniffing de MIME type |
 | `X-Frame-Options` | `DENY` — anti-clickjacking (redundância do `frame-ancestors 'none'` da CSP) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` — não vaza caminho/query para outras origens |
@@ -105,7 +116,7 @@ Todas as respostas do painel saem com headers de segurança definidos em `header
 
 Detalhes da CSP: `connect-src` inclui a origem da API (`NEXT_PUBLIC_API_URL`); em modo dev entram
 `'unsafe-eval'` (HMR) e `ws:/wss:`, removidos automaticamente no build de produção. HSTS não é
-enviado pelo Next — fica no proxy HTTPS de produção (ver `docs/setup.md`).
+enviado pelo Next — fica no proxy HTTPS de produção (ver `docs/deploy-producao.md`).
 
 > **Atenção ao rodar `next build` localmente:** pare o `next dev` antes. Os dois compartilham a
 > pasta `.next/` e um build feito com o dev server ativo sai contaminado com artefatos de dev
@@ -164,7 +175,8 @@ frontend/mobile/
 
 | Aspecto | Web (Next.js) | Mobile (Expo) |
 |---|---|---|
-| Armazenamento do token | `localStorage` | `expo-secure-store` (criptografado) |
+| Armazenamento do token | Cookie `HttpOnly` (invisível ao JS) | `expo-secure-store` (criptografado) |
+| Como autentica | Cookie + `X-CSRF-Token`, via proxy `/api/*` | `Authorization: Bearer`, direto na API |
 | URL da API | `NEXT_PUBLIC_API_URL` | `EXPO_PUBLIC_API_URL` |
 | Navegação | `useRouter()` do Next.js | `useRouter()` do Expo Router |
 | Proteção de rota | `useEffect` no layout | `app/index.tsx` redireciona |

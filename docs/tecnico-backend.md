@@ -115,9 +115,27 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - Senhas armazenadas com hash **argon2** via `pwdlib` (nunca em texto puro)
 - JWT assinado com `HS256` e chave secreta configurável
 - Token válido por **8 horas** (configurável via `JWT_EXPIRE_MINUTES`)
+- **Duas formas de sessão convivem** (item S6), resolvidas por `obterTokenDaRequisicao`:
+  o **painel web** usa o cookie `sessao` (`HttpOnly`, emitido pelo backend no login, `Max-Age`
+  igual à validade do token); o **app mobile** usa `Authorization: Bearer` com o token no
+  `SecureStore`. O header tem precedência sobre o cookie.
+- **CSRF** (`app/servicos/csrf.py`, middleware): em `POST`/`PUT`/`PATCH`/`DELETE` valida
+  `Origin`/`Referer` contra `CORS_ORIGINS` e, quando a credencial é o cookie, exige o
+  double-submit (`X-CSRF-Token` == cookie `csrf_token`, comparado em tempo constante).
+  Requisições com `Bearer` pulam o double-submit: um header não é credencial ambiente, então
+  não há superfície de CSRF. `SameSite` sozinho **não** basta (OWASP).
+- `POST /autenticacao/logout` apaga os cookies. É logout do lado do cliente: **o JWT continua
+  válido até expirar**. Revogação server-side é o item `S14`.
+- Cookie configurável por ambiente: `COOKIE_SECURE`, `COOKIE_SAMESITE`, `COOKIE_DOMAIN`
+  (defaults seguros; `SameSite=none` sem `Secure` falha na subida)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use
 - Login e cadastro público têm rate limit simples por IP/e-mail; login usa hash dummy quando o e-mail não existe para reduzir enumeração por timing
-- **CORS** restrito às origens em `CORS_ORIGINS` (config/.env) — sem `"*"` junto de credenciais
+- **CORS** restrito às origens em `CORS_ORIGINS` (config/.env), sem `"*"` em nenhum eixo (item S17):
+  métodos limitados aos que a API expõe (`GET, POST, PATCH, OPTIONS`) e headers a `Authorization` e
+  `Content-Type`. `allow_credentials=False` — a autenticação é por header `Bearer`, nenhum cliente
+  envia cookies. Religar credentials é tarefa do **S6**, e só junto da proteção CSRF.
+  > Ao criar uma rota com um verbo novo (ex.: `DELETE`), adicione-o a `CORS_METODOS_PERMITIDOS`
+  > em `app/main.py` — senão o preflight do navegador reprova a chamada.
 - **Cadastro público fechado por padrão**; quando habilitado, só aceita a Empresa configurada e cria Cliente. Perfis privilegiados só via `/usuarios/equipe` (Gestor)
 - **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
 

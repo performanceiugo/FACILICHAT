@@ -1,392 +1,121 @@
-# FaciliChat — Guia de Configuração do Ambiente
+# FaciliChat — Setup de Desenvolvimento (caminho rápido)
 
-> Para desenvolvedores que vão rodar o projeto pela primeira vez.
+> Para colocar o projeto rodando na sua máquina em ~5 minutos, com Docker.
+>
+> - Prefere rodar o Python sem Docker (WSL/venv)? → [`docs/setup-manual.md`](setup-manual.md)
+> - Vai publicar em staging/produção? → [`docs/deploy-producao.md`](deploy-producao.md)
 
 ---
 
 ## Pré-requisitos
 
-- Windows 10/11 com WSL 2 instalado (distribuição Ubuntu recomendada)
-- Docker Desktop instalado no Windows
-- Git instalado no WSL
+- **Docker Desktop** instalado e rodando (Windows/Mac/Linux)
+- **Node.js 20+** (para o frontend web)
+- **Git**
 
 ---
 
-## Opção A (recomendada) — Rodar o backend com Docker
-
-Este é o caminho mais simples: **não precisa instalar Python nem as dependências** na sua máquina.
-Sobe a API + o banco juntos, em containers. Requer apenas o **Docker Desktop** rodando.
+## Passo 1 — Criar os dois `.env` (uma vez)
 
 ```bash
-# 1. Na raiz do projeto, criar o .env do backend (uma vez)
+# .env da RAIZ: credenciais do Postgres (lido pelo docker-compose.yml)
+cp .env.example .env
+# edite .env e defina uma POSTGRES_PASSWORD aleatória:
+#   python -c "import secrets; print(secrets.token_hex(24))"
+
+# .env do BACKEND: configuração da aplicação
 cp backend/.env.example backend/.env
-# edite backend/.env e gere um JWT_SECRET (pode deixar ANTHROPIC_API_KEY como placeholder)
-
-# 2. Subir API + banco (a primeira vez baixa a imagem e instala as dependências)
-docker compose up --build -d
-
-# 3. Conferir que está no ar
-docker compose ps                 # backend e db devem estar "Up"
-curl http://localhost:8000/        # -> {"mensagem":"FaciliChat online!"}
+# edite backend/.env e gere um JWT_SECRET:
+#   python -c "import secrets; print(secrets.token_urlsafe(32))"
+# (ANTHROPIC_API_KEY pode ficar como placeholder — a IA ainda não é usada)
 ```
 
-Acesse a documentação interativa em **`http://localhost:8000/docs`** (Swagger).
+> **Dois arquivos, papéis diferentes:** o da **raiz** guarda só as credenciais do Postgres;
+> o de **`backend/`** guarda a configuração da aplicação. Ambos estão no `.gitignore`.
+> Se o `.env` da raiz não existir, `docker compose up` falha dizendo qual variável falta,
+> em vez de subir o banco com senha padrão.
 
-> **DATABASE_URL no Docker:** dentro dos containers o host do banco é `db` (não `localhost`).
-> O `docker-compose.yml` já injeta a `DATABASE_URL` correta automaticamente — não precisa mexer no `.env`.
-> A porta do Postgres fica exposta apenas em `127.0.0.1:5432` para ferramentas locais de desenvolvimento;
-> ela não deve ficar aberta em `0.0.0.0` na rede.
-
-### Criar a primeira Empresa + Gestor (rodando dentro do container)
-
-O sistema é multi-tenant: todo usuário pertence a uma Empresa. Crie a primeira Empresa e o seu
-primeiro Gestor juntos com o CLI do banco (ver "Scripts do banco" em `docs/tecnico-backend.md`):
-
-```bash
-docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "12.345.678/0001-90" "Nome do Gestor" gestor@exemplo.com SenhaForte123
-```
-
-> Para popular dados de demonstração (clientes, chamados e chat de exemplo) na Empresa criada:
-> `docker compose exec backend python scripts/gerenciar_banco.py semear`. Para zerar o banco de dev
-> do zero (dropa tudo, recria e aplica RLS): `... gerenciar_banco.py reset`.
-
-### Comandos úteis do dia a dia (Docker)
-
-```bash
-docker compose up -d        # subir
-docker compose logs -f backend   # acompanhar logs da API
-docker compose down         # parar (mantém os dados do banco no volume)
-docker compose up --build -d     # reconstruir após mudar dependências
-```
-
-> O código do backend é montado no container, então alterações em `.py` recarregam sozinhas (--reload).
-> O **frontend web** (Next.js) ainda roda fora do Docker — veja os passos 10 em diante (requer Node.js).
-
----
-
-## Opção B — Ambiente local manual (sem Docker para o backend)
-
-Use esta opção se preferir rodar o Python direto no WSL.
-
-## Passo 1 — Habilitar Docker no WSL 2
-
-O Docker precisa ser integrado ao WSL para funcionar no terminal Linux.
-
-1. Abra o **Docker Desktop** no Windows
-2. Vá em **Settings → Resources → WSL Integration**
-3. Ative **"Enable integration with my default WSL distro"**
-4. Clique em **Apply & Restart**
-
-Verifique se funcionou no terminal WSL:
-
-```bash
-docker --version
-```
-
----
-
-## Passo 2 — Instalar Python no WSL
-
-```bash
-sudo apt update && sudo apt install -y python3 python3-pip python3-venv
-```
-
-Verifique:
-
-```bash
-python3 --version
-```
-
----
-
-## Passo 3 — Clonar o repositório (se ainda não tiver)
-
-```bash
-cd ~
-git clone <url-do-repositorio> facilichat
-cd facilichat
-```
-
-> Se já clonou no Windows, o projeto estará disponível em `/mnt/c/` ou `/mnt/d/` no WSL.
-> Exemplo: `cd "/mnt/d/ProjetoDEV/FACILICHAT"`
-
----
-
-## Passo 4 — Criar o ambiente virtual Python
-
-Na raiz do projeto:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-O terminal vai mostrar `(.venv)` no início da linha quando estiver ativo.
-
-> Para reativar em sessões futuras, sempre rode `source .venv/bin/activate` na raiz do projeto.
-
----
-
-## Passo 5 — Instalar dependências do backend
-
-```bash
-pip install -r backend/requirements.txt
-```
-
----
-
-## Passo 6 — Criar o arquivo `.env`
-
-Copie o exemplo e edite com os valores reais:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Abra `backend/.env` e preencha:
-
-```env
-DATABASE_URL=postgresql+asyncpg://facilichat:facilichat123@localhost:5432/facilichat_db
-JWT_SECRET=coloque-aqui-uma-chave-aleatoria-longa
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=480
-ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-CADASTRO_PUBLICO_HABILITADO=false
-CADASTRO_PUBLICO_EMPRESA_ID=
-```
-
-Detalhes de cada variável:
+### Variáveis do `backend/.env` (referência)
 
 | Variável | Para que serve | Observação |
 |---|---|---|
-| `DATABASE_URL` | Conexão com o Postgres | Em dev, use exatamente o valor acima (bate com o `docker-compose.yml`). Mantenha o driver `+asyncpg`. |
-| `JWT_SECRET` | Assina/valida os tokens de login | Gere uma chave aleatória forte (veja abaixo). **Nunca** commite. Se mudar, todos os logins caem. |
+| `DATABASE_URL` | Conexão com o Postgres | Usada só quando o backend roda **fora** do Docker (o compose monta a URL sozinho). Usuário/senha/banco devem bater com o `.env` da raiz. Manter o driver `+asyncpg`. |
+| `JWT_SECRET` | Assina/valida os tokens de login | Chave aleatória forte, mínimo 32 bytes — o backend recusa placeholder/curta na subida. **Nunca** commite. Se mudar, todos os logins caem. |
 | `JWT_EXPIRE_MINUTES` | Validade do token (minutos) | Padrão 480 (8h). |
-| `ANTHROPIC_API_KEY` | Funcionalidades de IA (Fase 5) | Ainda **não é usada** pelo código, mas é obrigatória para a app subir. Use um placeholder por enquanto. |
-| `CORS_ORIGINS` | Quais frontends podem chamar a API pelo navegador | Lista separada por vírgula. Em produção, troque pelos domínios reais. |
-| `CADASTRO_PUBLICO_HABILITADO` | Liga/desliga `POST /usuarios/` sem autenticação | Padrão seguro: `false`. Use `true` só em dev/onboarding assistido. |
-| `CADASTRO_PUBLICO_EMPRESA_ID` | Empresa única autorizada a receber cadastro público | Obrigatória quando `CADASTRO_PUBLICO_HABILITADO=true`; o `EmpresaID` do payload precisa bater exatamente com este valor. |
-| `DEBUG` | Liga o `echo` do SQLAlchemy (loga todo SQL no console) | Padrão `false`. Use `true` só em dev, para depurar queries. |
-
-Para gerar um `JWT_SECRET` forte (com o venv ativado):
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-O backend recusa `JWT_SECRET` curto, previsível ou placeholder na inicialização. Para HS256, use
-um valor aleatório com pelo menos 32 bytes por ambiente; se ele mudar, todos os tokens existentes
-deixam de ser válidos e os usuários precisam entrar novamente.
+| `ANTHROPIC_API_KEY` | Funcionalidades de IA (Fase 5) | Ainda **não é usada**, mas é obrigatória para a app subir. Placeholder serve. |
+| `CORS_ORIGINS` | Frontends autorizados a chamar a API pelo navegador | Lista separada por vírgula. O middleware CSRF também valida `Origin` contra ela. |
+| `CADASTRO_PUBLICO_HABILITADO` | Liga/desliga `POST /usuarios/` sem autenticação | Padrão seguro: `false`. `true` só em dev/onboarding assistido. |
+| `CADASTRO_PUBLICO_EMPRESA_ID` | Empresa única autorizada a receber cadastro público | Obrigatória quando o cadastro público está habilitado. |
+| `COOKIE_SECURE` / `COOKIE_SAMESITE` / `COOKIE_DOMAIN` | Atributos do cookie de sessão do painel web | Em dev: `COOKIE_SECURE=false` (roda em http). Produção: ver `deploy-producao.md`. |
+| `DEBUG` | Liga o `echo` do SQLAlchemy (loga todo SQL) | Padrão `false`. `true` só para depurar queries em dev. |
 
 ---
 
-## Passo 7 — Subir o banco de dados
-
-Na raiz do projeto:
+## Passo 2 — Subir banco + API
 
 ```bash
-docker compose up -d
+docker compose up --build -d
+
+# conferir que está no ar
+docker compose ps                  # backend e db devem estar "Up"
+curl http://localhost:8000/        # -> {"mensagem":"FaciliChat online!"}
 ```
 
-Verifique se o container subiu:
+Swagger em **`http://localhost:8000/docs`**.
 
-```bash
-docker ps
-```
-
-Você deve ver o container `facilichat_db` com status `Up`.
+> Dentro dos containers o host do banco é `db` (não `localhost`) — o compose já monta a
+> `DATABASE_URL` correta. A porta 5432 fica exposta só em `127.0.0.1`, para ferramentas locais.
+> O código do backend é montado no container: alterações em `.py` recarregam sozinhas (`--reload`).
 
 ---
 
-## Passo 8 — Rodar o backend (cria as tabelas automaticamente)
+## Passo 3 — Criar a primeira Empresa + Gestor (e dados demo)
 
-> **Como as tabelas são criadas hoje:** o backend executa `Base.metadata.create_all` no startup,
-> ou seja, **as tabelas são criadas sozinhas na primeira vez que o servidor sobe**. Não há Alembic
-> configurado ainda (migrações estão no backlog — `plano-implementacao.md`). Por isso **não** rode
-> `alembic upgrade head`: o comando falharia, pois não existe configuração de Alembic no projeto.
+O sistema é multi-tenant: todo usuário pertence a uma Empresa, e o cadastro público fica fechado
+por padrão. O bootstrap é pelo CLI do banco (ver "Scripts do banco" em `docs/tecnico-backend.md`):
 
 ```bash
-cd backend
-uvicorn app.main:app --reload
+docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "12.345.678/0001-90" "Nome do Gestor" gestor@exemplo.com SenhaForte123
+
+# opcional: clientes, chamados e chat de demonstração (idempotente)
+docker compose exec backend python scripts/gerenciar_banco.py semear
+
+# se precisar zerar o banco de dev (dropa tudo, recria e aplica RLS):
+docker compose exec backend python scripts/gerenciar_banco.py reset
 ```
 
-O servidor estará disponível em:
-
-- API: `http://localhost:8000`
-- Documentação interativa (Swagger): `http://localhost:8000/docs`
-- Documentação alternativa (Redoc): `http://localhost:8000/redoc`
-
-> Na primeira execução, observe no log a mensagem "Banco de dados conectado!" — sinal de que as tabelas foram criadas.
+Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe`).
 
 ---
 
-## Passo 9 — Criar o primeiro usuário Gestor
-
-Por segurança, o cadastro público (`POST /usuarios/`) fica **desabilitado por padrão** e, quando
-habilitado em dev/onboarding assistido, **sempre cria um Cliente** apenas para a Empresa definida em
-`CADASTRO_PUBLICO_EMPRESA_ID`. A criação de perfis privilegiados (`POST /usuarios/equipe`) exige um
-**Gestor já autenticado**. Logo, o primeiro Gestor precisa ser criado pelo script de bootstrap (rode
-uma única vez, com o backend já tendo subido ao menos uma vez para as tabelas existirem):
+## Passo 4 — Rodar o frontend web
 
 ```bash
-cd backend
-python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "00.000.000/0001-00" "Nome do Gestor" gestor@exemplo.com SenhaForte123
-```
-
-Depois disso, faça login com esse Gestor para criar os demais usuários da equipe (Supervisores,
-Funcionários, RH, Financeiro e outros Gestores) via `POST /usuarios/equipe`. Para liberar cadastro
-público de Clientes em dev, defina `CADASTRO_PUBLICO_HABILITADO=true` e copie o ID da Empresa criada
-para `CADASTRO_PUBLICO_EMPRESA_ID`.
-
----
-
-## Passo 10 — Rodar o frontend web (opcional)
-
-Abra outro terminal WSL:
-
-```bash
-cd "/mnt/d/ProjetoDEV/FACILICHAT/frontend/web"
-npm install
+cd frontend/web
+cp .env.example .env.local   # NEXT_PUBLIC_API_URL=http://localhost:8000 (só na primeira vez)
+npm install                  # só na primeira vez
 npm run dev
 ```
 
-Acesse: `http://localhost:3000`
+Acesse **`http://localhost:3000`**.
+
+> **Mobile (opcional):** `cd frontend/mobile && npm install && npx expo start` e escaneie o QR Code
+> com o app Expo Go. Em dispositivo físico, defina `EXPO_PUBLIC_API_URL` com o IP da sua máquina.
 
 ---
 
-## Passo 11 — Rodar o frontend mobile (opcional)
-
-Requer Node.js instalado no WSL:
+## Comandos do dia a dia
 
 ```bash
-sudo apt install -y nodejs npm
+docker compose up -d               # subir banco + API
+docker compose logs -f backend     # acompanhar logs da API
+docker compose down                # parar (mantém os dados no volume; down -v apaga)
+docker compose up --build -d       # reconstruir após mudar dependências Python
+cd frontend/web && npm run dev     # web
 ```
 
-```bash
-cd "/mnt/d/ProjetoDEV/FACILICHAT/frontend/mobile"
-npm install
-npx expo start
-```
-
-Escaneie o QR Code com o aplicativo **Expo Go** no celular.
-
----
-
-## Resumo dos comandos do dia a dia
-
-Depois da configuração inicial, para rodar o projeto basta:
-
-```bash
-# 1. Entrar na pasta do projeto
-cd "/mnt/d/ProjetoDEV/FACILICHAT"
-
-# 2. Ativar o ambiente virtual
-source .venv/bin/activate
-
-# 3. Garantir que o banco está rodando
-docker compose up -d
-
-# 4. Rodar o backend
-cd backend && uvicorn app.main:app --reload
-```
-
----
-
-## Produção — `JWT_SECRET` e secrets por ambiente
-
-> Guia para quando o app for publicado (staging/produção). Em dev, o `backend/.env` local já resolve.
-> **Regra central: o segredo nunca entra no código nem no Git** — ele vive apenas no `.env` local
-> (dev) e no cofre de variáveis do ambiente onde a API roda (produção). Colar a chave em
-> `configuracoes.py` ou em qualquer arquivo versionado é vazamento: se acontecer, gere outra.
-
-### 1. Gerar uma chave forte (uma por ambiente)
-
-Cada ambiente (dev, staging, produção) deve ter **sua própria chave** — assim, o vazamento de uma
-não compromete as outras. Qualquer um dos comandos abaixo serve; copie a saída direto para o destino:
-
-```powershell
-# PowerShell (Windows, sem dependências)
-$bytes = New-Object byte[] 64
-[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-[Convert]::ToBase64String($bytes)
-```
-
-```bash
-# Python
-python -c "import secrets; print(secrets.token_urlsafe(64))"
-
-# openssl (Linux/Mac/Git Bash)
-openssl rand -base64 64
-```
-
-O backend valida na inicialização: recusa segredo com menos de 32 bytes ou igual aos placeholders
-conhecidos (ver `backend/app/configuracoes.py`).
-
-### 2. Cadastrar como secret no ambiente de produção
-
-"Cadastrar como secret" = informar o par `JWT_SECRET=<valor>` na área de variáveis de ambiente do
-lugar onde a API vai rodar. O provedor injeta a variável no processo quando a API sobe — o valor
-nunca passa pelo repositório.
-
-| Onde a API roda | Como cadastrar |
-|---|---|
-| **VPS próprio com Docker Compose** (DigitalOcean, Hostinger, etc.) | Via SSH, criar `backend/.env` direto no servidor com a chave de produção e restringir leitura: `chmod 600 backend/.env`. O `env_file` do compose carrega igual ao dev. |
-| **Render** | Painel do serviço → aba **Environment** → *Add Environment Variable* → `JWT_SECRET` + valor → Save. |
-| **Railway** | Painel do serviço → aba **Variables** → *New Variable*. |
-| **Fly.io** | Terminal: `fly secrets set JWT_SECRET=<valor>` (criptografa e reinicia o app). |
-| **CI (GitHub Actions)** | Repositório → **Settings → Secrets and variables → Actions → New repository secret**. No workflow, usar `${{ secrets.JWT_SECRET }}` (o GitHub mascara o valor nos logs). |
-
-> **Docker Desktop não é provedor de produção.** Ele roda containers **na sua máquina** (dev). A
-> conta Docker (Docker Hub) serve para publicar **imagens** — e imagem também não pode conter
-> secret, pois quem baixa a imagem enxerga tudo que foi copiado para dentro dela. Em produção, a
-> imagem roda em um servidor/provedor, e é **lá** que o secret é cadastrado.
-
-### 3. Rotação (trocar a chave)
-
-Trocar o `JWT_SECRET` **invalida todos os tokens já emitidos** — todos os usuários logados caem e
-precisam entrar de novo. Em produção, rotacione em horário de baixo uso. Rotacione imediatamente
-sempre que houver suspeita de exposição (chave commitada, colada em chat, etc.).
-
----
-
-## Produção — headers de segurança, CSP e HSTS (web) · item S16
-
-O `frontend/web/next.config.ts` envia headers de segurança em **todas** as respostas do painel:
-`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
-`Permissions-Policy` e uma **Content Security Policy em modo Report-Only**.
-
-### 1. CSP: fase de observação (Report-Only) → enforce
-
-Hoje a política sai no header `Content-Security-Policy-Report-Only`: o navegador **só registra**
-violações no console (aba Console do DevTools, mensagens `[Report Only]`), sem bloquear nada.
-Isso permite validar a política com o app real antes de ativá-la.
-
-Passos para promover a enforce, após um período de uso sem violações legítimas:
-
-1. Navegar pelo painel inteiro (login, chamados, plataforma) com o DevTools aberto e confirmar
-   que não aparecem violações `[Report Only]` causadas pelo próprio app.
-2. Em `next.config.ts`, trocar a chave `Content-Security-Policy-Report-Only` por
-   `Content-Security-Policy` (mesma política).
-3. Evolução futura (junto do endurecimento): substituir `'unsafe-inline'` de `script-src` por
-   nonces (middleware do Next), o que exige gerar a CSP por requisição.
-
-> A origem da API entra no `connect-src` a partir de `NEXT_PUBLIC_API_URL` — em produção,
-> **defina essa variável com a URL HTTPS real da API**, senão os `fetch` do painel viram violação.
-
-### 2. HSTS (só no proxy HTTPS de produção)
-
-`Strict-Transport-Security` **não** é enviado pelo Next de propósito: em dev o site roda em HTTP
-e HSTS gravaria no navegador uma exigência de HTTPS para `localhost`. Configure no proxy/host
-TLS de produção (nginx, Caddy, Cloudflare, Vercel etc.). Exemplo (nginx, dentro do bloco TLS):
-
-```nginx
-# Começar SEM includeSubDomains/preload; adicionar depois que todos os subdomínios tiverem TLS
-add_header Strict-Transport-Security "max-age=31536000" always;
-```
-
-> Referências do item S16: OWASP XSS Prevention Cheat Sheet (CSP como defesa em profundidade) e
-> MDN HTTP Headers. O CORS do backend (S17) e o cookie de sessão (S6) são itens separados do plano.
+> ⚠️ Não rode `npm run build` do web com o `npm run dev` ativo — os dois compartilham a pasta
+> `.next/` e o build sai corrompido (detalhes em `docs/tecnico-frontend.md`).
 
 ---
 
@@ -394,11 +123,11 @@ add_header Strict-Transport-Security "max-age=31536000" always;
 
 | Problema | Causa | Solução |
 |---|---|---|
-| `docker: command not found` | Integração WSL não ativada | Refazer o Passo 1 |
-| `No such file or directory` ao usar caminho `D:\` | Sintaxe Windows no WSL | Usar `/mnt/d/` em vez de `D:\` |
-| `ModuleNotFoundError` ao rodar uvicorn | Venv não ativado | Rodar `source .venv/bin/activate` |
-| Erro de conexão com banco | Container não está rodando | Rodar `docker compose up -d` |
-| `ANTHROPIC_API_KEY` inválida | Placeholder no `.env` | Substituir pela chave real em `backend/.env` |
+| `docker compose up` falha pedindo variável | `.env` da raiz não existe | Passo 1 |
+| API não sobe, erro de `JWT_SECRET` | Placeholder/chave curta no `backend/.env` | Gerar chave com o comando do Passo 1 |
+| Erro de conexão com banco | Container não está rodando | `docker compose up -d` |
+| Web não fala com a API (CORS/rede) | `.env.local` ausente ou URL errada | Passo 4; conferir `CORS_ORIGINS` no `backend/.env` |
+| Login com contas demo falha | Banco sem seed | `gerenciar_banco.py semear` (senha demo: `Senha123`) |
 
 ---
 

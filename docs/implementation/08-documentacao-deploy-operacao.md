@@ -11,7 +11,9 @@ Esta trilha garante que cada entrega seja operavel, verificavel e compreensivel 
 | `docs/arquitetura.md` | Decisoes arquiteturais atuais |
 | `docs/tecnico-backend.md` | Rotas, modelos e execucao backend |
 | `docs/tecnico-frontend.md` | Web/mobile, design system e build |
-| `docs/setup.md` | Ambiente local, producao, secrets e headers |
+| `docs/setup.md` | Setup de dev rápido (Docker, ~5 min) |
+| `docs/setup-manual.md` | Setup de dev alternativo sem Docker (WSL/venv) |
+| `docs/deploy-producao.md` | Runbook de produção: secrets, banco, cookies/CSRF, CSP/HSTS, checklist final (fecha com o S9) |
 | `docs/visao-geral.md` | Visao de produto e estado atual |
 
 ## Itens documentais

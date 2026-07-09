@@ -184,14 +184,25 @@ FACILICHAT/
 
 ## Variáveis de ambiente necessárias
 
+### Raiz do projeto (arquivo `.env`) — credenciais do Postgres do `docker-compose.yml`
+```
+POSTGRES_USER=facilichat
+POSTGRES_PASSWORD=<senha aleatória, uma por ambiente>
+POSTGRES_DB=facilichat_db
+```
+
 ### Backend (arquivo `backend/.env`)
 ```
-DATABASE_URL=postgresql+asyncpg://facilichat:facilichat123@localhost:5432/facilichat_db
+DATABASE_URL=postgresql+asyncpg://facilichat:<mesma senha do .env da raiz>@localhost:5432/facilichat_db
 JWT_SECRET=sua_chave_secreta_aqui
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=480
 ANTHROPIC_API_KEY=sua_chave_anthropic_aqui
 ```
+
+> Nenhum dos dois `.env` é versionado. O compose monta a `DATABASE_URL` dos containers a partir das
+> variáveis `POSTGRES_*`, então a senha existe em um único lugar. Regras de produção em
+> `docs/deploy-producao.md`.
 
 ### Frontend Web (arquivo `frontend/web/.env`)
 ```

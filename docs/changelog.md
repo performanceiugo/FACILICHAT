@@ -7,6 +7,121 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Docs — implantação reorganizada em 3 documentos com papéis claros
+- **Motivação (pedido do usuário):** o `setup.md` tinha ~510 linhas misturando três papéis —
+  onboarding de dev via Docker, onboarding manual via WSL e notas de produção acumuladas pelos
+  itens de segurança — o que passava a impressão de que subir/publicar o app exigia dezenas de
+  passos.
+- **`docs/setup.md` (reescrito):** só o caminho rápido de dev — 4 passos com Docker (~5 min),
+  tabela de referência das variáveis do `backend/.env` (agora incluindo as `COOKIE_*` do S6),
+  comandos do dia a dia e troubleshooting. Aponta para os outros dois documentos.
+- **`docs/setup-manual.md` (novo):** os antigos Passos 1–11 do caminho WSL/venv, atualizados
+  (bootstrap via `gerenciar_banco.py`, aviso sobre Alembic/reset) — apêndice para quem precisa
+  rodar o Python fora do container.
+- **`docs/deploy-producao.md` (novo):** runbook único de produção, consolidando as 4 seções
+  "Produção — ..." que estavam no setup (JWT_SECRET/secrets, credenciais do banco/S4,
+  sessão-cookies/S6, headers-CSP-HSTS/S16) + tabela "pronto vs pendente" e checklist final
+  numerado. Marcado como em construção: fecha de vez com o **S9**.
+- **`S9` ampliado no plano e no ClickUp** (`868kaa3cg`, segue `[ ]`): além do compose de produção
+  endurecido, agora cobre o serviço do web (build standalone do Next + Dockerfile), proxy TLS com
+  HSTS, `.env.prod.example` e a finalização do runbook — meta: deploy em ~4 comandos.
+- **Referências atualizadas** para as seções movidas: `.env.example` (raiz), `backend/.env.example`,
+  `frontend/web/next.config.ts`, `docs/arquitetura.md`, `docs/tecnico-frontend.md` e a trilha
+  `docs/implementation/08-documentacao-deploy-operacao.md`.
+
+### `S6` (+ `M6`) — Sessão do painel em cookie `HttpOnly`, com CSRF e proxy do Next
+- **Problema:** o JWT ficava no `localStorage` **e** num cookie escrito por JavaScript, sem
+  `HttpOnly`/`Secure` e com `Max-Age` de 7 dias para um token de 8h. Qualquer XSS no painel lia e
+  exfiltrava o token. O `middleware.ts` roteava com base em cookies graváveis pelo cliente.
+- **Decisões tomadas com o usuário** (registradas no plano):
+  - **Proxy do Next** (`/api/*`) em vez de chamada direta com `credentials`. Motivo: se web e API
+    ficassem em domínios registráveis diferentes, o cookie viraria de terceira parte
+    (`SameSite=None`), **bloqueado por padrão no Safari**. Com o proxy o cookie é first-party e a
+    hospedagem da API deixa de afetar a autenticação. Isso **inverteu** a cláusula final do S6
+    (`allow_credentials` do CORS **permanece `False`**) e absorveu o `M6`.
+  - **Middleware do Next só checa a presença** do cookie (evitar flash de conteúdo). Não valida
+    assinatura, para não espalhar o `JWT_SECRET` a um segundo serviço. Autorização real é do backend.
+- **Backend:** `login` emite `sessao` (`HttpOnly`), `csrf_token` e `funcao`, com `Max-Age` **igual à
+  validade real do token**. `obterTokenDaRequisicao` aceita cookie (web) **ou** `Bearer` (mobile),
+  com precedência do header. Novo `POST /autenticacao/logout`. Novo `app/servicos/csrf.py`
+  (middleware): valida `Origin`/`Referer` em métodos que mudam estado — o que cobre também o
+  **login CSRF** do form-urlencoded — e exige double-submit (`X-CSRF-Token` == cookie, comparado com
+  `compare_digest`) quando a credencial é o cookie. Bearer pula o double-submit por não ser
+  credencial ambiente. Logout é isento do double-submit (senão um cookie CSRF perdido prenderia o
+  usuário numa sessão que ele não consegue encerrar); a validação de origem continua valendo.
+- **Configuração por ambiente:** `COOKIE_SECURE`/`COOKIE_SAMESITE`/`COOKIE_DOMAIN`, com defaults de
+  produção. `SameSite=none` sem `Secure` **falha na subida** (o navegador descartaria o cookie em
+  silêncio). Em dev, `COOKIE_SECURE=false` porque o painel roda em `http://localhost`.
+- **Web:** `api.ts` chama `/api/*` e anexa o `X-CSRF-Token`; `auth.ts` não guarda mais token nem
+  escreve cookies (só nome/empresa, para exibição) e perdeu o `auth.token()`; `auth-storage.ts` não
+  serializa mais cookies; `middleware.ts` lê o cookie `sessao`; CSP fechou em `connect-src 'self'`.
+  Mobile **inalterado**.
+- **Achado durante a verificação:** o Next redireciona (308) URLs terminadas em barra, e as rotas do
+  backend usam barra final. Sem correção, o `fetch` seguiria um 307 do FastAPI **para a origem da
+  API**, saindo do proxy e esbarrando na CSP. Resolvido com `skipTrailingSlashRedirect: true` mais
+  uma regra de rewrite que preserva a barra — ambos comentados no `next.config.ts`.
+- **Verificado por requisição real** (12 casos, backend direto e através do proxy): `Set-Cookie` com
+  `HttpOnly` só no `sessao` e `Max-Age=28800` (8h); GET autenticado só com cookie; POST sem CSRF →
+  403; com CSRF errado → 403; com CSRF correto → 200; `Bearer` puro sem cookie nem CSRF → 200
+  (mobile preservado); `Origin` maliciosa → 403 mesmo com CSRF válido; login com `Origin` maliciosa
+  → 403; sem credencial → 401; logout devolve os três cookies expirados.
+- **Não verificado:** a interface clicada em navegador real — o Chrome disponível nesta sessão não
+  alcançava o servidor de dev. A garantia do `HttpOnly` está no header `Set-Cookie` e no cookie jar.
+- **Escopo:** logout apaga o cookie, mas **o JWT continua válido até expirar**. Revogação server-side
+  é o `S14`; refresh token com janela curta é o `S15`.
+- **Docs:** nova seção "Produção — sessão e cookies" no `setup.md` (com checklist de deploy);
+  `tecnico-backend.md` e `tecnico-frontend.md` atualizados.
+
+### `S17` — CORS sem wildcards e sem credentials
+- **Problema:** o `CORSMiddleware` rodava com `allow_credentials=True` mesmo sem a API usar cookies,
+  e com `allow_methods=["*"]` / `allow_headers=["*"]`.
+- **Por que os wildcards importavam:** lendo o código do Starlette 1.3.1 instalado, `allow_headers=["*"]`
+  faz o middleware **espelhar de volta qualquer header** que o cliente pedir no
+  `Access-Control-Request-Headers` — uma permissão em branco, não apenas uma lista genérica. E
+  `allow_methods=["*"]` expandia para os 7 verbos (incluindo `PUT`/`DELETE`/`HEAD`, que a API não tem).
+- **O que mudou** (`backend/app/main.py`): `allow_credentials=False`; `allow_methods` e `allow_headers`
+  viraram as constantes `CORS_METODOS_PERMITIDOS` (`GET, POST, PATCH, OPTIONS`) e
+  `CORS_HEADERS_PERMITIDOS` (`Authorization, Content-Type`). `configuracoes.py` não precisou mudar —
+  as origens já vinham explícitas do `.env`.
+- **Escopo ajustado ao código real:** o plano previa liberar também `DELETE`, mas a auditoria das rotas
+  mostrou que a API só expõe `GET` (3), `POST` (6) e `PATCH` (2) — nenhum `PUT`/`DELETE`. Verbo novo
+  exige incluir em `CORS_METODOS_PERMITIDOS` (documentado no `tecnico-backend.md`).
+- **Verificado com preflights reais** contra a API no ar: origem autorizada + `POST` + `Authorization`
+  → 200 com `Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS` e **sem**
+  `Access-Control-Allow-Credentials`; `DELETE` → 400 `Disallowed CORS method`; header arbitrário →
+  400 `Disallowed CORS headers`; origem estranha → 400 `Disallowed CORS origin`; `PATCH` → 200.
+  Fluxo real preservado: login (form-urlencoded) e `GET /chamados/` autenticado devolvendo 12 chamados.
+- **`allow_credentials` volta a `True` apenas no `S6`**, junto do cookie `HttpOnly` e da proteção CSRF
+  (token imprevisível + validação de `Origin`/`Referer`) — a spec proíbe `*` em requisição credenciada,
+  e as listas explícitas já deixam a configuração pronta para essa virada.
+- **Nota da checagem (`verificar-seguranca`):** as origens explícitas já estavam alinhadas ao OWASP; o
+  `pg_hba.conf` do container usa `trust` no loopback interno (padrão do initdb), sem efeito para quem
+  vem de fora do container.
+
+### `S4` — Credenciais do Postgres saem do `docker-compose.yml`
+- **Problema:** usuário, senha e nome do banco estavam escritos em texto puro no
+  `docker-compose.yml` (inclusive a senha repetida dentro da `DATABASE_URL` do serviço backend), e o
+  arquivo é versionado — ou seja, a credencial de desenvolvimento estava no Git e duplicada em dois
+  lugares que podiam sair de sincronia.
+- **O que mudou:**
+  - Novo **`.env` na raiz** (ignorado pelo Git) com `POSTGRES_USER`, `POSTGRES_PASSWORD` e
+    `POSTGRES_DB`, e o modelo correspondente em **`.env.example`**. É o arquivo que o Docker Compose
+    lê automaticamente para interpolar `${...}`.
+  - `docker-compose.yml` passou a usar `${VAR:?mensagem}`: sem o `.env`, a subida **falha com um
+    aviso claro** em vez de usar um default fraco. O healthcheck usa `$$POSTGRES_USER` e a
+    `DATABASE_URL` do backend é **montada a partir das mesmas variáveis** — a senha vive num lugar só.
+  - **Senha local rotacionada** via `ALTER USER` no banco em execução, preservando os dados
+    (a variável `POSTGRES_PASSWORD` só tem efeito na criação do volume).
+- **Verificado:** `docker compose up -d` recria os serviços, o db fica `healthy`, o backend loga
+  "Banco de dados conectado!", `GET /` responde e os 6 usuários seguem no banco. Testado de outro
+  container pela rede: a senha antiga é **rejeitada** (`password authentication failed`) e a nova é
+  aceita. Observação registrada: o `pg_hba.conf` da imagem usa `trust` para o loopback **dentro** do
+  container (padrão do initdb); qualquer outra origem cai em `scram-sha-256`.
+- **Docs:** `docs/setup.md` ganhou a seção "Produção — credenciais do banco por ambiente" (tabela
+  dev/staging/produção, exigência de papel não-superusuário em produção para a RLS valer também para
+  a aplicação, TLS, banco fora da internet) e o passo a passo de rotação da senha local; `docs/setup.md`
+  e `docs/arquitetura.md` não exibem mais a senha real.
+
 ### Tooling — scripts do banco unificados num único CLI (`gerenciar_banco.py`)
 - **Motivação (pedido do usuário):** havia 7 scripts espalhados em `backend/scripts/`, e a cada
   mudança de schema estava sendo criado um novo script de migração incremental — desnecessário em
