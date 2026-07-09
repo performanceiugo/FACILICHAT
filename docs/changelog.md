@@ -40,6 +40,9 @@
   criação de chamado (resposta com `Criacao` em `...Z`), atualização de status e listagem com as
   datas antigas preservadas. `DEBUG` documentado no `setup.md`; regra "sempre `agoraUtc()`"
   registrada no `tecnico-backend.md`.
+- **Nota:** o `scripts/aplicar_m5_timestamptz.py` citado acima foi **removido no mesmo dia** pela
+  unificação dos scripts de banco (ver a entrada "Scripts do banco unificados" no topo) — em dev,
+  a conversão de schema passa a ser feita por `gerenciar_banco.py reset`.
 
 ### `M12` — Retornos de erro do projeto inteiro traduzidos para português
 - **Origem:** o usuário viu um aviso em inglês na tela de login do web. Diagnóstico: as mensagens
