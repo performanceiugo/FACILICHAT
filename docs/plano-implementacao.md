@@ -222,6 +222,7 @@
 | `[ ]` | `868k60vbb` | M9 | Web: arquivos CSS sem nenhum comentário (viola regra do `CLAUDE.md`) | Adicionar cabeçalho e comentar blocos (especialmente `:root` de tokens) | `frontend/web/src/app/**/*.css` |
 | `[x]` | `868k60vbj` | M10 | Mobile: `chamados.tsx`/`perfil.tsx` sem `catch` → erros engolidos | Adicionar `catch` com estado de erro e botão "Tentar novamente" | `frontend/mobile/app/(tabs)/chamados.tsx`, `frontend/mobile/app/(tabs)/perfil.tsx` |
 | `[x]` | `868k60vbz` | M11 | Mobile: paleta fora dos tokens; Figtree não carregada | Substituir pelos tokens Ink; carregar Figtree via `expo-font` | `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts`, `frontend/mobile/app/_layout.tsx` |
+| `[x]` | `868kakk65` | M12 | Mensagens de erro em inglês vazam ao usuário: 422 do Pydantic (`Field required` etc., com `detail` em lista que o front exibe como `[object Object]`) e falha de rede do fetch (`Failed to fetch`) | Handler de `RequestValidationError` no backend traduz os tipos comuns para PT e devolve `detail` como string; web/mobile ganharam `extrairDetail` (string/lista) e `fetchOuErroDeConexao` (falha de rede → mensagem PT); validado com curl (422/401 em PT) e `tsc --noEmit` nos dois fronts | `backend/app/main.py`, `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 
 ### 🟢 Baixos
 

@@ -7,6 +7,22 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### `M12` — Retornos de erro do projeto inteiro traduzidos para português
+- **Origem:** o usuário viu um aviso em inglês na tela de login do web. Diagnóstico: as mensagens
+  do nosso código já eram PT; o inglês vazava de (1) erros de validação automáticos do
+  FastAPI/Pydantic (422 — "Field required", "value is not a valid email address", com `detail` em
+  lista que o front exibiria como `[object Object]`) e (2) falhas de rede do `fetch`
+  ("Failed to fetch" no navegador / "Network request failed" no React Native).
+- **Backend:** handler global de `RequestValidationError` em `main.py` traduz os tipos comuns de
+  erro Pydantic para PT com o nome do campo e devolve `detail` como string única — mesmo formato
+  dos `HTTPException` das rotas (ex.: `"O campo 'Email' deve ser um e-mail válido"`).
+- **Web e mobile:** `lib/api.ts` de ambos ganhou `extrairDetail` (aceita `detail` string ou lista,
+  por defesa) e `fetchOuErroDeConexao` (falha de rede → "Não foi possível conectar ao servidor.
+  Verifique sua conexão e tente novamente."), aplicados ao `req` genérico e ao `login`.
+- **Verificado:** curls de 422 (campo faltando, UUID inválido, e-mail inválido) e 401 respondendo
+  em português; `tsc --noEmit` limpo no web e no mobile. Regra registrada no `tecnico-backend.md`:
+  rotas novas devem escrever `detail` em português.
+
 ### Segurança — `S7` parcial: rate limit e resposta menos enumerável em login/cadastro
 - Criado `backend/app/servicos/seguranca.py` com rate limit em memória por IP e e-mail para fluxos
   públicos de autenticação (`login` e cadastro público), retornando `429` após excesso de tentativas.

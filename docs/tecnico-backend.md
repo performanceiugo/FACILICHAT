@@ -124,6 +124,20 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - **Cadastro público fechado por padrão**; quando habilitado, só aceita a Empresa configurada e cria Cliente. Perfis privilegiados só via `/usuarios/equipe` (Gestor)
 - **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
 
+## Erros para o usuário — sempre em português (M12)
+
+Todo corpo de erro da API sai como `{"detail": "<mensagem em português>"}` (string única):
+
+- Os `HTTPException` das rotas já são escritos em PT ("Email ou senha incorretos" etc.).
+- Os erros de **validação automática do Pydantic** (422), que por padrão saem em inglês e em
+  formato de lista, passam por um handler global de `RequestValidationError` no `main.py` que
+  traduz os tipos comuns (`missing`, `uuid_parsing`, e-mail inválido, etc.) e junta tudo numa
+  única string — ex.: `"O campo 'Email' deve ser um e-mail válido"`.
+- Ao criar rotas novas, **escreva o `detail` em português**; tipos de validação ainda não mapeados
+  caem no genérico "tem um valor inválido" (adicione ao mapa `TRADUCAO_ERROS_VALIDACAO` se preciso).
+- Nos clientes web/mobile, `lib/api.ts` normaliza o `detail` (string ou lista) e converte falha de
+  rede do `fetch` em "Não foi possível conectar ao servidor..." — nunca "Failed to fetch".
+
 ---
 
 ## Multi-tenancy (SaaS) — a implementar (Fase 0.7, prioritária)
