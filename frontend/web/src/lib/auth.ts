@@ -1,51 +1,40 @@
-// Gerenciamento de sessão no frontend web
-// Armazena token, função, nome e o tenant (EmpresaID) no localStorage do navegador
+// Gerenciamento de sessao no frontend web.
+//
+// Depois do item S6, o token NAO passa mais por aqui. Ele vive num cookie `HttpOnly` emitido pelo
+// backend, invisivel para JavaScript — e portanto inalcancavel para um XSS. Este modulo cuida
+// apenas do que a interface precisa exibir (nome, empresa) e de ler a funcao para rotear telas.
+//
+// Consequencia pratica: nao existe mais `auth.token()`. O navegador anexa o cookie sozinho nas
+// chamadas para `/api/*` (mesma origem, via proxy do Next), entao o cliente HTTP nao precisa
+// injetar `Authorization`.
 
 import type { TokenResposta, UsuarioFuncao } from '@/types'
-import { serializarCookie, serializarRemocaoCookie } from '@/lib/auth-storage'
+import {
+  COOKIE_FUNCAO,
+  EMPRESA_ID_KEY,
+  EMPRESA_NOME_KEY,
+  NOME_KEY,
+  lerCookie,
+} from '@/lib/auth-storage'
 
-// Chaves usadas no localStorage — centralizadas para evitar erros de digitação
-const TOKEN_KEY = 'token'
-const FUNCAO_KEY = 'funcao'
-const NOME_KEY = 'nome'
-const EMPRESA_ID_KEY = 'empresaId'  // Tenant do usuário logado — sempre lido do token de login (Fase 0.7)
-const EMPRESA_NOME_KEY = 'empresaNome'  // Nome da Empresa, só para exibição (ex.: "Admin · Cefram")
-
-// Indica se o código está rodando no navegador (cliente).
-// No SSR do Next.js (servidor) o objeto `window` não existe, e acessar localStorage lançaria erro.
+// Indica se o codigo esta rodando no navegador (cliente).
+// No SSR do Next.js (servidor) o objeto `window` nao existe, e acessar localStorage lancaria erro.
 const noNavegador = () => typeof window !== 'undefined'
 
-function salvarCookie(chave: string, valor: string) {
-  if (!noNavegador()) return
-  document.cookie = serializarCookie(chave, valor)
-}
-
-function removerCookie(chave: string) {
-  if (!noNavegador()) return
-  document.cookie = serializarRemocaoCookie(chave)
-}
-
 export const auth = {
-  // Salva os dados de sessão após login bem-sucedido
+  // Guarda os dados de EXIBICAO do login. Os cookies (sessao, csrf, funcao) ja vieram no
+  // `Set-Cookie` da resposta — o navegador os armazenou sozinho, sem passar por este codigo.
   salvar(dados: TokenResposta) {
     if (!noNavegador()) return
-    localStorage.setItem(TOKEN_KEY, dados.token_acesso)
-    localStorage.setItem(FUNCAO_KEY, dados.funcao)
     localStorage.setItem(NOME_KEY, dados.nome)
     localStorage.setItem(EMPRESA_ID_KEY, dados.empresa_id)
     localStorage.setItem(EMPRESA_NOME_KEY, dados.empresa_nome ?? '')
-    salvarCookie(TOKEN_KEY, dados.token_acesso)
-    salvarCookie(FUNCAO_KEY, dados.funcao)
   },
 
-  token(): string | null {
-    if (!noNavegador()) return null
-    return localStorage.getItem(TOKEN_KEY)
-  },
-
+  // A funcao vem do cookie legivel emitido pelo backend (nao do localStorage), para que o
+  // middleware do Next e o cliente enxerguem exatamente o mesmo valor.
   funcao(): UsuarioFuncao | null {
-    if (!noNavegador()) return null
-    return localStorage.getItem(FUNCAO_KEY) as UsuarioFuncao | null
+    return lerCookie(COOKIE_FUNCAO) as UsuarioFuncao | null
   },
 
   nome(): string | null {
@@ -53,8 +42,8 @@ export const auth = {
     return localStorage.getItem(NOME_KEY)
   },
 
-  // ID da Empresa (tenant) do usuário logado — só existe para exibição; nunca é enviado
-  // de volta à API (o backend sempre resolve o tenant a partir do próprio token).
+  // ID da Empresa (tenant) do usuario logado — so existe para exibicao; nunca e enviado
+  // de volta a API (o backend sempre resolve o tenant a partir do proprio token).
   empresaId(): string | null {
     if (!noNavegador()) return null
     return localStorage.getItem(EMPRESA_ID_KEY)
@@ -65,22 +54,20 @@ export const auth = {
     return localStorage.getItem(EMPRESA_NOME_KEY) || null
   },
 
-  // Verifica se há sessão ativa (token presente no localStorage)
+  // Ha sessao ativa? O cookie de sessao e HttpOnly, entao o cliente NAO consegue ve-lo; usamos a
+  // presenca do cookie `funcao`, que o backend emite junto e com a mesma validade. E so uma dica
+  // de interface: quem de fato decide e o backend, que rejeita com 401 e dispara o redirecionamento.
   autenticado(): boolean {
-    if (!noNavegador()) return false
-    return !!localStorage.getItem(TOKEN_KEY)
+    return this.funcao() !== null
   },
 
-  // Remove todos os dados de sessão — chamado no logout
-  sair() {
+  // Limpa apenas os dados locais de exibicao. NAO apaga os cookies — so o backend consegue apagar
+  // um cookie HttpOnly. Use `api.logout()` para encerrar a sessao de verdade.
+  limparLocal() {
     if (!noNavegador()) return
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(FUNCAO_KEY)
     localStorage.removeItem(NOME_KEY)
     localStorage.removeItem(EMPRESA_ID_KEY)
     localStorage.removeItem(EMPRESA_NOME_KEY)
-    removerCookie(TOKEN_KEY)
-    removerCookie(FUNCAO_KEY)
   },
 
   isGestor(): boolean {
@@ -91,7 +78,7 @@ export const auth = {
     return this.funcao() === 'Superadmin'
   },
 
-  // Supervisores e gestores têm acesso às funcionalidades de supervisão
+  // Supervisores e gestores tem acesso as funcionalidades de supervisao
   isSupervisor(): boolean {
     const f = this.funcao()
     return f === 'Supervisor' || f === 'Gestor'

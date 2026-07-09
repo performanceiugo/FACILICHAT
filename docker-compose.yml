@@ -1,11 +1,15 @@
+# Ambiente de desenvolvimento local (Postgres + API FastAPI).
+# As credenciais do banco NÃO ficam neste arquivo: vêm do `.env` da raiz (ignorado pelo Git),
+# cujo modelo é o `.env.example`. A sintaxe `${VAR:?mensagem}` faz o compose falhar cedo,
+# com mensagem clara, se a variável não estiver definida — em vez de subir com um default fraco.
 services:
   db:
     image: postgres:16
     container_name: facilichat_db
     environment:
-      POSTGRES_USER: facilichat
-      POSTGRES_PASSWORD: facilichat123
-      POSTGRES_DB: facilichat_db
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env da raiz (veja .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env da raiz (veja .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB no .env da raiz (veja .env.example)}
     ports:
       # Exposto apenas para localhost em dev; os containers usam a rede interna do Compose.
       - "127.0.0.1:5432:5432"
@@ -13,7 +17,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     # Healthcheck: só libera o backend depois que o Postgres aceitar conexões
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U facilichat -d facilichat_db"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -28,7 +32,9 @@ services:
     environment:
       # Dentro da rede do compose o host do banco é o serviço "db" (não "localhost").
       # Esta variável sobrescreve a DATABASE_URL do .env, que aponta para localhost.
-      DATABASE_URL: postgresql+asyncpg://facilichat:facilichat123@db:5432/facilichat_db
+      # A URL é montada a partir das mesmas variáveis do serviço `db`, para que a senha
+      # exista em um lugar só e não haja como os dois lados saírem de sincronia.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "8000:8000"
     # Espera o banco ficar saudável antes de subir (evita erro de conexão no create_all)

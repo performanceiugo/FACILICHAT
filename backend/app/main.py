@@ -9,6 +9,7 @@ from app.banco_dados import engine, Base
 from app.configuracoes import configuracoes
 from app import modelos  # importação necessária para que o SQLAlchemy reconheça os modelos antes do create_all
 from app.rotas import Autenticacao, Usuarios, Chamados, Plataforma
+from app.servicos.csrf import CsrfMiddleware
 
 # Instância principal da aplicação — título e versão aparecem no Swagger (/docs)
 app = FastAPI(
@@ -17,14 +18,40 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# Métodos HTTP realmente expostos pela API (rotas em app/rotas/). Listar explicitamente, em vez de
+# "*", evita anunciar ao navegador verbos que não existem (PUT, DELETE, HEAD). Ao criar uma rota com
+# um verbo novo, ele precisa ser adicionado aqui — senão o preflight do navegador reprova a chamada.
+CORS_METODOS_PERMITIDOS = ["GET", "POST", "PATCH", "OPTIONS"]
+
+# Headers que os frontends enviam. `Content-Type` já entra pela safelist do CORS, mas fica explícito
+# para o preflight de JSON. Com "*", o Starlette devolveria de volta QUALQUER header pedido pelo
+# cliente (ele espelha o `Access-Control-Request-Headers`), o que é uma permissão em branco.
+CORS_HEADERS_PERMITIDOS = ["Authorization", "Content-Type"]
+
+# Proteção CSRF (item S6) — obrigatória a partir do momento em que a sessão do painel viaja em
+# cookie, porque o navegador anexa cookies sozinho em requisições vindas de qualquer site.
+# Registrado ANTES do CORS de propósito: no FastAPI, o último middleware adicionado é o mais
+# externo, então o CORS envolve o CSRF. Assim o preflight (OPTIONS) é respondido pelo CORS sem
+# passar pelo CSRF, e um 403 do CSRF ainda sai com os headers de CORS — sem isso o navegador
+# esconderia o erro real do painel atrás de uma mensagem genérica de CORS.
+app.add_middleware(CsrfMiddleware)
+
 # CORS — libera os frontends (web/mobile) configurados a chamar a API pelo navegador.
-# Origens explícitas (nunca "*" junto de allow_credentials) vindas das configurações/.env.
+# Origens explícitas (nunca "*") vindas das configurações/.env.
+#
+# `allow_credentials=False` (item S17): hoje a autenticação é por header `Authorization: Bearer`,
+# e nenhum cliente envia cookies (`credentials: 'include'`). Manter o flag ligado só anunciava um
+# poder que ninguém usa. Quando o S6 migrar a sessão do web para cookie `HttpOnly`, este flag volta
+# a `True` — mas **somente junto** da proteção CSRF (token imprevisível + validação de Origin/Referer),
+# porque `SameSite` sozinho não basta. A especificação também proíbe "*" em `allow_methods`,
+# `allow_headers` e `allow_origins` em requisições credenciadas, então as listas explícitas abaixo
+# já deixam a configuração pronta para essa virada.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=configuracoes.cors_origins_lista,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=CORS_METODOS_PERMITIDOS,
+    allow_headers=CORS_HEADERS_PERMITIDOS,
 )
 
 # Tradução dos erros de validação automáticos do Pydantic (item M12 do plano).

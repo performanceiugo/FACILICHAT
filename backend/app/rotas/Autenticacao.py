@@ -1,7 +1,7 @@
 # Rotas de autenticação e utilitários de segurança JWT
 # Responsável por: login, geração de token e validação do usuário atual em rotas protegidas
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
@@ -15,6 +15,7 @@ from app.modelos.Usuarios import Usuario
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.configuracoes import configuracoes
 from app.servicos.seguranca import aplicarRateLimitAutenticacao
+from app.servicos.sessao import COOKIE_SESSAO, definirCookiesSessao, limparCookiesSessao
 import uuid
 
 roteador = APIRouter(prefix="/autenticacao", tags=["Autenticacao"])
@@ -26,8 +27,23 @@ pwd = PasswordHash.recommended()
 # e inexistente no login. O valor representa uma senha aleatoria sem utilidade operacional.
 HASH_DUMMY_LOGIN = pwd.hash("senha-dummy-para-uniformizar-tempo-de-login")
 
-# Informa ao FastAPI onde está o endpoint de login para o fluxo OAuth2 (exibido no Swagger)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/autenticacao/login")
+# Informa ao FastAPI onde está o endpoint de login para o fluxo OAuth2 (exibido no Swagger).
+# `auto_error=False`: sem o header Authorization, devolve None em vez de lançar 401 — porque o
+# painel web autentica por cookie, e quem decide se há credencial é `obterTokenDaRequisicao`.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/autenticacao/login", auto_error=False)
+
+
+# Extrai o token da requisição, aceitando as DUAS formas de sessão que o produto usa (item S6):
+# o cookie `HttpOnly` do painel web e o header `Authorization: Bearer` do app mobile (SecureStore).
+# O header tem precedência: se o cliente se identificou explicitamente, é essa credencial que vale.
+async def obterTokenDaRequisicao(
+    request: Request,
+    tokenDoHeader: str | None = Depends(oauth2_scheme),
+) -> str:
+    token = tokenDoHeader or request.cookies.get(COOKIE_SESSAO)
+    if not token:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    return token
 
 # Gera um token JWT com o ID, função e tenant (Empresa) do usuário, válido pelo tempo configurado
 # em JWT_EXPIRE_MINUTES. O empresa_id viaja no token para que o front nunca precise informar o
@@ -46,7 +62,7 @@ def criarToken(usuarioID: str, funcao: str, empresaID: str) -> str:
 # Dependência injetável — decodifica o token da requisição e retorna o usuário autenticado
 # Usada em todas as rotas protegidas com Depends(obterUsuarioAtual)
 async def obterUsuarioAtual(
-    token: str = Depends(oauth2_scheme),
+    token: str = Depends(obterTokenDaRequisicao),
     db: AsyncSession = Depends(obterBancoDados)
 ):
     try:
@@ -71,7 +87,7 @@ async def obterUsuarioAtual(
 # Dependência leve — extrai só o tenant (EmpresaID) do token, sem carregar o Usuario inteiro do banco.
 # Existe separada de obterUsuarioAtual para rotas/serviços que só precisam do escopo do tenant
 # (ex.: filtros de query), evitando um SELECT extra quando o usuário completo não é necessário.
-async def obterTenantAtual(token: str = Depends(oauth2_scheme)) -> uuid.UUID:
+async def obterTenantAtual(token: str = Depends(obterTokenDaRequisicao)) -> uuid.UUID:
     try:
         payload = jwt.decode(token, configuracoes.JWT_SECRET, algorithms=[configuracoes.JWT_ALGORITHM])
         empresaID = payload.get("empresa_id")
@@ -101,10 +117,14 @@ async def obterBancoDadosComTenant(
     finally:
         await db.execute(text("RESET app.empresa_id"))
 
-# POST /autenticacao/login — recebe email e senha, retorna o token JWT e dados básicos do usuário
+# POST /autenticacao/login — recebe email e senha, retorna o token JWT e dados básicos do usuário.
+# Além do corpo, emite os cookies de sessão (S6): o painel web usa os cookies e ignora o
+# `token_acesso` do corpo; o app mobile faz o inverso (guarda o token no SecureStore e descarta
+# os cookies). Uma rota só, servindo os dois clientes.
 @roteador.post("/login")
 async def login(
     request: Request,
+    resposta: Response,
     formulario: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(obterBancoDados)
 ):
@@ -130,6 +150,9 @@ async def login(
 
     token = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
 
+    # Cookies da sessão web: `sessao` (HttpOnly, invisível para JavaScript), `csrf_token` e `funcao`.
+    definirCookiesSessao(resposta, token, usuario.Funcao.value)
+
     return {
         "token_acesso": token,
         "tipo_token": "bearer",
@@ -138,3 +161,17 @@ async def login(
         "empresa_id": str(usuario.EmpresaID),
         "empresa_nome": empresa.Nome if empresa else None,
     }
+
+
+# POST /autenticacao/logout — encerra a sessão do painel web apagando os cookies.
+#
+# Limite conhecido e proposital: isto é logout do LADO DO CLIENTE. O JWT em si continua válido até
+# expirar — se alguém já tiver copiado o token, apagar o cookie não o invalida. A revogação real
+# (denylist por `jti`) é o item S14 do plano e depende das claims do B6. Não confunda os dois.
+#
+# Não exige autenticação: chamar logout sem sessão simplesmente não faz nada. Exigir um token válido
+# só criaria um jeito de o usuário ficar preso numa sessão expirada, sem conseguir limpar o cookie.
+@roteador.post("/logout")
+async def logout(resposta: Response):
+    limparCookiesSessao(resposta)
+    return {"mensagem": "Sessão encerrada"}

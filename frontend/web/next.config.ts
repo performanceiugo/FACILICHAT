@@ -1,11 +1,13 @@
 // Configuração do Next.js do painel web FaciliChat
 // Responsável por: proxy opcional para a API (rewrites) e headers de segurança de todas as
 // respostas (item S16 do plano): CSP em Report-Only, anti-sniffing, anti-clickjacking,
-// política de referrer e de permissões. HSTS fica no proxy HTTPS de produção (docs/setup.md).
+// política de referrer e de permissões. HSTS fica no proxy HTTPS de produção (docs/deploy-producao.md).
 
 import type { NextConfig } from 'next'
 
-// Origem da API FastAPI — precisa entrar no connect-src da CSP, senão o fetch do painel é violação
+// Origem da API FastAPI — destino do proxy `/api/*`. Note que ela NÃO entra no `connect-src` da
+// CSP: depois do item S6 o navegador nunca fala com a API diretamente, só com este servidor Next,
+// que reencaminha. Quem faz a chamada à API é o servidor, e CSP não se aplica a ele.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 // Em desenvolvimento o Next exige 'unsafe-eval' (HMR/react-refresh) e WebSocket local;
@@ -21,7 +23,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",                               // CSS próprio + inline do Next
   "img-src 'self' data: blob:",                                     // imagens locais e data-URIs (logo SVG)
   "font-src 'self' data:",                                          // Figtree é self-hosted via next/font
-  `connect-src 'self' ${API_ORIGIN}${dev ? ' ws: wss:' : ''}`,      // fetch para a API (+HMR em dev)
+  `connect-src 'self'${dev ? ' ws: wss:' : ''}`,                    // só a própria origem: a API é alcançada pelo proxy /api/* (S6). (+HMR em dev)
   "object-src 'none'",                                              // sem plugins/embeds
   "base-uri 'self'",                                                // impede sequestro de <base>
   "form-action 'self'",                                             // forms só postam na própria origem
@@ -29,9 +31,24 @@ const csp = [
 ].join('; ')
 
 const nextConfig: NextConfig = {
-  // Proxy /api/* → backend (configurado desde o início; estratégia definitiva é o item M6 do plano)
+  // Por padrão o Next redireciona (308) qualquer URL terminada em "/" para a versão sem barra.
+  // As rotas do backend usam barra final (`/chamados/`), então esse redirecionamento quebraria o
+  // proxy: o fetch seguiria para `/api/chamados` e o método/corpo do POST se perderiam no caminho.
+  // Desligar o redirecionamento faz a URL chegar intacta ao rewrite.
+  skipTrailingSlashRedirect: true,
+
+  // Proxy /api/* → backend. Estratégia definitiva escolhida no item M6 e implementada junto do S6:
+  // o navegador só conversa com esta origem, o que torna o cookie de sessão first-party.
   async rewrites() {
     return [
+      // A barra final precisa sobreviver ao proxy. O padrão `/api/:path*` a consome, e o backend
+      // (cujas rotas são `/chamados/`) responderia 307 apontando para a ORIGEM DA API — o navegador
+      // seguiria esse redirecionamento para fora do proxy, tornando o cookie de terceira parte e
+      // esbarrando na CSP `connect-src 'self'`. Esta regra vem primeiro e preserva a barra.
+      {
+        source: '/api/:path*/',
+        destination: `${API_ORIGIN}/:path*/`,
+      },
       {
         source: '/api/:path*',
         destination: `${API_ORIGIN}/:path*`,
@@ -47,7 +64,7 @@ const nextConfig: NextConfig = {
         headers: [
           // CSP em modo Report-Only: o navegador só REGISTRA violações no console, sem bloquear
           // nada. Depois de um período de observação sem violações legítimas, renomear para
-          // 'Content-Security-Policy' (enforce) — passos em docs/setup.md.
+          // 'Content-Security-Policy' (enforce) — passos em docs/deploy-producao.md.
           { key: 'Content-Security-Policy-Report-Only', value: csp },
           // Impede o navegador de "adivinhar" o MIME type de uma resposta (bloqueia sniffing)
           { key: 'X-Content-Type-Options', value: 'nosniff' },

@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import styles from './AdminShell.module.css'
 
@@ -58,9 +59,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     setCarregado(true)
   }, [router])
 
-  // Encerra a sessão e volta ao login
-  function sair() {
-    auth.sair()
+  // Encerra a sessão e volta ao login. O logout é uma chamada ao backend porque só ele consegue
+  // apagar o cookie `HttpOnly` da sessão (item S6) — limpar o localStorage não bastaria.
+  async function sair() {
+    await api.logout()
     router.push('/login')
   }
 

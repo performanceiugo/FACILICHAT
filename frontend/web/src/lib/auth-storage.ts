@@ -1,18 +1,34 @@
 // Chaves de armazenamento da sessao web.
-// LocalStorage e cookies usam o mesmo mapa para manter middleware e cliente em sincronia.
+//
+// Depois do item S6, o cliente NAO escreve mais nenhum cookie: quem os emite e o backend.
+// Restam aqui (a) os nomes dos cookies que o backend define, para middleware e cliente lerem,
+// e (b) as chaves de localStorage usadas apenas para dados de EXIBICAO.
 
-export const TOKEN_KEY = 'token'
-export const FUNCAO_KEY = 'funcao'
+// --- Cookies emitidos pelo backend -----------------------------------------------------------
+// `sessao` guarda o JWT e e HttpOnly: nem este arquivo nem qualquer outro JavaScript o enxerga.
+// Ele so aparece aqui como nome, para o middleware do Next (que roda no servidor) checar presenca.
+export const COOKIE_SESSAO = 'sessao'
+
+// Token CSRF: legivel de proposito. O cliente le e repete no header X-CSRF-Token.
+export const COOKIE_CSRF = 'csrf_token'
+export const HEADER_CSRF = 'X-CSRF-Token'
+
+// Funcao do usuario: legivel, usada so para decidir QUAL TELA abrir (roteamento).
+// Forjavel — e tudo bem: a autorizacao real acontece no backend, a partir do JWT assinado.
+export const COOKIE_FUNCAO = 'funcao'
+
+// --- localStorage: apenas dados de exibicao, nunca credenciais --------------------------------
 export const NOME_KEY = 'nome'
 export const EMPRESA_ID_KEY = 'empresaId'
 export const EMPRESA_NOME_KEY = 'empresaNome'
 
-const COOKIE_MAX_AGE_SEGUNDOS = 60 * 60 * 24 * 7
-
-export function serializarCookie(chave: string, valor: string): string {
-  return `${chave}=${encodeURIComponent(valor)}; Path=/; Max-Age=${COOKIE_MAX_AGE_SEGUNDOS}; SameSite=Lax`
-}
-
-export function serializarRemocaoCookie(chave: string): string {
-  return `${chave}=; Path=/; Max-Age=0; SameSite=Lax`
+// Le um cookie nao-HttpOnly do documento. Retorna null no SSR (onde `document` nao existe) e
+// quando o cookie nao esta presente.
+export function lerCookie(nome: string): string | null {
+  if (typeof document === 'undefined') return null
+  const encontrado = document.cookie
+    .split('; ')
+    .find(parte => parte.startsWith(`${nome}=`))
+  if (!encontrado) return null
+  return decodeURIComponent(encontrado.slice(nome.length + 1))
 }

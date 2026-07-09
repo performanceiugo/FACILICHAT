@@ -15,12 +15,30 @@ import type {
   Usuario,
 } from '@/types'
 import { auth } from '@/lib/auth'
+import { COOKIE_CSRF, HEADER_CSRF, lerCookie } from '@/lib/auth-storage'
 
-// URL base da API — configurada via variável de ambiente, com fallback para desenvolvimento local
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+// URL base da API — o painel chama o PROXY do Next (`/api/*` → backend, rewrite em next.config.ts),
+// nunca a API direto. Isso mantém tudo na mesma origem, o que (a) torna o cookie de sessão
+// first-party, (b) dispensa CORS com credenciais no backend e (c) permite CSP `connect-src 'self'`.
+// Itens S6 e M6 do plano.
+const BASE = '/api'
+
+// Métodos que mudam estado precisam do token CSRF (o backend exige — ver servicos/csrf.py).
+const METODOS_QUE_MUDAM_ESTADO = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+// Monta o header CSRF lendo o cookie `csrf_token` que o backend emitiu no login. O cookie é
+// legível por JavaScript de propósito: um site atacante consegue fazer o navegador ENVIAR o
+// cookie, mas a same-origin policy o impede de LÊ-LO, então não sabe qual header repetir.
+function headerCsrf(metodo: string): Record<string, string> {
+  if (!METODOS_QUE_MUDAM_ESTADO.has(metodo.toUpperCase())) return {}
+  const token = lerCookie(COOKIE_CSRF)
+  return token ? { [HEADER_CSRF]: token } : {}
+}
 
 function redirecionarParaLoginPorSessaoExpirada() {
-  auth.sair()
+  // Só limpa os dados locais: o cookie HttpOnly já está inválido (foi ele que gerou o 401),
+  // e apagá-lo exigiria uma chamada ao backend que não tem serventia aqui.
+  auth.limparLocal()
   if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
     window.location.assign('/login')
   }
@@ -52,16 +70,23 @@ async function fetchOuErroDeConexao(url: string, options?: RequestInit): Promise
   }
 }
 
-// Função genérica de requisição HTTP com tipagem — injeta token e trata erros da API
+// Função genérica de requisição HTTP com tipagem — anexa o CSRF e trata erros da API.
+// A credencial de sessão NÃO é injetada aqui: o navegador manda o cookie `HttpOnly` sozinho,
+// por ser mesma origem. `credentials: 'same-origin'` é o padrão do fetch, mas fica explícito
+// para deixar claro que a chamada é autenticada por cookie.
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const t = auth.token()
+  const metodo = options?.method ?? 'GET'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...headerCsrf(metodo),
     ...(options?.headers as Record<string, string>),
   }
-  if (t) headers['Authorization'] = `Bearer ${t}`
 
-  const res = await fetchOuErroDeConexao(`${BASE}${path}`, { ...options, headers })
+  const res = await fetchOuErroDeConexao(`${BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: 'same-origin',
+  })
   if (res.status === 401) {
     redirecionarParaLoginPorSessaoExpirada()
     throw new Error('Sessao expirada. Faca login novamente.')
@@ -79,19 +104,36 @@ function funcionalidadeFutura(nome: string): never {
 
 // Métodos disponíveis para o frontend consumir a API
 export const api = {
-  // Login usa form-urlencoded conforme exigido pelo OAuth2PasswordRequestForm do FastAPI
+  // Login usa form-urlencoded conforme exigido pelo OAuth2PasswordRequestForm do FastAPI.
+  // A resposta traz os cookies de sessão no `Set-Cookie`; o navegador os guarda sozinho.
+  // O `token_acesso` do corpo é ignorado pelo painel (existe para o app mobile).
   async login(email: string, senha: string): Promise<TokenResposta> {
     const form = new URLSearchParams({ username: email, password: senha })
     const res = await fetchOuErroDeConexao(`${BASE}/autenticacao/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
+      credentials: 'same-origin',
     })
     if (!res.ok) {
       const erro = await res.json().catch(() => null)
       throw new Error(extrairDetail(erro) ?? 'Email ou senha incorretos')
     }
     return res.json() as Promise<TokenResposta>
+  },
+
+  // Encerra a sessão: só o backend consegue apagar o cookie `HttpOnly`, então o logout é uma
+  // chamada de rede — não um `localStorage.clear()`. Se a rede falhar, ainda assim limpamos os
+  // dados locais e devolvemos o controle ao chamador, que redireciona para o login.
+  async logout(): Promise<void> {
+    try {
+      await fetchOuErroDeConexao(`${BASE}/autenticacao/logout`, {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
+    } finally {
+      auth.limparLocal()
+    }
   },
 
   // Retorna os dados do usuário autenticado (baseado no token da requisição)

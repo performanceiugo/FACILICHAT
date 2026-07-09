@@ -45,8 +45,9 @@ export default function EmpresasPlataformaPage() {
       .finally(() => setCarregado(true))
   }, [router])
 
-  function sair() {
-    auth.sair()
+  // Logout via backend: só ele apaga o cookie `HttpOnly` da sessão (item S6).
+  async function sair() {
+    await api.logout()
     router.push('/login')
   }
 
