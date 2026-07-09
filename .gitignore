@@ -28,6 +28,7 @@ next-env.d.ts
 
 # Claude Code — configurações locais da máquina (permissões); settings.json é versionado
 .claude/settings.local.json
+.claude/plan-edit-approved.flag
 
 # Logs
 *.log

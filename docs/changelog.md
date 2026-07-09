@@ -7,6 +7,30 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Infra/Integrações — camada local do Codex para o FaciliChat
+- **Camada `.codex/` criada no repositório** com skills/checklists equivalentes às rotinas do Claude:
+  `validar-regras`, `verificar-seguranca`, `subir-projeto`, `find-docs`, `commit-sync` e
+  `diagnosticar-sandbox`. O objetivo é manter o fluxo operacional rastreável no próprio projeto,
+  sem depender de instalação global fora do workspace.
+- **Scripts locais de apoio adicionados**: `.codex/scripts/diagnosticar-ambiente.ps1` verifica se o
+  problema é do projeto ou do ambiente da sessão; `.codex/scripts/lembrete-clickup.ps1` reforça a
+  sincronização manual do board quando o Codex não tiver integração ativa.
+- **Documentação de infra atualizada** em `docs/implementation/05-infra-integracoes.md` e
+  `docs/implementation/README.md`, registrando os limites reais desta sessão do Codex:
+  escrita restrita ao workspace, rede limitada e ausência atual de MCP de ClickUp.
+- **Plano ajustado** para incluir a trilha de compatibilidade Claude -> Codex e deixar explícita a
+  pendência externa: habilitar uma integração nativa de ClickUp no ambiente do Codex ainda depende
+  de instalação/autenticação fora do repositório.
+
+### Planejamento — reorganizacao por trilhas
+- Criada a nova visao de execucao em `docs/implementation/`, separando o roadmap em trilhas de
+  seguranca, backend, frontend web, frontend mobile, infra/integracoes, QA, bugs/pendencias e
+  documentacao/deploy/operacao.
+- Mantido `docs/plano-implementacao.md` como fonte canonica por fase, status e `CU:` do ClickUp,
+  agora com ponteiro para a visao por trilhas e para o mapa de migracao.
+- Adicionado `docs/implementation/migration-map.md` para preservar a rastreabilidade entre as fases
+  antigas, os `CU:` existentes e a nova organizacao por trilhas.
+
 ### Revisão de layouts web/mobile
 - **Web alinhado aos tokens do design system** — login e cards de chamados usam raio de 8px, botões
   ganharam altura mínima adequada e a sidebar do painel agora se adapta a telas estreitas.

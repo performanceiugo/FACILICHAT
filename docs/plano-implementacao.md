@@ -12,6 +12,14 @@
 
 ---
 
+## Plano por trilhas (visao de execucao)
+
+> Este arquivo continua sendo o registro canonico por fase, status e `CU:` do ClickUp.
+> A visao reorganizada por trilhas foi criada em `docs/implementation/README.md`, com mapa
+> antigo -> novo em `docs/implementation/migration-map.md`.
+
+---
+
 ## 🔗 Integração com o ClickUp (fonte da verdade dupla: este `.md` + o board)
 
 > Este plano está **espelhado** num board do ClickUp. Cada **fase** é uma **tarefa-pai** e cada
@@ -58,6 +66,10 @@
 | `[x]` | Completar o board com as fases de discovery (4.5, 5.5, 11), "Adiados" e itens extras das fases 0.6/1/3/4/5 |
 | `[x]` | Unificar os `CU:` no `plano-implementacao.md` canônico e apagar o mirror `plano-implementacao_1_clickup.md` |
 | `[x]` | Corrigir o hook `plano-clickup-reminder.js` (sem dependência de mapa) e registrá-lo em `.claude/settings.json` |
+| `[x]` | Criar uma camada local `.codex/` com skills/checklists equivalentes às do Claude para uso por referência dentro do repositório |
+| `[x]` | Documentar o fluxo do Codex neste ambiente: leitura obrigatória do `CLAUDE.md`, limites de sandbox/rede e ausência atual de MCP do ClickUp nesta sessão |
+| `[x]` | Adicionar scripts locais do Codex para diagnóstico do ambiente e lembrete operacional de sincronização manual do ClickUp |
+| `[ ]` | Habilitar no ambiente do Codex uma integração nativa de ClickUp equivalente à sessão do Claude (depende de instalação/autenticação fora do repositório) |
 | `[ ]` | Commitar os artefatos da integração (hook, settings, plano unificado, changelog) |
 
 ---

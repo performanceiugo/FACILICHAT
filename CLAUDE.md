@@ -62,6 +62,36 @@ classifica cada item como OK/ATENÇÃO/CRÍTICO.
 
 ---
 
+## 🧱 TRAVA DO PLANO — avisar antes de alterar roadmap/backlog
+
+> O projeto pode ser trabalhado por mais de um agente ao mesmo tempo. Para manter Claude, Codex e o
+> usuário indo na mesma direção, os arquivos de plano são protegidos contra alteração silenciosa.
+
+**Arquivos protegidos:**
+- `docs/plano-implementacao.md`
+- `docs/implementation/**`
+
+**Regra obrigatória para qualquer agente:**
+1. **Não altere arquivos de plano sem antes avisar o usuário em mensagem visível.**
+2. Se a mudança altera escopo, prioridade, ordem, critério de aceite, status ou cria/remove item,
+   **peça confirmação explícita antes de editar**.
+3. Se a mudança é apenas marcar status durante uma implementação que o usuário já pediu, avise antes
+   da edição e diga qual item/`CU:` será alterado.
+4. Nunca reorganize, compacte, renomeie ou "limpe" o plano por iniciativa própria.
+5. O `CU:` do ClickUp é a chave de rastreabilidade; nunca remova nem substitua sem confirmação.
+
+**Frase mínima antes de editar o plano:**
+```text
+Vou alterar o plano agora: <arquivo>, item <ID/CU>, motivo <motivo>. Posso seguir?
+```
+
+**Cerca mecânica do Claude:** `.claude/hooks/plano-guard.js` roda em `PreToolUse` e bloqueia edições
+diretas em arquivos de plano. Depois de confirmação explícita do usuário, crie a flag local
+`.claude/plan-edit-approved.flag`; ela é ignorada pelo Git e vale por 30 minutos. Se o usuário tiver
+pedido explicitamente a mudança nesta conversa, registre esse contexto na mensagem antes de editar.
+
+---
+
 ## LEIA PRIMEIRO — Verificação obrigatória antes de qualquer implementação
 
 **Antes de escrever qualquer código, leia `docs/plano-implementacao.md` na íntegra.**
