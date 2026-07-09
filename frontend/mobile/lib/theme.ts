@@ -35,6 +35,17 @@ export const theme = {
     xl: 24,
     xxl: 32,
   },
+  fontSize: {
+    xs: 12,
+    sm: 14,
+    md: 15,
+    base: 16,
+    lg: 20,
+    xl: 28,
+  },
+  control: {
+    minHeight: 44,
+  },
   typography: {
     fontFamily: 'Figtree',
     fontFamilySemiBold: 'Figtree-SemiBold',

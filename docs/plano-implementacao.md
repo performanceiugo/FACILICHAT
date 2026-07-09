@@ -215,13 +215,22 @@
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
-| `[ ]` | `868k60vc3` | B1 | Raios de canto fora da escala (cards 10/12 em vez de 8; inputs 10) | Padronizar 8px em cards | web e mobile (CSS/estilos) |
+| `[x]` | `868k60vc3` | B1 | Raios de canto fora da escala (cards 10/12 em vez de 8; inputs 10) | Cards web ajustados para `--r-sm`/8px e mobile centralizado em `theme.radius.card/control` | web e mobile (CSS/estilos) |
 | `[ ]` | `868k60vca` | B2 | `useEffect` de fetch sem cleanup/AbortController (web e mobile) | Adicionar `AbortController`/flag de montagem no cleanup | `chamados/page.tsx` (web), telas mobile |
 | `[ ]` | `868k60vck` | B3 | Web: faltam `error.tsx` e `not-found.tsx` | Criar `app/error.tsx` e `app/not-found.tsx` | `frontend/web/src/app/` |
 | `[x]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
 | `[ ]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
 | `[ ]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud/jti`; hasher duplicado; `@app.on_event` deprecado | Adicionar claims (**o `jti` é pré-requisito da revogação do `S14`** — fazer junto); centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
-| `[ ]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | Analisar o enquadramento responsivo do painel web em telas de navegador mobile e ajustar CSS/layout | `frontend/web/src/app/painel/**` |
+| `[~]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | CSS responsivo aplicado no `AdminShell` e na lista de chamados; falta validação visual final em navegador mobile | `frontend/web/src/app/painel/**` |
+
+### Revisão de layouts web/mobile — 09/07/2026
+
+| Status | Ordem | Etapa | Arquivo(s) |
+|--------|-------|-------|------------|
+| `[x]` | 1 | Mapear fontes de design, tokens, telas, navegação e estilos globais existentes | `docs/FaciliChat-Regras/`, `docs/tecnico-frontend.md`, `frontend/web/src/app/globals.css`, `frontend/mobile/lib/theme.ts` |
+| `[x]` | 2 | Padronizar raios, estados de botão e breakpoints das telas web existentes | `frontend/web/src/app/**/*.css`, `frontend/web/src/components/**/*.css` |
+| `[x]` | 3 | Remover cores, tamanhos e espaçamentos soltos das telas mobile já existentes | `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts` |
+| `[~]` | 4 | Validar visualmente em navegador desktop/mobile e em Expo após build/typecheck | web/mobile |
 
 ### 📄 Documentação (divergências com o código real)
 

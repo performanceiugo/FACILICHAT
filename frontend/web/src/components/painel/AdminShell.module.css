@@ -136,6 +136,7 @@
 
 .botaoSair {
   padding: var(--sp-2) var(--sp-3);
+  min-height: 40px;
   border: 1px solid var(--border-default);
   border-radius: var(--r-sm);
   background: transparent;
@@ -153,4 +154,60 @@
   margin-left: 240px;
   padding: var(--sp-8);
   flex: 1;
+}
+
+@media (max-width: 760px) {
+  .wrapper {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: sticky;
+    z-index: 10;
+    width: 100%;
+    flex-direction: column;
+    padding: var(--sp-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .logo {
+    padding: 0 0 var(--sp-3);
+  }
+
+  .nav {
+    flex: initial;
+  }
+
+  .link,
+  .linkAtivo {
+    min-height: 44px;
+  }
+
+  .rodape {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .usuario {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .botaoSair {
+    flex-shrink: 0;
+  }
+
+  .conteudo {
+    margin-left: 0;
+    padding: var(--sp-5);
+  }
+}
+
+@media (max-width: 420px) {
+  .rodape {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }

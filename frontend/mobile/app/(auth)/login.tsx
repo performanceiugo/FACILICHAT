@@ -64,7 +64,7 @@ export default function LoginScreen() {
       {/* Botão desabilitado durante o carregamento para evitar múltiplas requisições */}
       <TouchableOpacity style={s.botao} onPress={handleLogin} disabled={carregando}>
         {carregando
-          ? <ActivityIndicator color="#fff" />
+          ? <ActivityIndicator color={theme.colors.white} />
           : <Text style={s.botaoTexto}>Entrar</Text>
         }
       </TouchableOpacity>
@@ -77,51 +77,58 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f9fafb',
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.surfacePage,
   },
   titulo: {
-    fontSize: 28,
+    fontSize: theme.fontSize.xl,
     fontFamily: theme.typography.fontFamilyBold,
     color: theme.colors.brandBlue,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing.xs,
   },
   subtitulo: {
-    fontSize: 15,
+    fontSize: theme.fontSize.md,
     fontFamily: theme.typography.fontFamily,
     color: theme.colors.ink500,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: theme.spacing.xxl,
   },
   input: {
     backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
     borderColor: theme.colors.borderSoft,
     borderRadius: theme.radius.control,
-    padding: 14,
-    fontSize: 16,
+    minHeight: theme.control.minHeight,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    fontSize: theme.fontSize.base,
     fontFamily: theme.typography.fontFamily,
     color: theme.colors.ink900,
-    marginBottom: 12,
+    marginBottom: theme.spacing.md,
   },
   erro: {
     color: theme.colors.danger,
-    fontSize: 14,
+    backgroundColor: theme.colors.dangerSoft,
+    borderRadius: theme.radius.control,
+    padding: theme.spacing.md,
+    fontSize: theme.fontSize.sm,
     fontFamily: theme.typography.fontFamily,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
   },
   botao: {
     backgroundColor: theme.colors.brandBlue,
     borderRadius: theme.radius.control,
-    padding: 16,
+    minHeight: theme.control.minHeight,
+    padding: theme.spacing.lg,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
+    marginTop: theme.spacing.xs,
   },
   botaoTexto: {
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamilySemiBold,
-    fontSize: 16,
+    fontSize: theme.fontSize.base,
   },
 })

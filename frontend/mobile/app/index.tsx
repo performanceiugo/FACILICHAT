@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'expo-router'
-import { View, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { auth } from '@/lib/auth'
 import { theme } from '@/lib/theme'
 
@@ -19,8 +19,18 @@ export default function Index() {
 
   // Spinner azul centralizado enquanto a verificação ocorre
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <View style={s.container}>
       <ActivityIndicator size="large" color={theme.colors.brandBlue} />
     </View>
   )
 }
+
+// Estado intermediario alinhado ao fundo padrao do app.
+const s = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfacePage,
+  },
+})

@@ -11,8 +11,14 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: theme.colors.brandBlue,
         tabBarInactiveTintColor: theme.colors.ink500,
-        tabBarStyle: { backgroundColor: theme.colors.surfaceCard, borderTopColor: theme.colors.borderSoft },
-        tabBarLabelStyle: { fontFamily: theme.typography.fontFamilySemiBold },
+        tabBarStyle: {
+          backgroundColor: theme.colors.surfaceCard,
+          borderTopColor: theme.colors.borderSoft,
+          minHeight: 58,
+          paddingBottom: theme.spacing.xs,
+          paddingTop: theme.spacing.xs,
+        },
+        tabBarLabelStyle: { fontFamily: theme.typography.fontFamilySemiBold, fontSize: theme.fontSize.xs },
         headerStyle: { backgroundColor: theme.colors.surfaceCard },
         headerTitleStyle: { color: theme.colors.ink900, fontFamily: theme.typography.fontFamilySemiBold },
       }}

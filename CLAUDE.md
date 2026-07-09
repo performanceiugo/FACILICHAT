@@ -45,6 +45,23 @@ MVP02). É o material do comercial. **Nada implementado pode contrariá-lo.**
 
 ---
 
+## 🔐 Segurança técnica — avisar antes de consultar documentação atualizada
+
+Práticas de segurança web (cookies `HttpOnly`/`SameSite`/`Secure`, CORS, JWT, headers HTTP,
+isolamento multi-tenant/RLS) mudam com o tempo. Antes de alterar código que toca esses temas,
+**avise o usuário que vai consultar a skill `verificar-seguranca`** e rode-a — ela compara a prática
+atual do projeto com a recomendação mais recente (OWASP, docs oficiais do FastAPI/Next.js, MDN) e
+classifica cada item como OK/ATENÇÃO/CRÍTICO.
+
+- Dispare isso **só** quando a mudança realmente tocar segurança técnica (autenticação, cookies,
+  CORS, JWT, isolamento multi-tenant/RLS, headers HTTP) — **não** para mudanças não relacionadas,
+  para não gastar tokens à toa.
+- É uma checagem informativa, não substitui a Trava de Segurança acima: se a skill encontrar algo
+  desatualizado, trate como mudança de regra — adicione ao `docs/plano-implementacao.md` e peça
+  confirmação explícita antes de alterar o código.
+
+---
+
 ## LEIA PRIMEIRO — Verificação obrigatória antes de qualquer implementação
 
 **Antes de escrever qualquer código, leia `docs/plano-implementacao.md` na íntegra.**

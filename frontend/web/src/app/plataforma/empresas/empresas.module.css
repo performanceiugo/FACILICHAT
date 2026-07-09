@@ -43,7 +43,7 @@
   font: inherit;
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 var(--sp-4);
 }
 
@@ -56,6 +56,15 @@
   background: var(--brand-blue);
   border-color: var(--brand-blue);
   color: var(--text-onbrand);
+}
+
+.botaoPrimario:hover:not(:disabled) {
+  background: var(--blue-600);
+  border-color: var(--blue-600);
+}
+
+.botaoSecundario:hover:not(:disabled) {
+  background: var(--bg-subtle);
 }
 
 .botaoPrimario:disabled,
@@ -76,6 +85,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   padding: var(--sp-5);
+  box-shadow: var(--shadow-xs);
 }
 
 .painelTitulo {
@@ -201,5 +211,16 @@
 
   .acoes {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .pagina {
+    padding: var(--sp-4);
+  }
+
+  .botaoPrimario,
+  .botaoSecundario {
+    width: 100%;
   }
 }

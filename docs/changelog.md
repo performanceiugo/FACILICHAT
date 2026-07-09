@@ -7,6 +7,14 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Revisão de layouts web/mobile
+- **Web alinhado aos tokens do design system** — login e cards de chamados usam raio de 8px, botões
+  ganharam altura mínima adequada e a sidebar do painel agora se adapta a telas estreitas.
+- **Mobile sem valores visuais soltos nas telas existentes** — login, chamados, perfil, tabs e estado
+  inicial passaram a consumir `theme.spacing`, `theme.fontSize`, `theme.control` e cores do tema.
+- **Plano atualizado** — `B1` marcado como concluído, `B7` colocado em andamento e criada uma trilha
+  ordenada para a revisão de layouts web/mobile de 09/07/2026.
+
 ### Segurança — `S16` concluído: CSP e headers de segurança no painel web
 - **`frontend/web/next.config.ts`** ganhou `headers()` aplicado a todas as rotas: CSP em modo
   **Report-Only** (fase de observação — só registra violações no console, sem bloquear),

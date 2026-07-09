@@ -11,7 +11,7 @@
 .card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   padding: var(--sp-10) var(--sp-8);
   width: 100%;
   max-width: 400px;
@@ -76,6 +76,7 @@
 
 .botao {
   padding: var(--sp-3);
+  min-height: 44px;
   background: var(--brand-blue);
   color: var(--text-onbrand);
   border: none;
@@ -88,3 +89,15 @@
 
 .botao:hover:not(:disabled) { background: var(--blue-600); }
 .botao:disabled { opacity: .6; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .container {
+    align-items: stretch;
+    padding: var(--sp-4);
+  }
+
+  .card {
+    padding: var(--sp-8) var(--sp-5);
+    max-width: none;
+  }
+}
