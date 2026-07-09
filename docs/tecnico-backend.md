@@ -97,7 +97,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/RH/Financeiro/Gestor) | Sim | Apenas Gestor (403 caso contrário) |
 | GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim | Qualquer perfil |
 
-> **Primeiro Gestor:** como o cadastro público fica fechado por padrão e `/usuarios/equipe` exige um Gestor, a primeira Empresa + primeiro Gestor são criados pelo script `backend/scripts/criar_empresa.py` (ver `docs/setup.md`).
+> **Primeiro Gestor:** como o cadastro público fica fechado por padrão e `/usuarios/equipe` exige um Gestor, a primeira Empresa + primeiro Gestor são criados por `python scripts/gerenciar_banco.py criar-empresa ...` (ver a seção "Scripts do banco" abaixo e `docs/setup.md`).
 
 ### Chamados — `/chamados`
 
@@ -107,9 +107,6 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
 | GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gerente vê todos |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gerente (403 caso contrário); chamado finalizado não reabre (409) |
-
-> Banco de dev já existente: rode `python scripts/aplicar_fase_06_tickets_irmaos.py` a partir de
-> `backend/` para adicionar `Chamados.GrupoOrigemID` sem recriar tabelas.
 
 ---
 
@@ -129,9 +126,33 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - Todas as colunas de data/hora usam `DateTime(timezone=True)` (`timestamptz` no Postgres) e os
   defaults/gravações usam **`agoraUtc()` de `app/tempo.py`** — nunca `datetime.utcnow()` (deprecado
   e naive) nem `datetime.now()` (hora local).
-- Banco de dev criado antes do M5: rode `python scripts/aplicar_m5_timestamptz.py` (ou via
-  `docker compose exec backend ...`) — converte as colunas existentes interpretando os valores como
-  UTC, sem perder dados. Colunas naive rejeitam datetime com timezone no asyncpg.
+- Se o schema mudar, em dev basta recriar o banco com `python scripts/gerenciar_banco.py reset`
+  (ver abaixo) — não há migrações incrementais a rodar.
+
+## Scripts do banco (desenvolvimento)
+
+Há **um único** ponto de entrada para tudo relacionado ao banco de dev: `backend/scripts/gerenciar_banco.py`.
+Rode a partir de `backend/` ou via `docker compose exec backend python scripts/gerenciar_banco.py <cmd>`.
+
+| Comando | O que faz |
+|---|---|
+| `reset [--semear]` | Dropa o schema inteiro, recria as tabelas (a partir dos modelos) e aplica a RLS. Com `--semear`, também popula os dados de demonstração. É o jeito correto de aplicar mudança de schema em dev. |
+| `criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>` | Cria a 1ª Empresa (tenant) + o 1º Gestor numa transação só. |
+| `semear` | Popula clientes, supervisor, chamados e chat de demonstração na 1ª Empresa (idempotente). |
+| `aplicar-rls` | (Re)aplica só as políticas de `app/rls.sql`. |
+| `verificar-rls` | Testa o isolamento multi-tenant (filtros por `EmpresaID` + RLS do Postgres). |
+
+Fluxo do zero: `reset` → `criar-empresa ...` → `semear`.
+
+> **Por que não há mais migrações incrementais:** como não há Alembic e o banco de dev não tem dados
+> de produção a preservar, `Base.metadata.create_all` já reconstrói o schema completo a partir dos
+> modelos. Os antigos scripts `aplicar_fase_06_*` e `aplicar_m5_timestamptz` foram removidos — o
+> `reset` os substitui.
+>
+> **Atenção:** rodar `reset` com a API no ar invalida o cache de prepared statements do pool; a
+> primeira requisição seguinte pode responder um 500 transitório (`InvalidCachedStatementError`) que
+> o SQLAlchemy se auto-corrige na sequência. Para evitar o soluço, rode
+> `docker compose restart backend` após o `reset`.
 - A API passa a responder datas com sufixo `Z` (ex.: `2026-07-09T15:52:34Z`); `new Date(...)` no
   front interpreta corretamente.
 
@@ -167,8 +188,8 @@ valerão para **todo** o backend a partir desta fase:
 - **Row-Level Security (RLS)** no PostgreSQL como segunda trava (defesa em profundidade).
 - **Papéis por tenant:** `Gestor`/`Supervisor`/etc. valem dentro da sua Empresa.
 - **Superadmin da plataforma (Iugo Performance):** nível acima dos tenants (rotas em `Plataforma.py`)
-  para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. O bootstrap deixa de ser só
-  `criar_gerente.py` e passa a `criar_empresa.py` (Empresa + 1º Gestor juntos).
+  para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. O bootstrap é feito por
+  `python scripts/gerenciar_banco.py criar-empresa ...` (cria Empresa + 1º Gestor juntos).
 
 > **Perfis (branding):** o produto define 7 perfis — Cliente, Funcionário, Supervisor, **RH**,
 > **Financeiro**, **Gestor**, **Superadmin**. O código atual tem 4 (Cliente, Supervisor, Funcionario,

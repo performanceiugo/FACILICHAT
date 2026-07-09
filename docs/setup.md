@@ -37,17 +37,18 @@ Acesse a documentação interativa em **`http://localhost:8000/docs`** (Swagger)
 > A porta do Postgres fica exposta apenas em `127.0.0.1:5432` para ferramentas locais de desenvolvimento;
 > ela não deve ficar aberta em `0.0.0.0` na rede.
 
-### Criar o primeiro Gerente (rodando dentro do container)
+### Criar a primeira Empresa + Gestor (rodando dentro do container)
+
+O sistema é multi-tenant: todo usuário pertence a uma Empresa. Crie a primeira Empresa e o seu
+primeiro Gestor juntos com o CLI do banco (ver "Scripts do banco" em `docs/tecnico-backend.md`):
 
 ```bash
-docker compose exec backend python scripts/criar_gerente.py "Nome do Gestor" gestor@exemplo.com SenhaForte123
+docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "12.345.678/0001-90" "Nome do Gestor" gestor@exemplo.com SenhaForte123
 ```
 
-> 🏢 **Mudança futura (SaaS multi-tenant — Fase 0.7):** quando a fundação multi-tenant entrar, o
-> primeiro acesso deixará de ser "só criar um Gerente". Passará a ser **criar uma Empresa
-> (tenant) + o seu primeiro Gestor juntos** — provavelmente via `scripts/criar_empresa.py`.
-> Cada Empresa terá seus próprios usuários/condomínios/chamados, isolados das demais. Detalhes
-> em `docs/plano-implementacao.md` (Fase 0.7) e `docs/arquitetura.md`.
+> Para popular dados de demonstração (clientes, chamados e chat de exemplo) na Empresa criada:
+> `docker compose exec backend python scripts/gerenciar_banco.py semear`. Para zerar o banco de dev
+> do zero (dropa tudo, recria e aplica RLS): `... gerenciar_banco.py reset`.
 
 ### Comandos úteis do dia a dia (Docker)
 
@@ -230,7 +231,7 @@ uma única vez, com o backend já tendo subido ao menos uma vez para as tabelas 
 
 ```bash
 cd backend
-python scripts/criar_empresa.py "Nome da Empresa" "00.000.000/0001-00" "Nome do Gestor" gestor@exemplo.com SenhaForte123
+python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "00.000.000/0001-00" "Nome do Gestor" gestor@exemplo.com SenhaForte123
 ```
 
 Depois disso, faça login com esse Gestor para criar os demais usuários da equipe (Supervisores,

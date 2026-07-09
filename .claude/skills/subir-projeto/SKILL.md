@@ -63,7 +63,7 @@ primeiro Gestor precisam ser criados fora da API, pelo script — rode-o **dentr
 reusa as dependências já instaladas, sem depender do Python local):
 
 ```
-docker compose exec backend python scripts/criar_empresa.py "Cefram Demo" 12.345.678/0001-90 "Gestor Demo" admin@facilichat.dev FaciliChat123
+docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Cefram Demo" 12.345.678/0001-90 "Gestor Demo" admin@facilichat.dev FaciliChat123
 ```
 
 - Se retornar sucesso, guarde as credenciais para o relatório final.

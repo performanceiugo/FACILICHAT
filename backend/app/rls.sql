@@ -8,7 +8,7 @@
 -- qualquer query. Sem essa variável setada, current_setting(...) retorna vazio e nenhuma linha passa
 -- (fail-closed).
 --
--- Aplicar com: python scripts/aplicar_rls.py (idempotente — pode rodar de novo sem erro)
+-- Aplicar com: python scripts/gerenciar_banco.py aplicar-rls (idempotente — pode rodar de novo sem erro)
 
 -- FORCE é necessário porque a aplicação conecta como dono das tabelas — sem FORCE, o Postgres
 -- isenta o dono da tabela da política por padrão, e a trava não valeria nada.

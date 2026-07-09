@@ -7,6 +7,25 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Tooling — scripts do banco unificados num único CLI (`gerenciar_banco.py`)
+- **Motivação (pedido do usuário):** havia 7 scripts espalhados em `backend/scripts/`, e a cada
+  mudança de schema estava sendo criado um novo script de migração incremental — desnecessário em
+  dev, onde o banco pode ser recriado. Consolidado tudo num ponto de entrada visível.
+- **Removidos 7 scripts**, substituídos por **`backend/scripts/gerenciar_banco.py`** com subcomandos:
+  `reset [--semear]` (dropa o schema, recria as tabelas e aplica RLS), `criar-empresa`, `semear`,
+  `aplicar-rls` e `verificar-rls`. Absorve `criar_empresa.py`, `semear_chamados.py`, `aplicar_rls.py`
+  e `verificar_isolamento_tenant.py`; **elimina** as três migrações incrementais
+  (`aplicar_fase_06_tickets_irmaos.py`, `aplicar_fase_06_condominios.py`, `aplicar_m5_timestamptz.py`),
+  já que `Base.metadata.create_all` reconstrói o schema completo a partir dos modelos.
+- **`app/rls.sql` mantido** como fonte das políticas (lido pelo `aplicar-rls`/`reset`).
+- **Verificado no container:** `reset` → `criar-empresa` → `semear` → `verificar-rls`, seed
+  idempotente na 2ª execução, e login/listagem de chamados pela API funcionando após o reset.
+  Documentada a pegadinha do `reset` com a API no ar (cache de prepared statements do asyncpg gera
+  um 500 transitório auto-corrigido; recomendação: `docker compose restart backend`).
+- **Docs atualizadas:** `docs/tecnico-backend.md` (nova seção "Scripts do banco"), `docs/setup.md`,
+  as skills `subir-projeto` (`.claude` e `.codex`) e o cabeçalho do `app/rls.sql`. Referência de
+  arquivo do item S10 no plano ajustada para o novo CLI.
+
 ### `M4` + `M5` — Modernização do backend: SQL echo configurável e datas UTC timezone-aware
 - **Trabalho iniciado em sessão paralela e finalizado aqui.** O que já estava feito: modelos com
   `DateTime(timezone=True)` e default `agoraUtc()` (novo `app/tempo.py`), `configuracoes.py`
