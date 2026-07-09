@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { View, ActivityIndicator } from 'react-native'
 import { auth } from '@/lib/auth'
+import { theme } from '@/lib/theme'
 
 export default function Index() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function Index() {
   // Spinner azul centralizado enquanto a verificação ocorre
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" color="#1a56db" />
+      <ActivityIndicator size="large" color={theme.colors.brandBlue} />
     </View>
   )
 }

@@ -47,6 +47,10 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+function funcionalidadeFutura(nome: string): never {
+  throw new Error(`${nome} sera entregue na Fase 1 do chat`)
+}
+
 // Métodos disponíveis para o frontend consumir a API
 export const api = {
   // Login usa form-urlencoded conforme exigido pelo OAuth2PasswordRequestForm do FastAPI
@@ -78,12 +82,8 @@ export const api = {
   },
 
   mensagens: {
-    listar: (chamadoID: string) => req<Mensagem[]>(`/mensagens/${chamadoID}`),
-    enviar: (chamadoID: string, conteudo: string) =>
-      req<Mensagem>(`/mensagens/${chamadoID}`, {
-        method: 'POST',
-        body: JSON.stringify({ Conteudo: conteudo }),
-      }),
+    listar: (_chamadoID: string) => Promise.reject(funcionalidadeFutura('Mensagens')),
+    enviar: (_chamadoID: string, _conteudo: string) => Promise.reject(funcionalidadeFutura('Mensagens')),
   },
 
   plataforma: {

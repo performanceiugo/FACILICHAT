@@ -54,8 +54,9 @@ Superadmin da plataforma (Iugo Performance)
 
 - **Um único banco** PostgreSQL para todos os tenants (mais econômico de operar nesta fase).
 - **Toda tabela** tem a coluna `EmpresaID` (o "tenant_id"), FK e `NOT NULL`.
-- **Toda consulta** é filtrada por `EmpresaID` — implementado por uma dependência de escopo
-  no FastAPI (`obterTenantAtual`) injetada em todas as rotas.
+- **Toda consulta sensível a tenant** é filtrada por `EmpresaID` — implementado por uma dependência
+  de sessão tenant-aware no FastAPI (`obterBancoDadosComTenant`, que extrai o tenant do JWT via
+  `obterTenantAtual`) aplicada nas rotas de negócio multi-tenant.
 - **Row-Level Security (RLS)** do PostgreSQL como **segunda trava** (defesa em profundidade): mesmo
   que uma query esqueça o filtro, o banco bloqueia o acesso cruzado entre tenants.
 - O **tenant viaja dentro do JWT** — não é enviado pelo frontend, evitando adulteração.

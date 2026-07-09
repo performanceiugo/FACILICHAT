@@ -6,6 +6,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator 
 import { useRouter } from 'expo-router'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+import { theme } from '@/lib/theme'
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -81,42 +82,46 @@ const s = StyleSheet.create({
   },
   titulo: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#1a56db',
+    fontFamily: theme.typography.fontFamilyBold,
+    color: theme.colors.brandBlue,
     textAlign: 'center',
     marginBottom: 4,
   },
   subtitulo: {
     fontSize: 15,
-    color: '#6b7280',
+    fontFamily: theme.typography.fontFamily,
+    color: theme.colors.ink500,
     textAlign: 'center',
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
+    borderColor: theme.colors.borderSoft,
+    borderRadius: theme.radius.control,
     padding: 14,
     fontSize: 16,
+    fontFamily: theme.typography.fontFamily,
+    color: theme.colors.ink900,
     marginBottom: 12,
   },
   erro: {
-    color: '#dc2626',
+    color: theme.colors.danger,
     fontSize: 14,
+    fontFamily: theme.typography.fontFamily,
     textAlign: 'center',
     marginBottom: 8,
   },
   botao: {
-    backgroundColor: '#1a56db',
-    borderRadius: 10,
+    backgroundColor: theme.colors.brandBlue,
+    borderRadius: theme.radius.control,
     padding: 16,
     alignItems: 'center',
     marginTop: 4,
   },
   botaoTexto: {
-    color: '#fff',
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamilySemiBold,
     fontSize: 16,
   },
 })

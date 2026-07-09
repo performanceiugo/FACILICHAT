@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { auth } from '@/lib/auth'
 import type { Chamado } from '@/types'
 import styles from './chamados.module.css'
 
@@ -15,6 +16,17 @@ const STATUS_LABEL: Record<string, string> = {
   Agendado: 'Agendado',
   Concluido: 'Concluído',
   Cancelado: 'Cancelado',
+}
+
+// Classe de cor do badge de status — semântica do design system (pílula bg+texto).
+// Recebido fica neutro (só chegou); Em andamento usa âmbar (atenção); Agendado usa azul
+// (compromisso confirmado); Concluído usa verde; Cancelado fica neutro-esmaecido.
+const STATUS_COR: Record<string, string> = {
+  Recebido: 'neutro',
+  EmAndamento: 'atencao',
+  Agendado: 'info',
+  Concluido: 'sucesso',
+  Cancelado: 'apagado',
 }
 
 // Cores de destaque para cada nível de prioridade — tokens do design system.
@@ -31,9 +43,11 @@ export default function ChamadosPage() {
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [empresaNome, setEmpresaNome] = useState<string | null>(null)
 
   // Busca os chamados ao montar o componente
   useEffect(() => {
+    setEmpresaNome(auth.empresaNome())
     api.chamados.listar()
       .then(setChamados)
       .catch(err => setErro(err.message))
@@ -45,9 +59,12 @@ export default function ChamadosPage() {
 
   return (
     <div>
-      {/* Cabeçalho com título e contador total */}
+      {/* Cabeçalho com título, contexto da Empresa (tenant) e contador total */}
       <div className={styles.cabecalho}>
-        <h1 className={styles.titulo}>Chamados</h1>
+        <div>
+          <h1 className={styles.titulo}>Chamados</h1>
+          {empresaNome && <p className={styles.subtitulo}>{empresaNome}</p>}
+        </div>
         <span className={styles.total}>{chamados.length} total</span>
       </div>
 
@@ -66,13 +83,16 @@ export default function ChamadosPage() {
               {/* Resumo/descrição do chamado */}
               <p className={styles.resumo}>{c.Resumo ?? '—'}</p>
 
-              {/* Rodapé do card: status, prioridade colorida e data */}
+              {/* Rodapé do card: status (pílula colorida), prioridade (indicador + label) e data */}
               <div className={styles.cardRodape}>
-                <span className={styles.status}>{STATUS_LABEL[c.Status]}</span>
-                <span
-                  className={styles.prioridade}
-                  style={{ color: PRIORIDADE_COR[c.Prioridade] }}
-                >
+                <span className={`${styles.status} ${styles[`status--${STATUS_COR[c.Status]}`]}`}>
+                  {STATUS_LABEL[c.Status]}
+                </span>
+                <span className={styles.prioridade}>
+                  <span
+                    className={styles.prioridadePonto}
+                    style={{ background: PRIORIDADE_COR[c.Prioridade] }}
+                  />
                   {c.Prioridade}
                 </span>
                 <span className={styles.data}>

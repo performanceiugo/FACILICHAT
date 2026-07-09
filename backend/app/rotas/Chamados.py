@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, ConfigDict
-from app.banco_dados import obterBancoDados
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
-from app.rotas.Autenticacao import obterUsuarioAtual
+from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
 from app.servicos.chamados import montarChamadosIrmaos
 from datetime import datetime
 import uuid
@@ -44,7 +43,7 @@ class ChamadoSaida(BaseModel):
 @roteador.post("/", response_model=ChamadoSaida)
 async def criarChamado(
     payload: ChamadoCriar,
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
     chamado = Chamado(
@@ -64,7 +63,7 @@ async def criarChamado(
 @roteador.post("/irmaos", response_model=list[ChamadoSaida])
 async def criarChamadosIrmaos(
     payload: ChamadosIrmaosCriar,
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
     if len(payload.Chamados) < 2:
@@ -80,7 +79,7 @@ async def criarChamadosIrmaos(
 # GET /chamados/ — lista chamados; gestores e supervisores veem todos, clientes veem apenas os seus
 @roteador.get("/", response_model=list[ChamadoSaida])
 async def listarChamados(
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
     # Regra de ouro do multi-tenant: toda consulta é filtrada pela Empresa do usuário logado,
@@ -103,7 +102,7 @@ async def listarChamados(
 async def atualizarStatus(
     chamadoID: uuid.UUID,
     status: ChamadoStatus,
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
     # Autorização: mudar status é operação interna — só Supervisor e Gestor podem.

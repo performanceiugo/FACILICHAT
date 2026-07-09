@@ -2,9 +2,10 @@
 // Suporta pull-to-refresh (puxar para atualizar) para recarregar a lista
 
 import { useEffect, useState } from 'react'
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native'
 import { api } from '@/lib/api'
 import type { Chamado } from '@/lib/types'
+import { theme } from '@/lib/theme'
 
 // Labels amigáveis para exibição dos status no card
 const STATUS_LABEL: Record<string, string> = {
@@ -17,22 +18,26 @@ const STATUS_LABEL: Record<string, string> = {
 
 // Cores de destaque para cada nível de prioridade
 const PRIORIDADE_COR: Record<string, string> = {
-  Baixa: '#16a34a',   // verde
-  Media: '#d97706',   // amarelo
-  Alta: '#dc2626',    // vermelho
-  Critica: '#7c3aed', // roxo
+  Baixa: theme.colors.success,
+  Media: theme.colors.warning,
+  Alta: theme.colors.danger,
+  Critica: theme.colors.dangerStrong,
 }
 
 export default function ChamadosScreen() {
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [carregando, setCarregando] = useState(true)
   const [recarregando, setRecarregando] = useState(false)  // true durante pull-to-refresh
+  const [erro, setErro] = useState('')
 
   // Busca os chamados da API — reutilizada tanto no mount quanto no pull-to-refresh
   async function carregar() {
     try {
+      setErro('')
       const dados = await api.chamados.listar()
       setChamados(dados)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar chamados')
     } finally {
       setCarregando(false)
       setRecarregando(false)
@@ -46,7 +51,18 @@ export default function ChamadosScreen() {
   if (carregando) {
     return (
       <View style={s.centro}>
-        <ActivityIndicator size="large" color="#1a56db" />
+        <ActivityIndicator size="large" color={theme.colors.brandBlue} />
+      </View>
+    )
+  }
+
+  if (erro) {
+    return (
+      <View style={s.centro}>
+        <Text style={s.erro}>{erro}</Text>
+        <TouchableOpacity style={s.botaoRetry} onPress={carregar}>
+          <Text style={s.botaoRetryTexto}>Tentar novamente</Text>
+        </TouchableOpacity>
       </View>
     )
   }
@@ -61,7 +77,7 @@ export default function ChamadosScreen() {
         <RefreshControl
           refreshing={recarregando}
           onRefresh={() => { setRecarregando(true); carregar() }}
-          tintColor="#1a56db"
+          tintColor={theme.colors.brandBlue}
         />
       }
       ListEmptyComponent={<Text style={s.vazio}>Nenhum chamado encontrado.</Text>}
@@ -91,34 +107,47 @@ export default function ChamadosScreen() {
 const s = StyleSheet.create({
   centro: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   lista: { padding: 16, gap: 10 },
-  vazio: { textAlign: 'center', color: '#6b7280', marginTop: 40 },
+  vazio: { textAlign: 'center', color: theme.colors.ink500, marginTop: 40, fontFamily: theme.typography.fontFamily },
+  erro: { color: theme.colors.danger, fontFamily: theme.typography.fontFamily, marginBottom: theme.spacing.md },
+  botaoRetry: {
+    backgroundColor: theme.colors.brandBlue,
+    borderRadius: theme.radius.control,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  botaoRetryTexto: {
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamilySemiBold,
+  },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.radius.card,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.colors.borderSoft,
     gap: 8,
   },
   cardTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  categoria: { fontWeight: '600', fontSize: 15, color: '#111827' },
+  categoria: { fontFamily: theme.typography.fontFamilySemiBold, fontSize: 15, color: theme.colors.ink900 },
   fila: {
     fontSize: 12,
-    color: '#6b7280',
-    backgroundColor: '#f3f4f6',
+    color: theme.colors.ink500,
+    backgroundColor: theme.colors.brandBlueSoft,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
+    fontFamily: theme.typography.fontFamily,
   },
-  resumo: { fontSize: 14, color: '#6b7280' },
+  resumo: { fontSize: 14, color: theme.colors.ink500, fontFamily: theme.typography.fontFamily },
   cardRodape: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   status: {
     fontSize: 12,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.surfacePage,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    color: '#374151',
+    borderRadius: theme.radius.pill,
+    color: theme.colors.ink700,
+    fontFamily: theme.typography.fontFamily,
   },
-  prioridade: { fontSize: 13, fontWeight: '700' },
+  prioridade: { fontSize: 13, fontFamily: theme.typography.fontFamilyBold },
 })

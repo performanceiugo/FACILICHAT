@@ -5,7 +5,25 @@
 
 ---
 
-## [não versionado] — 8 de julho de 2026
+## [não versionado] — 9 de julho de 2026
+
+### Frontend web — polimento visual das telas existentes (continuação da A5)
+- **Objetivo:** aproximar o visual das telas que já existem no código (login, sidebar do painel,
+  lista de chamados) do protótipo comercial em `docs/FaciliChat-Regras/FaciliChat-Apresentacao.html`
+  (seção `id="admin"`), sem adicionar telas/funcionalidades novas (essas ficam para os Milestones 3a-4
+  já planejados — ver `plano-implementacao.md`).
+- **`AdminShell` (sidebar do painel):** adicionada a marca oficial do FaciliChat (logo SVG inline,
+  mesma arte do protótipo), ícone de linha no item "Chamados", estado ativo por rota
+  (`usePathname`), e avatar circular com iniciais + nome + Empresa no rodapé, no lugar do texto
+  solto. `frontend/web/src/components/painel/AdminShell.tsx`, `.module.css`.
+- **Login:** adicionada a marca acima do título, fundo com gradiente radial sutil em azul-marca, e
+  o CSS migrado dos valores antigos em `rem`/aliases para os tokens novos (`--sp-*`, `--r-*`,
+  `--fs-*`, `--shadow-lg`), alinhando com o restante do painel. `frontend/web/src/app/(auth)/login/*`.
+- **Lista de chamados:** cabeçalho passou a mostrar o nome da Empresa (tenant) abaixo do título;
+  status ganhou pílula colorida por semântica (Recebido neutro, Em andamento âmbar, Agendado azul,
+  Concluído verde, Cancelado apagado); prioridade passou a ter indicador de cor + label, separado
+  visualmente do status; cards com sombra e hover. `frontend/web/src/app/painel/chamados/*`.
+- Verificado com `next build` (typecheck + lint limpos).
 
 ### Infraestrutura de acompanhamento — Sincronização do board ClickUp com o plano
 - **Board reconciliado com o `plano-implementacao.md`** — comparado o status de cada subtarefa do
@@ -259,6 +277,54 @@
   `/login` redireciona usuários já autenticados para a área correta.
 
 ---
+
+## [0.5.13] — 8 de julho de 2026
+
+### Frontend — fechamento do bloco restante de Altos da Fase 0.5
+- **A5 concluído no mobile**: o app ganhou tokens compartilhados em
+  `frontend/mobile/lib/theme.ts`, carregamento da fonte **Figtree** via `expo-font` no
+  `frontend/mobile/app/_layout.tsx`, e atualização visual das telas de login, chamados, perfil e
+  tabs para a paleta oficial do design system (`#148AF5`, inks, bordas e superfícies corretas).
+- **A6 tratado como código futuro seguro**: `api.mensagens.*` no web e no mobile deixou de chamar
+  uma rota inexistente do backend e agora falha explicitamente com a mensagem de que Mensagens será
+  entregue na **Fase 1 do chat**, evitando erro silencioso/enganoso de integração.
+- **A7 corrigido**: o link `/usuarios` foi removido da sidebar do painel enquanto a página ainda não
+  existe, eliminando o 404 navegável.
+- **A8 corrigido**: o mobile foi alinhado ao baseline oficial do **Expo SDK 53**, com atualização
+  para `react 19`, `expo-router 5`, ajuste das dependências de navegação/fontes e geração do
+  `package-lock.json` local.
+- **Ganhos colaterais já fechados no mesmo bloco**:
+  `M10` (erros engolidos em `chamados.tsx`/`perfil.tsx`) passou a exibir estado de erro com botão
+    "Tentar novamente";
+    `M11` (paleta/tipografia mobile) foi resolvido junto do A5;
+    `B4` (ícones nas tabs) foi entregue no layout das abas do mobile.
+
+  ---
+
+## [0.5.14] — 8 de julho de 2026
+
+### Segurança — fechamento de `S1` e `S2` da Fase 0.5
+- **`S1` corrigido no frontend web**: `next` e `eslint-config-next` foram atualizados para
+  **`15.5.20`**, e o `postcss` transitivo vulnerável foi fixado em **`8.5.10`** com `overrides` no
+  `frontend/web/package.json`. A árvore instalada ficou limpa em `npm audit --json` e o
+  `npm run build` do painel passou com sucesso na mesma revisão.
+- **`S2` corrigido no backend**: as rotas multi-tenant de `Chamados` e os endpoints autenticados de
+  `Usuarios` deixaram de usar sessão pura e passaram a depender de `obterBancoDadosComTenant`.
+  A própria dependência foi endurecida para usar `set_config('app.empresa_id', ..., false)` e
+  `RESET app.empresa_id`, preservando o tenant durante toda a request mesmo após `commit()`.
+- **RLS ampliada para `Condominios`**: `backend/app/rls.sql` agora aplica a política também à tabela
+  `Condominios`, cobrindo a nova entidade introduzida na Fase 0.6 e alinhando a defesa em
+  profundidade com o fluxo real de cadastro de clientes.
+- **Verificação automatizada de isolamento adicionada**:
+  `backend/scripts/verificar_isolamento_tenant.py` cria dois tenants temporários, grava
+  `Condominios`/`Usuarios`/`Chamados`, valida o filtro por `EmpresaID` e tenta validar a RLS do
+  banco. No ambiente local atual, o script detectou que o papel `facilichat` está com
+  `rolsuper=true` e `rolbypassrls=true`, então a checagem de RLS foi conscientemente pulada e ficou
+  registrada no output; a camada da aplicação continuou validada.
+- **Documentação sincronizada (`D6`)**: `docs/arquitetura.md` deixou de afirmar que toda rota usa
+  `obterTenantAtual` diretamente e passou a descrever a dependência tenant-aware real do projeto.
+
+  ---
 
 ## [0.6.4] — 1 de julho de 2026
 

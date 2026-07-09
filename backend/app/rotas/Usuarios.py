@@ -9,7 +9,7 @@ from pwdlib import PasswordHash
 from app.banco_dados import obterBancoDados
 from app.modelos.Condominio import Condominio
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
-from app.rotas.Autenticacao import obterUsuarioAtual
+from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
 import uuid
 
 roteador = APIRouter(prefix="/usuarios", tags=["Usuarios"])
@@ -180,7 +180,7 @@ async def criarUsuario(payload: UsuarioCriar, db: AsyncSession = Depends(obterBa
 @roteador.post("/equipe", response_model=UsuarioSaida)
 async def criarUsuarioEquipe(
     payload: UsuarioCriarEquipe,
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual),
 ):
     if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
@@ -194,7 +194,7 @@ async def criarUsuarioEquipe(
 @roteador.get("/eu", response_model=UsuarioSaida)
 async def obterEu(
     usuarioAtual: Usuario = Depends(obterUsuarioAtual),
-    db: AsyncSession = Depends(obterBancoDados),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
 ):
     condominioNome = usuarioAtual.Condominio
     if usuarioAtual.CondominioID:

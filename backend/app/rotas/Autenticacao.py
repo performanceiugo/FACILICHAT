@@ -82,8 +82,17 @@ async def obterBancoDadosComTenant(
     empresaID: uuid.UUID = Depends(obterTenantAtual),
     db: AsyncSession = Depends(obterBancoDados),
 ):
-    await db.execute(text("SET LOCAL app.empresa_id = :empresa_id"), {"empresa_id": str(empresaID)})
-    yield db
+    # Usa escopo de sessão (não transação-local) para que o tenant continue aplicado mesmo após
+    # commits internos da rota. No finally, o valor é limpo para não vazar para a próxima
+    # requisição quando a conexão voltar ao pool.
+    await db.execute(
+        text("SELECT set_config('app.empresa_id', :empresa_id, false)"),
+        {"empresa_id": str(empresaID)},
+    )
+    try:
+        yield db
+    finally:
+        await db.execute(text("RESET app.empresa_id"))
 
 # POST /autenticacao/login — recebe email e senha, retorna o token JWT e dados básicos do usuário
 @roteador.post("/login")

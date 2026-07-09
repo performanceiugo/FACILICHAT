@@ -7,17 +7,29 @@ import { useRouter } from 'expo-router'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import type { Usuario } from '@/lib/types'
+import { theme } from '@/lib/theme'
 
 export default function PerfilScreen() {
   const router = useRouter()
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
 
   // Busca os dados do usuário autenticado ao abrir a tela
+  async function carregarPerfil() {
+    try {
+      setErro('')
+      const dados = await api.eu()
+      setUsuario(dados)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar perfil')
+    } finally {
+      setCarregando(false)
+    }
+  }
+
   useEffect(() => {
-    api.eu()
-      .then(setUsuario)
-      .finally(() => setCarregando(false))
+    carregarPerfil()
   }, [])
 
   // Remove sessão do SecureStore e retorna para a tela de login
@@ -29,7 +41,18 @@ export default function PerfilScreen() {
   if (carregando) {
     return (
       <View style={s.centro}>
-        <ActivityIndicator size="large" color="#1a56db" />
+        <ActivityIndicator size="large" color={theme.colors.brandBlue} />
+      </View>
+    )
+  }
+
+  if (erro) {
+    return (
+      <View style={s.centro}>
+        <Text style={s.erro}>{erro}</Text>
+        <TouchableOpacity style={s.botaoRetry} onPress={carregarPerfil}>
+          <Text style={s.botaoRetryTexto}>Tentar novamente</Text>
+        </TouchableOpacity>
       </View>
     )
   }
@@ -59,35 +82,43 @@ export default function PerfilScreen() {
 // Estilos da tela de perfil
 const s = StyleSheet.create({
   centro: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, padding: 24, backgroundColor: '#f9fafb' },
+  container: { flex: 1, padding: 24, backgroundColor: theme.colors.surfacePage },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.radius.card,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.colors.borderSoft,
     gap: 8,
     alignItems: 'center',
     marginBottom: 24,
   },
-  nome: { fontSize: 20, fontWeight: '700', color: '#111827' },
-  email: { fontSize: 14, color: '#6b7280' },
+  erro: { color: theme.colors.danger, fontFamily: theme.typography.fontFamily, marginBottom: theme.spacing.md },
+  botaoRetry: {
+    backgroundColor: theme.colors.brandBlue,
+    borderRadius: theme.radius.control,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  botaoRetryTexto: { color: theme.colors.white, fontFamily: theme.typography.fontFamilySemiBold },
+  nome: { fontSize: 20, fontFamily: theme.typography.fontFamilyBold, color: theme.colors.ink900 },
+  email: { fontSize: 14, color: theme.colors.ink500, fontFamily: theme.typography.fontFamily },
   tag: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.colors.brandBlueSoft,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     marginTop: 4,
   },
-  tagTexto: { color: '#1a56db', fontWeight: '600', fontSize: 13 },
-  condominio: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  tagTexto: { color: theme.colors.brandBlue, fontFamily: theme.typography.fontFamilySemiBold, fontSize: 13 },
+  condominio: { fontSize: 14, color: theme.colors.ink500, marginTop: 4, fontFamily: theme.typography.fontFamily },
   botaoSair: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
+    borderColor: theme.colors.borderSoft,
+    borderRadius: theme.radius.control,
     padding: 16,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surfaceCard,
   },
-  botaoSairTexto: { color: '#dc2626', fontWeight: '600', fontSize: 15 },
+  botaoSairTexto: { color: theme.colors.danger, fontFamily: theme.typography.fontFamilySemiBold, fontSize: 15 },
 })

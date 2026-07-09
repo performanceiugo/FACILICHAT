@@ -20,13 +20,22 @@
   top: 0; left: 0; bottom: 0;
 }
 
-/* Marca no topo da sidebar */
+/* Marca no topo da sidebar — logo oficial + wordmark */
 .logo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-size: var(--fs-h4);
   font-weight: var(--fw-bold);
-  color: var(--brand-blue);
-  padding: 0 var(--sp-2) var(--sp-3);
+  color: var(--text-strong);
+  padding: 0 var(--sp-2) var(--sp-4);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
 
 .nav {
@@ -37,7 +46,11 @@
 }
 
 /* Item de menu — estado de repouso discreto, hover com fundo azul sutil do DS */
-.link {
+.link,
+.linkAtivo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
   padding: 9px var(--sp-3);
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
@@ -51,19 +64,71 @@
   color: var(--blue-700);
 }
 
+/* Item ativo (rota atual) — fundo azul sutil fixo, sem depender do hover */
+.linkAtivo {
+  background: var(--blue-50);
+  color: var(--blue-700);
+  font-weight: var(--fw-semibold);
+}
+
+.navIcone {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.navIcone svg { width: 100%; height: 100%; }
+
 /* Rodapé com identificação do usuário e logout */
 .rodape {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   border-top: 1px solid var(--border-subtle);
   padding-top: var(--sp-4);
 }
 
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-2);
+}
+
+/* Avatar circular com as iniciais do nome — mesmo padrão do protótipo (ex.: "ED") */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--blue-50);
+  color: var(--blue-700);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  flex-shrink: 0;
+}
+
+.usuarioInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .nomeUsuario {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-default);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empresaUsuario {
   font-size: var(--fs-xs);
   color: var(--text-muted);
-  padding: 0 var(--sp-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

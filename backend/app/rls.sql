@@ -3,7 +3,8 @@
 -- profundidade caso uma query futura esqueça o filtro por Empresa.
 --
 -- Funciona lendo a variável de sessão `app.empresa_id`, que a aplicação define por requisição em
--- `banco_dados.obterBancoDadosComTenant` via `SET LOCAL app.empresa_id = '<uuid>'` antes de rodar
+-- `rotas.Autenticacao.obterBancoDadosComTenant` via `set_config('app.empresa_id', '<uuid>', false)`
+-- antes de rodar
 -- qualquer query. Sem essa variável setada, current_setting(...) retorna vazio e nenhuma linha passa
 -- (fail-closed).
 --
@@ -28,4 +29,10 @@ ALTER TABLE "Mensagens" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Mensagens" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolamento ON "Mensagens";
 CREATE POLICY tenant_isolamento ON "Mensagens"
+    USING ("EmpresaID" = current_setting('app.empresa_id', true)::uuid);
+
+ALTER TABLE "Condominios" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Condominios" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolamento ON "Condominios";
+CREATE POLICY tenant_isolamento ON "Condominios"
     USING ("EmpresaID" = current_setting('app.empresa_id', true)::uuid);

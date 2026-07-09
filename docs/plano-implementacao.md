@@ -159,10 +159,10 @@
 | `[x]` | `868k60v1q` | A1 | `obterUsuarioAtual` retorna 500 (não 401) em token malformado | Conversão de UUID dentro do try e captura `(PyJWTError, ValueError)` | `backend/app/rotas/Autenticacao.py` |
 | `[x]` | `868k60v1x` | A3 | Web e mobile sem tratamento de 401/token expirado | No cliente HTTP, ao receber 401 → `auth.sair()` + redirecionar para login | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 | `[x]` | `868k60v29` | A4 | Proteção de rota só client-side com flash de conteúdo (web) | Usar `middleware.ts` do Next; renderizar `null`/loader enquanto não autenticado | `frontend/web/src/middleware.ts` (novo), `(painel)/layout.tsx`, `frontend/web/src/lib/auth.ts` |
-| `[~]` | `868k60v2e` | A5 | Design system violado: cor `#1a56db` (deveria `#148AF5`) e fonte Geist (deveria Figtree) | **Web feito** (tokens completos do DS em `globals.css` + Figtree via `next/font`); **mobile pendente** | `frontend/web/src/app/layout.tsx`, `globals.css`; `frontend/mobile/app/**` (mobile ainda) |
-| `[ ]` | `868k60v2g` | A6 | API de mensagens (`api.mensagens.*`) aponta para rota inexistente no backend | Alinhar com a Fase 1 (criar rota) ou marcar como código futuro | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
-| `[ ]` | `868k60v2k` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/app/(painel)/layout.tsx` |
-| `[ ]` | `868k60v2r` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5 | `frontend/mobile/package.json` |
+| `[x]` | `868k60v2e` | A5 | Design system violado: cor `#1a56db` (deveria `#148AF5`) e fonte Geist (deveria Figtree) | **Web feito** (tokens completos do DS em `globals.css` + Figtree via `next/font`); mobile alinhado a tokens, Figtree e navegação do design system | `frontend/web/src/app/layout.tsx`, `globals.css`, `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts` |
+| `[x]` | `868k60v2g` | A6 | API de mensagens (`api.mensagens.*`) aponta para rota inexistente no backend | Alinhar com a Fase 1 (criar rota) ou marcar como código futuro | `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
+| `[x]` | `868k60v2k` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/components/painel/AdminShell.tsx` |
+| `[x]` | `868k60v2r` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5 | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 
 ### 🔐 Segurança (levantamento de 08/07/2026)
 
@@ -172,8 +172,8 @@
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
-| `[ ]` | `868kaa34a` | S1 | `npm audit` reportou vulnerabilidades atuais em `next@15.3.6` e `postcss` transitivo | Atualizar Next/ESLint config para versão segura da linha suportada; rodar `npm audit` e build após o update | `frontend/web/package.json`, `package-lock.json` |
-| `[ ]` | `868kaa359` | S2 | RLS existe, mas as rotas usam `obterBancoDados` puro; `SET LOCAL app.empresa_id` não é aplicado nas consultas normais | Migrar rotas sensíveis para `obterBancoDadosComTenant` ou fazer a sessão tenant-aware ser padrão; adicionar teste de isolamento entre Empresas | `backend/app/rotas/*.py`, `backend/app/rls.sql` |
+| `[x]` | `868kaa34a` | S1 | `npm audit` reportou vulnerabilidades atuais em `next@15.3.6` e `postcss` transitivo | Next/ESLint config atualizados para `15.5.20`; `postcss` forçado para `8.5.10` via `overrides`; `npm audit --json` e `npm run build` validados | `frontend/web/package.json`, `frontend/web/package-lock.json` |
+| `[x]` | `868kaa359` | S2 | RLS existe, mas as rotas usam `obterBancoDados` puro; `SET LOCAL app.empresa_id` não é aplicado nas consultas normais | Rotas multi-tenant migradas para `obterBancoDadosComTenant`; tenant agora persiste por request com `set_config(...)` + `RESET`; `Condominios` entrou na RLS e foi criado verificador automatizado de isolamento | `backend/app/rotas/*.py`, `backend/app/rls.sql`, `backend/scripts/verificar_isolamento_tenant.py` |
 | `[ ]` | `868kaa363` | S3 | Cadastro público permite escolher qualquer `EmpresaID` no payload | Substituir por convite/onboarding por Empresa; enquanto não houver convite, restringir ou desabilitar cadastro público em produção | `backend/app/rotas/Usuarios.py` |
 | `[ ]` | `868kaa36v` | S4 | Credenciais do Postgres fixas no `docker-compose.yml` e na `DATABASE_URL` do serviço backend | Mover credenciais para `.env`/`.env.example`, rotacionar senha local e documentar separação dev/staging/prod | `docker-compose.yml`, `docs/setup.md` |
 | `[x]` | `868kaa37j` | S5 | Postgres publicado em `5432:5432`, abrindo o banco para o host/rede local | Porta presa em `127.0.0.1:5432:5432` para manter acesso local de dev sem expor o banco na rede | `docker-compose.yml`, `docs/setup.md` |
@@ -199,8 +199,8 @@
 | `[ ]` | `868k60vb1` | M7 | Web: `Record<string,string>` em vez dos enums; `err: any`; `erro.detail` não tipado | Tipar com `Record<ChamadoStatus, ...>`; normalizar `detail`; `err instanceof Error` | `frontend/web/src/app/(painel)/chamados/page.tsx`, `lib/api.ts` |
 | `[ ]` | `868k60vb3` | M8 | Web: `token()` duplicado entre `api.ts` e `auth.ts` | `api.ts` importa e usa `auth.token()` | `frontend/web/src/lib/api.ts` |
 | `[ ]` | `868k60vbb` | M9 | Web: arquivos CSS sem nenhum comentário (viola regra do `CLAUDE.md`) | Adicionar cabeçalho e comentar blocos (especialmente `:root` de tokens) | `frontend/web/src/app/**/*.css` |
-| `[ ]` | `868k60vbj` | M10 | Mobile: `chamados.tsx`/`perfil.tsx` sem `catch` → erros engolidos | Adicionar `catch` com estado de erro e botão "Tentar novamente" | `frontend/mobile/app/(tabs)/chamados.tsx`, `perfil.tsx` |
-| `[ ]` | `868k60vbz` | M11 | Mobile: paleta fora dos tokens; Figtree não carregada | Substituir pelos tokens Ink; carregar Figtree via `expo-font` | `frontend/mobile/app/**` |
+| `[x]` | `868k60vbj` | M10 | Mobile: `chamados.tsx`/`perfil.tsx` sem `catch` → erros engolidos | Adicionar `catch` com estado de erro e botão "Tentar novamente" | `frontend/mobile/app/(tabs)/chamados.tsx`, `frontend/mobile/app/(tabs)/perfil.tsx` |
+| `[x]` | `868k60vbz` | M11 | Mobile: paleta fora dos tokens; Figtree não carregada | Substituir pelos tokens Ink; carregar Figtree via `expo-font` | `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts`, `frontend/mobile/app/_layout.tsx` |
 
 ### 🟢 Baixos
 
@@ -209,7 +209,7 @@
 | `[ ]` | `868k60vc3` | B1 | Raios de canto fora da escala (cards 10/12 em vez de 8; inputs 10) | Padronizar 8px em cards | web e mobile (CSS/estilos) |
 | `[ ]` | `868k60vca` | B2 | `useEffect` de fetch sem cleanup/AbortController (web e mobile) | Adicionar `AbortController`/flag de montagem no cleanup | `chamados/page.tsx` (web), telas mobile |
 | `[ ]` | `868k60vck` | B3 | Web: faltam `error.tsx` e `not-found.tsx` | Criar `app/error.tsx` e `app/not-found.tsx` | `frontend/web/src/app/` |
-| `[ ]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
+| `[x]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
 | `[ ]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
 | `[ ]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud`; hasher duplicado; `@app.on_event` deprecado | Adicionar claims; centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
 | `[ ]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | Analisar o enquadramento responsivo do painel web em telas de navegador mobile e ajustar CSS/layout | `frontend/web/src/app/painel/**` |
@@ -222,7 +222,7 @@
 | `[ ]` | `868k60vdm` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Padronizar para o calendário correto | `docs/changelog.md` |
 | `[ ]` | `868k60vdp` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports | Atualizar comando de execução após corrigir imports | `docs/tecnico-backend.md` |
 | `[ ]` | `868kaa3f2` | D5 | `visao-geral.md` está desatualizado: diz que o código ainda tem 4 perfis/"Gerente" e só 3 filas, mas o código já tem 7 perfis e fila `Comercial` | Atualizar visão geral para refletir o estado atual e separar "feito" de "planejado" | `docs/visao-geral.md` |
-| `[ ]` | `868kaa3fz` | D6 | `arquitetura.md` afirma que `obterTenantAtual` é injetada em todas as rotas, mas a revisão mostrou rotas usando `obterBancoDados` puro | Corrigir a documentação junto do item `S2`, deixando claro o estado real até a correção | `docs/arquitetura.md`, `backend/app/rotas/*.py` |
+| `[x]` | `868kaa3fz` | D6 | `arquitetura.md` afirma que `obterTenantAtual` é injetada em todas as rotas, mas a revisão mostrou rotas usando `obterBancoDados` puro | `arquitetura.md` atualizado junto do `S2`, descrevendo a dependência tenant-aware real (`obterBancoDadosComTenant`) | `docs/arquitetura.md`, `backend/app/rotas/*.py` |
 | `[ ]` | `868kaa3ga` | D7 | Notas rápidas do plano mantêm `AutorTipo mensagem: Humano/IA/Sistema`, divergindo do código atual (`Cliente/Supervisor/Funcionario/IA/Sistema`) | Sincronizar notas de arquitetura com enums reais ou ajustar o código se a regra canônica for outra | `docs/plano-implementacao.md`, `docs/tecnico-backend.md` |
 | `[ ]` | `868kaa3h4` | D8 | Resultado da validação dos HTMLs de branding ainda não existe como checklist explícito de aceite | Criar checklist de aceite por eixo: design system, anti-amnésia, multi-tenant, IA ancorada, visita técnica e jornadas | `docs/plano-implementacao.md`, `docs/arquitetura.md` |
 
