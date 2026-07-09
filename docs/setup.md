@@ -166,6 +166,7 @@ Detalhes de cada variável:
 | `CORS_ORIGINS` | Quais frontends podem chamar a API pelo navegador | Lista separada por vírgula. Em produção, troque pelos domínios reais. |
 | `CADASTRO_PUBLICO_HABILITADO` | Liga/desliga `POST /usuarios/` sem autenticação | Padrão seguro: `false`. Use `true` só em dev/onboarding assistido. |
 | `CADASTRO_PUBLICO_EMPRESA_ID` | Empresa única autorizada a receber cadastro público | Obrigatória quando `CADASTRO_PUBLICO_HABILITADO=true`; o `EmpresaID` do payload precisa bater exatamente com este valor. |
+| `DEBUG` | Liga o `echo` do SQLAlchemy (loga todo SQL no console) | Padrão `false`. Use `true` só em dev, para depurar queries. |
 
 Para gerar um `JWT_SECRET` forte (com o venv ativado):
 

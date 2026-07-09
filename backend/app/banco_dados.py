@@ -6,7 +6,7 @@ from sqlalchemy.orm import DeclarativeBase
 from app.configuracoes import configuracoes
 
 # Engine assíncrono — echo=True imprime todas as queries SQL no console (útil em desenvolvimento)
-engine = create_async_engine(configuracoes.DATABASE_URL, echo=True)
+engine = create_async_engine(configuracoes.DATABASE_URL, echo=configuracoes.DEBUG)
 
 # Fábrica de sessões dedicada ao asyncio (SQLAlchemy 2.0) — expire_on_commit=False evita erros
 # ao acessar atributos após o commit

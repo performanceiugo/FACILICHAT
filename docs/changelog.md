@@ -7,6 +7,21 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### `M4` + `M5` — Modernização do backend: SQL echo configurável e datas UTC timezone-aware
+- **Trabalho iniciado em sessão paralela e finalizado aqui.** O que já estava feito: modelos com
+  `DateTime(timezone=True)` e default `agoraUtc()` (novo `app/tempo.py`), `configuracoes.py`
+  migrado para `SettingsConfigDict` (Pydantic v2) e `M4` (`echo=configuracoes.DEBUG`, com `DEBUG`
+  no `.env.example`).
+- **Finalização nesta sessão:** os três `datetime.utcnow()` restantes trocados por `agoraUtc()`
+  (`criarToken` em `Autenticacao.py`, `atualizarStatus` em `Chamados.py` e o seed
+  `semear_chamados.py`) e criado **`scripts/aplicar_m5_timestamptz.py`** — converte as colunas do
+  banco de dev existente de `TIMESTAMP` naive para `TIMESTAMPTZ` interpretando os valores antigos
+  como UTC (sem isso, o asyncpg rejeita datetime com timezone em coluna naive).
+- **Verificado no ambiente real:** migração executada no container; login (JWT com `exp` aware),
+  criação de chamado (resposta com `Criacao` em `...Z`), atualização de status e listagem com as
+  datas antigas preservadas. `DEBUG` documentado no `setup.md`; regra "sempre `agoraUtc()`"
+  registrada no `tecnico-backend.md`.
+
 ### `M12` — Retornos de erro do projeto inteiro traduzidos para português
 - **Origem:** o usuário viu um aviso em inglês na tela de login do web. Diagnóstico: as mensagens
   do nosso código já eram PT; o inglês vazava de (1) erros de validação automáticos do

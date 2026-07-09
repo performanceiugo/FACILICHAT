@@ -124,6 +124,17 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - **Cadastro público fechado por padrão**; quando habilitado, só aceita a Empresa configurada e cria Cliente. Perfis privilegiados só via `/usuarios/equipe` (Gestor)
 - **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
 
+## Data/hora — sempre UTC timezone-aware (M5)
+
+- Todas as colunas de data/hora usam `DateTime(timezone=True)` (`timestamptz` no Postgres) e os
+  defaults/gravações usam **`agoraUtc()` de `app/tempo.py`** — nunca `datetime.utcnow()` (deprecado
+  e naive) nem `datetime.now()` (hora local).
+- Banco de dev criado antes do M5: rode `python scripts/aplicar_m5_timestamptz.py` (ou via
+  `docker compose exec backend ...`) — converte as colunas existentes interpretando os valores como
+  UTC, sem perder dados. Colunas naive rejeitam datetime com timezone no asyncpg.
+- A API passa a responder datas com sufixo `Z` (ex.: `2026-07-09T15:52:34Z`); `new Date(...)` no
+  front interpreta corretamente.
+
 ## Erros para o usuário — sempre em português (M12)
 
 Todo corpo de erro da API sai como `{"detail": "<mensagem em português>"}` (string única):

@@ -5,6 +5,7 @@ from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
+from app.tempo import agoraUtc
 import uuid
 import enum
 from datetime import datetime
@@ -47,9 +48,9 @@ class Chamado(Base):
     Status: Mapped[ChamadoStatus | None] = mapped_column(SAEnum(ChamadoStatus), default=ChamadoStatus.Recebido)
     Prioridade: Mapped[ChamadoPrioridade | None] = mapped_column(SAEnum(ChamadoPrioridade), default=ChamadoPrioridade.Media)
     Resumo: Mapped[str | None] = mapped_column(Text, nullable=True)                     # Descrição livre do problema
-    PrazoSLA: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)          # Prazo de atendimento conforme acordo de nível de serviço
-    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
-    Atualizacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    PrazoSLA: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)          # Prazo de atendimento conforme acordo de nível de serviço
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=agoraUtc)
+    Atualizacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=agoraUtc, onupdate=agoraUtc)
 
     # Relacionamentos ORM — permitem acessar chamado.Cliente, chamado.Mensagens, etc.
     Cliente = relationship("Usuario", foreign_keys=[ClienteID])

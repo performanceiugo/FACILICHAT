@@ -8,8 +8,9 @@ from sqlalchemy import select, text
 import jwt
 from jwt import PyJWTError
 from pwdlib import PasswordHash
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.banco_dados import obterBancoDados
+from app.tempo import agoraUtc
 from app.modelos.Usuarios import Usuario
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.configuracoes import configuracoes
@@ -32,7 +33,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/autenticacao/login")
 # em JWT_EXPIRE_MINUTES. O empresa_id viaja no token para que o front nunca precise informar o
 # tenant (regra da Fase 0.7 — "tenant vem do token").
 def criarToken(usuarioID: str, funcao: str, empresaID: str) -> str:
-    expiracao = datetime.utcnow() + timedelta(minutes=configuracoes.JWT_EXPIRE_MINUTES)
+    # agoraUtc (timezone-aware) no lugar do datetime.utcnow deprecado — o PyJWT converte para epoch
+    expiracao = agoraUtc() + timedelta(minutes=configuracoes.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": usuarioID,  # subject: identificador único do usuário
         "funcao": funcao,

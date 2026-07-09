@@ -9,7 +9,8 @@ from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPri
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
 from app.servicos.chamados import montarChamadosIrmaos
-from datetime import datetime
+from app.tempo import agoraUtc
+from datetime import datetime  # ainda usado nas anotações dos schemas de saída
 import uuid
 
 roteador = APIRouter(prefix="/chamados", tags=["Chamados"])
@@ -124,7 +125,7 @@ async def atualizarStatus(
         raise HTTPException(status_code=409, detail="Chamado finalizado não pode ter o status alterado")
 
     chamado.Status = status
-    chamado.Atualizacao = datetime.utcnow()
+    chamado.Atualizacao = agoraUtc()  # timezone-aware, compatível com a coluna DateTime(timezone=True)
     await db.commit()
     await db.refresh(chamado)
     return chamado

@@ -16,7 +16,7 @@
 import os
 import sys
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 # Garante que a raiz do backend (pasta-pai de scripts/) esteja no sys.path para achar o pacote `app`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,6 +30,7 @@ from app.modelos.Empresa import Empresa
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Mensagens import Mensagem, AutorTipo
+from app.tempo import agoraUtc  # timestamps timezone-aware, como nas colunas DateTime(timezone=True)
 import app.modelos  # importa todos os modelos para o create_all conhecer todas as tabelas
 
 # Hasher de senha (mesmo argon2 das rotas de autenticação) — todos os clientes demo usam "Senha123".
@@ -274,7 +275,7 @@ async def main():
                 db, empresa.ID, c["Nome"], c["Email"], UsuarioFuncao.Cliente, c["Condominio"]
             ))
 
-        agora = datetime.utcnow()
+        agora = agoraUtc()
 
         # Cria cada chamado com data de abertura escalonada e o histórico de chat correspondente.
         for item in CHAMADOS:

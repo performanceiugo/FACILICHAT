@@ -6,6 +6,7 @@ from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
+from app.tempo import agoraUtc
 import uuid
 import enum
 from datetime import datetime
@@ -29,7 +30,7 @@ class Mensagem(Base):
     AutorTipo: Mapped[AutorTipo] = mapped_column(SAEnum(AutorTipo), nullable=False)
     Conteudo: Mapped[str] = mapped_column(Text, nullable=False)
     Anexo: Mapped[str | None] = mapped_column(String(500), nullable=True)  # URL de arquivo ou imagem anexada
-    Criacao: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    Criacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=agoraUtc)
 
     # Relacionamentos ORM
     Chamado = relationship("Chamado", back_populates="Mensagens")
