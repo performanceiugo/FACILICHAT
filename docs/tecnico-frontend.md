@@ -90,6 +90,27 @@ chamados: {
 | `auth.isSupervisor()` | Retorna `true` para Supervisor ou Gerente |
 | `auth.isGerente()` | Retorna `true` apenas para Gerente |
 
+### Headers de segurança (`next.config.ts`) — item S16
+
+Todas as respostas do painel saem com headers de segurança definidos em `headers()` do
+`next.config.ts`:
+
+| Header | Valor / propósito |
+|---|---|
+| `Content-Security-Policy-Report-Only` | CSP em fase de observação: o navegador só registra violações no console, sem bloquear. Promover a `Content-Security-Policy` (enforce) após período sem violações — passos em `docs/setup.md` |
+| `X-Content-Type-Options` | `nosniff` — impede sniffing de MIME type |
+| `X-Frame-Options` | `DENY` — anti-clickjacking (redundância do `frame-ancestors 'none'` da CSP) |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` — não vaza caminho/query para outras origens |
+| `Permissions-Policy` | nega câmera, microfone e geolocalização |
+
+Detalhes da CSP: `connect-src` inclui a origem da API (`NEXT_PUBLIC_API_URL`); em modo dev entram
+`'unsafe-eval'` (HMR) e `ws:/wss:`, removidos automaticamente no build de produção. HSTS não é
+enviado pelo Next — fica no proxy HTTPS de produção (ver `docs/setup.md`).
+
+> **Atenção ao rodar `next build` localmente:** pare o `next dev` antes. Os dois compartilham a
+> pasta `.next/` e um build feito com o dev server ativo sai contaminado com artefatos de dev
+> (sintoma: `EvalError: Code generation from strings disallowed` no middleware ao usar `next start`).
+
 ---
 
 ## App Mobile (Expo)

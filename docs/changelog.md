@@ -7,6 +7,23 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Segurança — `S16` concluído: CSP e headers de segurança no painel web
+- **`frontend/web/next.config.ts`** ganhou `headers()` aplicado a todas as rotas: CSP em modo
+  **Report-Only** (fase de observação — só registra violações no console, sem bloquear),
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy:
+  strict-origin-when-cross-origin` e `Permissions-Policy` negando câmera/microfone/geolocalização.
+- A CSP inclui a origem da API no `connect-src` (via `NEXT_PUBLIC_API_URL`) e afrouxa só em dev
+  (`'unsafe-eval'` para HMR e `ws:`), removendo isso automaticamente em produção. HSTS ficou
+  documentado para o proxy HTTPS de produção (não faz sentido em dev HTTP).
+- **Documentação:** `docs/setup.md` ganhou a seção "Produção — headers de segurança, CSP e HSTS"
+  com o passo a passo de promoção da CSP de Report-Only para enforce; `docs/tecnico-frontend.md`
+  ganhou a tabela dos headers.
+- **Verificado de ponta a ponta:** `next build` + `next start` com inspeção dos headers na resposta
+  HTTP real (variante de produção sem `unsafe-eval`) e middleware de rotas protegidas funcionando
+  (307 → `/login`). Aprendizado registrado no `tecnico-frontend.md`: rodar `next build` com o
+  `next dev` ativo contamina a pasta `.next/` compartilhada e quebra o `next start` com
+  `EvalError` no middleware — parar o dev antes de buildar.
+
 ### Segurança — auditoria de autenticação/sessão incorporada ao plano (sem código)
 - **Auditoria completa de autenticação, sessão e cookies** feita sobre backend (FastAPI/JWT), web
   (Next.js) e mobile (Expo), usando como referência as cheat sheets da OWASP (Session Management,

@@ -342,6 +342,46 @@ sempre que houver suspeita de exposição (chave commitada, colada em chat, etc.
 
 ---
 
+## Produção — headers de segurança, CSP e HSTS (web) · item S16
+
+O `frontend/web/next.config.ts` envia headers de segurança em **todas** as respostas do painel:
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+`Permissions-Policy` e uma **Content Security Policy em modo Report-Only**.
+
+### 1. CSP: fase de observação (Report-Only) → enforce
+
+Hoje a política sai no header `Content-Security-Policy-Report-Only`: o navegador **só registra**
+violações no console (aba Console do DevTools, mensagens `[Report Only]`), sem bloquear nada.
+Isso permite validar a política com o app real antes de ativá-la.
+
+Passos para promover a enforce, após um período de uso sem violações legítimas:
+
+1. Navegar pelo painel inteiro (login, chamados, plataforma) com o DevTools aberto e confirmar
+   que não aparecem violações `[Report Only]` causadas pelo próprio app.
+2. Em `next.config.ts`, trocar a chave `Content-Security-Policy-Report-Only` por
+   `Content-Security-Policy` (mesma política).
+3. Evolução futura (junto do endurecimento): substituir `'unsafe-inline'` de `script-src` por
+   nonces (middleware do Next), o que exige gerar a CSP por requisição.
+
+> A origem da API entra no `connect-src` a partir de `NEXT_PUBLIC_API_URL` — em produção,
+> **defina essa variável com a URL HTTPS real da API**, senão os `fetch` do painel viram violação.
+
+### 2. HSTS (só no proxy HTTPS de produção)
+
+`Strict-Transport-Security` **não** é enviado pelo Next de propósito: em dev o site roda em HTTP
+e HSTS gravaria no navegador uma exigência de HTTPS para `localhost`. Configure no proxy/host
+TLS de produção (nginx, Caddy, Cloudflare, Vercel etc.). Exemplo (nginx, dentro do bloco TLS):
+
+```nginx
+# Começar SEM includeSubDomains/preload; adicionar depois que todos os subdomínios tiverem TLS
+add_header Strict-Transport-Security "max-age=31536000" always;
+```
+
+> Referências do item S16: OWASP XSS Prevention Cheat Sheet (CSP como defesa em profundidade) e
+> MDN HTTP Headers. O CORS do backend (S17) e o cookie de sessão (S6) são itens separados do plano.
+
+---
+
 ## Solução de problemas comuns
 
 | Problema | Causa | Solução |
