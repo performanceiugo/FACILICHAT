@@ -53,10 +53,12 @@ export interface Mensagem {
   Criacao: string
 }
 
-// Resposta do endpoint de login — contém o token e dados básicos do usuário
+// Resposta dos endpoints de login e de atualização de token (item S15) — contém o access token,
+// o refresh token opaco (guardado no SecureStore, sem cookies no mobile) e dados do usuário.
 export interface TokenResposta {
   token_acesso: string
   tipo_token: string
+  refresh_token: string
   funcao: UsuarioFuncao
   nome: string
   empresa_id: string

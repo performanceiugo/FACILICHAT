@@ -5,20 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from pydantic import BaseModel, ConfigDict, EmailStr
-from pwdlib import PasswordHash
 from app.banco_dados import obterBancoDados
 from app.configuracoes import configuracoes
 from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
+from app.servicos.hasher import pwd
 from app.servicos.seguranca import aplicarRateLimitAutenticacao
 import uuid
 
 roteador = APIRouter(prefix="/usuarios", tags=["Usuarios"])
-
-# Instancia do hasher de senhas (mesma configuracao usada em Autenticacao.py)
-pwd = PasswordHash.recommended()
 
 # Schema de entrada do cadastro PUBLICO - nao inclui Funcao de proposito.
 # A funcao e sempre forcada para Cliente no servidor, impedindo que alguem se cadastre como Gestor.

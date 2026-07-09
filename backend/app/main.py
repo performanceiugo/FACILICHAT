@@ -1,6 +1,7 @@
 # Ponto de entrada da aplicação FaciliChat
 # Inicializa o FastAPI, cria as tabelas no banco de dados e registra as rotas
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,11 +12,30 @@ from app import modelos  # importação necessária para que o SQLAlchemy reconh
 from app.rotas import Autenticacao, Usuarios, Chamados, Plataforma
 from app.servicos.csrf import CsrfMiddleware
 
-# Instância principal da aplicação — título e versão aparecem no Swagger (/docs)
+
+# Substitui o `@app.on_event("startup")` deprecado (item B6). `lifespan` roda o código antes do
+# `yield` na subida e o que viesse depois do `yield` no encerramento — hoje não há nada a limpar.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("Banco de dados conectado!")
+    yield
+
+
+# Instância principal da aplicação — título e versão aparecem no Swagger (/docs).
+# Docs configuráveis por ambiente (item S8): com API_DOCS_HABILITADO=false, os três parâmetros
+# viram None e o FastAPI nem registra as rotas de /docs, /redoc e /openapi.json (não é só uma
+# UI escondida — o schema deixa de ser gerado/servido).
+_docsHabilitados = configuracoes.API_DOCS_HABILITADO
 app = FastAPI(
     title="FaciliChat",
     description="Plataforma de atendimento para gestão de condomínios",
-    version="0.1.0"
+    version="0.1.0",
+    docs_url="/docs" if _docsHabilitados else None,
+    redoc_url="/redoc" if _docsHabilitados else None,
+    openapi_url="/openapi.json" if _docsHabilitados else None,
+    lifespan=lifespan,
 )
 
 # Métodos HTTP realmente expostos pela API (rotas em app/rotas/). Listar explicitamente, em vez de
@@ -95,13 +115,6 @@ async def tratarErroValidacao(request: Request, exc: RequestValidationError):
     mensagens = [_traduzirErroValidacao(erro) for erro in exc.errors()]
     return JSONResponse(status_code=422, content={"detail": "; ".join(mensagens)})
 
-
-# Cria todas as tabelas no banco ao iniciar o servidor (somente se ainda não existirem)
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("Banco de dados conectado!")
 
 # Registra os roteadores de cada módulo com seus prefixos de URL
 app.include_router(Autenticacao.roteador)  # /autenticacao/...

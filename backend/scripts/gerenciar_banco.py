@@ -10,6 +10,7 @@
 # Uso (a partir de backend/, ou via `docker compose exec backend python scripts/gerenciar_banco.py <cmd>`):
 #   python scripts/gerenciar_banco.py reset [--semear]     # zera o banco: dropa tudo, recria e aplica RLS
 #   python scripts/gerenciar_banco.py criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>
+#   python scripts/gerenciar_banco.py criar-superadmin "<Nome>" <email> <senha>   # Superadmin da Iugo
 #   python scripts/gerenciar_banco.py semear               # popula dados de demonstração (idempotente)
 #   python scripts/gerenciar_banco.py aplicar-rls          # (re)aplica as políticas de app/rls.sql
 #   python scripts/gerenciar_banco.py verificar-rls        # testa o isolamento multi-tenant
@@ -29,7 +30,6 @@ from datetime import timedelta
 # Garante que a raiz do backend (pasta-pai de scripts/) esteja no sys.path para achar o pacote `app`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pwdlib import PasswordHash
 from sqlalchemy import delete, func, select, text
 
 from app.banco_dados import AsyncSessionLocal, Base, engine
@@ -38,11 +38,9 @@ from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Mensagens import AutorTipo, Mensagem
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
+from app.servicos.hasher import pwd  # mesmo hasher (argon2) usado pelas rotas de autenticação
 from app.tempo import agoraUtc
 import app.modelos  # importa todos os modelos para o create_all conhecer todas as tabelas
-
-# Hasher de senhas (mesmo argon2 das rotas de autenticação)
-pwd = PasswordHash.recommended()
 
 # Caminho do arquivo de políticas RLS — fonte da verdade das políticas do Postgres, aplicadas fora
 # do ciclo do create_all (que só cria tabelas/colunas, não políticas).
@@ -433,6 +431,86 @@ async def cmd_criar_empresa(args) -> None:
     print(f"Gestor criado com sucesso: {args.email}")
 
 
+# Empresa que hospeda o Superadmin da plataforma. A documentação posiciona a Iugo ACIMA dos tenants,
+# mas o schema exige `Usuario.EmpresaID NOT NULL` (ver modelos/Usuarios.py) — então ela precisa
+# existir como uma linha em `Empresas`. Decisão de produto de 09/07/2026: manter o schema intacto.
+EMPRESA_PLATAFORMA_NOME = "Iugo Performance"
+
+# CNPJ é `unique NOT NULL` e não há validação de dígito verificador em lugar nenhum do projeto.
+# Este é um PLACEHOLDER de desenvolvimento — passe `--cnpj` com o CNPJ real ao rodar em produção.
+EMPRESA_PLATAFORMA_CNPJ_PADRAO = "00.000.000/0001-00"
+
+
+# `criar-superadmin` — bootstrap do primeiro Superadmin (Iugo Performance).
+#
+# Por que existe: `POST /plataforma/empresas` exige um Superadmin já autenticado (`exigirSuperadmin`
+# em rotas/Plataforma.py), e nada no backend criava o primeiro — um ovo-e-galinha que travava o
+# acesso ao painel de plataforma.
+#
+# Idempotente, ao contrário de `criar-empresa`: pode rodar de novo sem duplicar nada. Isso importa
+# porque ele é um passo de provisionamento, executado à mão em cada ambiente.
+async def cmd_criar_superadmin(args) -> None:
+    await criar_tabelas()  # garante que as tabelas existem (idempotente)
+
+    async with AsyncSessionLocal() as db:
+        # --- Empresa da plataforma: reutiliza se já existir ---------------------------------
+        resultado = await db.execute(select(Empresa).where(Empresa.Nome == args.empresa_nome))
+        empresa = resultado.scalar_one_or_none()
+
+        if empresa is None:
+            empresa = Empresa(
+                Nome=args.empresa_nome, CNPJ=args.cnpj, Status=EmpresaStatus.Ativa, EhPlataforma=True
+            )
+            db.add(empresa)
+            await db.flush()  # empresa.ID preenchido antes de o Usuario referenciá-lo
+            print(f"Empresa da plataforma criada: {args.empresa_nome} ({args.cnpj})")
+        else:
+            # Empresa suspensa faz `obterUsuarioAtual` responder 403 — o Superadmin ficaria trancado
+            # para fora da própria plataforma. Reativar é a única saída sensata aqui.
+            if empresa.Status == EmpresaStatus.Suspensa:
+                empresa.Status = EmpresaStatus.Ativa
+                print(f"Empresa da plataforma reativada: {empresa.Nome}")
+            else:
+                print(f"Empresa da plataforma já existia: {empresa.Nome}")
+            # Corrige instalações que rodaram este bootstrap antes do campo existir (ambiente
+            # gravado sem o flag) — reutilizar a Empresa da Iugo sempre a marca como plataforma.
+            if not empresa.EhPlataforma:
+                empresa.EhPlataforma = True
+                print("Empresa da plataforma marcada como EhPlataforma=True (correção)")
+
+        # --- Usuário Superadmin --------------------------------------------------------------
+        resultado = await db.execute(select(Usuario).where(Usuario.Email == args.email))
+        usuario = resultado.scalar_one_or_none()
+
+        if usuario is not None:
+            # Já é Superadmin: nada a fazer. É o caminho da idempotência (rodar 2x é seguro).
+            if usuario.Funcao == UsuarioFuncao.Superadmin:
+                await db.commit()  # persiste uma eventual reativação da Empresa
+                print(f"Superadmin já existia, nada a fazer: {args.email}")
+                return
+
+            # NÃO promover um usuário existente. Um comando de bootstrap que transforma qualquer
+            # conta em Superadmin é escalonamento de privilégio disfarçado — quem tiver acesso ao
+            # shell promoveria o próprio Cliente. Falha alto e explícito.
+            raise SystemExit(
+                f"ERRO: o e-mail {args.email} já pertence a um usuário com perfil "
+                f"{usuario.Funcao.value}. Este comando não promove usuários existentes a "
+                f"Superadmin. Use outro e-mail."
+            )
+
+        superadmin = Usuario(
+            EmpresaID=empresa.ID,
+            Nome=args.nome,
+            Email=args.email,
+            SenhaHash=pwd.hash(args.senha),  # argon2, mesmo hasher das rotas
+            Funcao=UsuarioFuncao.Superadmin,
+        )
+        db.add(superadmin)
+        await db.commit()
+
+    print(f"Superadmin criado com sucesso: {args.email} (Empresa: {args.empresa_nome})")
+
+
 # `semear` — popula os dados de demonstração (clientes, supervisor, chamados e histórico de chat)
 # na primeira Empresa existente. Idempotente: não semeia de novo se já houver chamados demo.
 async def _semear() -> None:
@@ -586,6 +664,24 @@ def construir_parser() -> argparse.ArgumentParser:
     p_empresa.add_argument("email", help="E-mail do Gestor")
     p_empresa.add_argument("senha", help="Senha do Gestor")
     p_empresa.set_defaults(func=cmd_criar_empresa)
+
+    # Bootstrap do Superadmin da plataforma. Separado de `criar-empresa` porque cria um perfil
+    # global (não o Gestor de um tenant) e porque é idempotente — pode rodar de novo sem erro.
+    p_super = sub.add_parser("criar-superadmin", help="Cria o 1º Superadmin da plataforma (Iugo)")
+    p_super.add_argument("nome", help="Nome do Superadmin")
+    p_super.add_argument("email", help="E-mail do Superadmin")
+    p_super.add_argument("senha", help="Senha do Superadmin")
+    p_super.add_argument(
+        "--empresa-nome",
+        default=EMPRESA_PLATAFORMA_NOME,
+        help=f"Empresa que hospeda o Superadmin (padrão: {EMPRESA_PLATAFORMA_NOME})",
+    )
+    p_super.add_argument(
+        "--cnpj",
+        default=EMPRESA_PLATAFORMA_CNPJ_PADRAO,
+        help="CNPJ da Empresa da plataforma — o padrão é placeholder de dev; informe o real em produção",
+    )
+    p_super.set_defaults(func=cmd_criar_superadmin)
 
     p_semear = sub.add_parser("semear", help="Popula dados de demonstração (idempotente)")
     p_semear.set_defaults(func=cmd_semear)

@@ -55,11 +55,16 @@ export interface Mensagem {
   Criacao: string
 }
 
-// Resposta do endpoint de login — contém o token e dados básicos do usuário.
-// O tenant (empresa_id) vem sempre do token/login — o frontend nunca escolhe ou envia a Empresa.
+// Resposta dos endpoints de login e de atualização de token (item S15) — contém o access token e
+// dados básicos do usuário. O tenant (empresa_id) vem sempre do token/login — o frontend nunca
+// escolhe ou envia a Empresa.
 export interface TokenResposta {
   token_acesso: string
   tipo_token: string
+  // Refresh token opaco (item S15). O painel web ignora este campo — ele usa o cookie HttpOnly
+  // `refresh` que o backend já emite junto na mesma resposta. Só o app mobile (sem cookies) lê
+  // este valor para guardar no SecureStore.
+  refresh_token: string
   funcao: UsuarioFuncao
   nome: string
   empresa_id: string

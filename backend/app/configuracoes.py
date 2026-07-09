@@ -11,11 +11,28 @@ class Configuracoes(BaseSettings):
     DATABASE_URL: str            # URL de conexão com o PostgreSQL (ex: postgresql+asyncpg://...)
     JWT_SECRET: str              # Chave secreta para assinar e verificar tokens JWT
     JWT_ALGORITHM: str = "HS256"        # Algoritmo de criptografia do JWT
-    JWT_EXPIRE_MINUTES: int = 480       # Tempo de expiração do token (padrão: 8 horas)
+    # Access token curto (item S15): 15min é o padrão atual (OWASP/2026) para limitar a janela de
+    # uso de um token roubado. A sessão continua longa na prática graças ao refresh token, que o
+    # cliente troca por um access token novo em segundo plano — ver POST /autenticacao/atualizar.
+    JWT_EXPIRE_MINUTES: int = 15
+    # Claims `iss`/`aud` (item B6): identificam quem emitiu o token e para quem ele vale. Não são
+    # segredo — servem para o `jwt.decode` rejeitar de cara um token emitido por outro serviço ou
+    # pensado para outro público, antes mesmo de checar a denylist.
+    JWT_ISSUER: str = "facilichat-api"
+    JWT_AUDIENCE: str = "facilichat-clientes"
+    # Validade do refresh token (item S15) — janela em que o usuário continua "logado" sem digitar
+    # a senha de novo, desde que o app chame /autenticacao/atualizar antes de expirar. Cada uso
+    # rotaciona o token e renova esta janela (sessão "deslizante"); só expira de vez com inatividade.
+    REFRESH_TOKEN_EXPIRE_DIAS: int = 30
     ANTHROPIC_API_KEY: str       # Chave da API da Anthropic para integração com IA
     # Origens (URLs de frontend) autorizadas a chamar a API via navegador, separadas por vírgula.
     # Default cobre o Next.js local; em produção, definir no .env com os domínios reais.
     DEBUG: bool = False
+    # Swagger (/docs), ReDoc (/redoc) e o schema (/openapi.json) — item S8. Documentam a API
+    # publicamente (rotas, schemas de request/response) e ajudam quem for atacar a mapear a
+    # superfície antes de tentar algo. Ligado por padrão (dev depende disso); desligar em produção
+    # via `.env` — nenhuma mudança de código entre os dois ambientes.
+    API_DOCS_HABILITADO: bool = True
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     # Cadastro publico fica fechado por padrao para impedir que o payload escolha qualquer EmpresaID.
     # Quando habilitado em dev/onboarding assistido, deve apontar para uma unica Empresa ativa.

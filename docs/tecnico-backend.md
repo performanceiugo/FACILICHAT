@@ -77,13 +77,16 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 | Método | Rota | Descrição | Autenticação |
 |---|---|---|---|
-| POST | `/autenticacao/login` | Login com email e senha, retorna JWT | Não |
+| POST | `/autenticacao/login` | Login com email e senha, retorna access + refresh token | Não |
+| POST | `/autenticacao/atualizar` | Troca um refresh token válido por um access token novo (item S15) | Refresh token (cookie ou corpo) |
+| POST | `/autenticacao/logout` | Revoga a sessão de verdade: denylist do `jti` do access token (S14) + família do refresh token (S15) | Opcional |
 
-**Resposta do login:**
+**Resposta do login e de `/autenticacao/atualizar`** (mesmo formato — item S15):
 ```json
 {
   "token_acesso": "eyJ...",
   "tipo_token": "bearer",
+  "refresh_token": "5f2c...-uuid.segredo-opaco",
   "funcao": "Cliente",
   "nome": "João Silva"
 }
@@ -112,9 +115,22 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 ## Segurança
 
-- Senhas armazenadas com hash **argon2** via `pwdlib` (nunca em texto puro)
-- JWT assinado com `HS256` e chave secreta configurável
-- Token válido por **8 horas** (configurável via `JWT_EXPIRE_MINUTES`)
+- Senhas armazenadas com hash **argon2** via `pwdlib` (nunca em texto puro); hasher centralizado
+  em `app/servicos/hasher.py` (item B6) — reaproveitado por todas as rotas e scripts que hasheiam
+  senha, em vez de instanciado de forma duplicada
+- JWT assinado com `HS256` e chave secreta configurável. Claims: `sub` (usuário), `funcao`,
+  `empresa_id`, `iat`/`exp` (emissão/expiração), `iss`/`aud` (`JWT_ISSUER`/`JWT_AUDIENCE`,
+  validados no decode) e `jti` (ID único do token — item B6/S14)
+- **Access token curto + refresh rotativo (item S15):** access token válido por **15 minutos**
+  (`JWT_EXPIRE_MINUTES`) — a sessão "longa" vem do **refresh token**, não do access token. Refresh
+  token opaco no formato `"{ID}.{segredo}"` (`RefreshTokens`, `app/servicos/refresh.py`): o `ID` é
+  a chave primária (lookup indexado) e só o **hash sha256** do segredo fica no banco, como uma
+  senha. Válido por `REFRESH_TOKEN_EXPIRE_DIAS` (padrão 30), sessão "deslizante" — cada rotação
+  renova a janela. **Rotação com detecção de reuso por família:** todo refresh nascido do mesmo
+  login compartilha um `FamiliaID`; cada uso em `POST /autenticacao/atualizar` consome o token e
+  gera o próximo elo da mesma família; reusar um token já consumido é tratado como furto/replay e
+  **revoga a família inteira** (não só o token reusado). `RefreshTokens` fica fora da RLS pelo
+  mesmo motivo do `SessoesRevogadas` do S14 (checagem roda antes de `app.empresa_id` ser setado).
 - **Duas formas de sessão convivem** (item S6), resolvidas por `obterTokenDaRequisicao`:
   o **painel web** usa o cookie `sessao` (`HttpOnly`, emitido pelo backend no login, `Max-Age`
   igual à validade do token); o **app mobile** usa `Authorization: Bearer` com o token no
@@ -124,8 +140,16 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
   double-submit (`X-CSRF-Token` == cookie `csrf_token`, comparado em tempo constante).
   Requisições com `Bearer` pulam o double-submit: um header não é credencial ambiente, então
   não há superfície de CSRF. `SameSite` sozinho **não** basta (OWASP).
-- `POST /autenticacao/logout` apaga os cookies. É logout do lado do cliente: **o JWT continua
-  válido até expirar**. Revogação server-side é o item `S14`.
+- `POST /autenticacao/logout` revoga a sessão de verdade (itens S14/S15): decodifica o access
+  token recebido (cookie ou `Bearer`) e registra o seu `jti` numa denylist (tabela
+  `SessoesRevogadas`, `app/servicos/revogacao.py`) — além disso, localiza e revoga a **família
+  inteira** do refresh token (`app/servicos/refresh.revogarFamilia`), então nem uma cópia do
+  access nem do refresh (roubados antes do logout) continuam funcionando. `obterUsuarioAtual` e
+  `obterTenantAtual` checam a denylist do access token a cada requisição autenticada. Ambas as
+  tabelas (`SessoesRevogadas`, `RefreshTokens`) ficam deliberadamente fora da RLS (a checagem roda
+  antes de `app.empresa_id` ser setado; com RLS a query veria sempre zero linhas). **Pendente:**
+  revogar todas as sessões de um usuário em troca/reset de senha ou mudança de função ainda não
+  tem onde ser acionado — essas rotas não existem no código hoje.
 - Cookie configurável por ambiente: `COOKIE_SECURE`, `COOKIE_SAMESITE`, `COOKIE_DOMAIN`
   (defaults seguros; `SameSite=none` sem `Secure` falha na subida)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use
@@ -138,6 +162,10 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
   > em `app/main.py` — senão o preflight do navegador reprova a chamada.
 - **Cadastro público fechado por padrão**; quando habilitado, só aceita a Empresa configurada e cria Cliente. Perfis privilegiados só via `/usuarios/equipe` (Gestor)
 - **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
+- **Docs da API configuráveis por ambiente (item S8):** `API_DOCS_HABILITADO` (default `true`)
+  controla `docs_url`/`redoc_url`/`openapi_url` na instância `FastAPI(...)` (`main.py`). Com
+  `false`, o FastAPI nem registra `/docs`, `/redoc` ou `/openapi.json` — não gera o schema, não é
+  só uma UI escondida. Ligado em dev, desligado em produção (`docs/deploy-producao.md`).
 
 ## Data/hora — sempre UTC timezone-aware (M5)
 
@@ -155,7 +183,8 @@ Rode a partir de `backend/` ou via `docker compose exec backend python scripts/g
 | Comando | O que faz |
 |---|---|
 | `reset [--semear]` | Dropa o schema inteiro, recria as tabelas (a partir dos modelos) e aplica a RLS. Com `--semear`, também popula os dados de demonstração. É o jeito correto de aplicar mudança de schema em dev. |
-| `criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>` | Cria a 1ª Empresa (tenant) + o 1º Gestor numa transação só. |
+| `criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>` | Cria a 1ª Empresa (tenant) + o 1º Gestor numa transação só. **Não** é idempotente. |
+| `criar-superadmin "<Nome>" <email> <senha> [--empresa-nome N] [--cnpj C]` | Cria a Empresa `Iugo Performance` (se faltar) + o 1º **Superadmin** da plataforma. **Idempotente.** Aborta se o e-mail já pertence a outro perfil — nunca promove usuário existente. |
 | `semear` | Popula clientes, supervisor, chamados e chat de demonstração na 1ª Empresa (idempotente). |
 | `aplicar-rls` | (Re)aplica só as políticas de `app/rls.sql`. |
 | `verificar-rls` | Testa o isolamento multi-tenant (filtros por `EmpresaID` + RLS do Postgres). |
@@ -206,8 +235,21 @@ valerão para **todo** o backend a partir desta fase:
 - **Row-Level Security (RLS)** no PostgreSQL como segunda trava (defesa em profundidade).
 - **Papéis por tenant:** `Gestor`/`Supervisor`/etc. valem dentro da sua Empresa.
 - **Superadmin da plataforma (Iugo Performance):** nível acima dos tenants (rotas em `Plataforma.py`)
-  para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. O bootstrap é feito por
-  `python scripts/gerenciar_banco.py criar-empresa ...` (cria Empresa + 1º Gestor juntos).
+  para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. Dois bootstraps distintos:
+  - `gerenciar_banco.py criar-superadmin ...` → cria o **Superadmin** (e a Empresa da Iugo).
+  - `gerenciar_banco.py criar-empresa ...` → cria uma **Empresa cliente** + o 1º Gestor dela.
+
+  > **Nuance de modelo:** conceitualmente a Iugo está *acima* dos tenants, mas o schema exige
+  > `Usuario.EmpresaID NOT NULL` (`modelos/Usuarios.py:32`). Por isso a Iugo existe como uma linha
+  > em `Empresas`, marcada com `EhPlataforma=True` — a única diferença de uma Empresa-cliente
+  > comum. `listarEmpresas` filtra `EhPlataforma=False`, então a Iugo **não aparece** na lista de
+  > tenants do painel (bug reportado pelo usuário em 09/07/2026, corrigido no mesmo dia:
+  > `Empresa.EhPlataforma`, `Plataforma.listarEmpresas`, `Plataforma.atualizarStatusEmpresa`).
+  > `atualizarStatusEmpresa` recusa (400) mudar o status desta Empresa mesmo se alguém chamar a
+  > API direto — suspendê-la trancaria todos os Superadmins fora da própria plataforma. A
+  > autorização de rota não depende do flag: `exigirSuperadmin` olha só a `Funcao`, e a tabela
+  > `Empresas` está fora da RLS, então qualquer Superadmin enxerga (nas queries que quiserem) todos
+  > os tenants.
 
 > **Perfis (branding):** o produto define 7 perfis — Cliente, Funcionário, Supervisor, **RH**,
 > **Financeiro**, **Gestor**, **Superadmin**. O código atual tem 4 (Cliente, Supervisor, Funcionario,

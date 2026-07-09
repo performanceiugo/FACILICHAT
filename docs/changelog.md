@@ -7,6 +7,154 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### `S7` — Fechado após verificação (sem mudança de código nesta sessão)
+- **Contexto:** o item estava `em andamento` no ClickUp e `[~]` no plano, mas ninguém estava
+  trabalhando nele. Verificação de código confirmou que todo o escopo descrito no ClickUp já está
+  implementado: rate limit em memória por IP/e-mail no login e no cadastro público
+  (`app/servicos/seguranca.py` — 5 tentativas/5min, bloqueio de 15min), hash dummy no login
+  uniformizando o timing (anti-enumeração) e respostas neutras ("Email ou senha incorretos";
+  cadastro público não revela e-mail já cadastrado).
+- **Ação:** plano marcado `[x]` e subtarefa `868kaa3ax` movida para ✅ concluída no ClickUp, com
+  comentário registrando as evoluções futuras: rate limit compartilhado (Redis) para produção
+  multi-réplica fica no endurecimento do `S9`; resposta neutra no fluxo de convite/onboarding
+  quando ele existir (evolução do `S3`).
+
+### `S8` — Docs da API (`/docs`, `/redoc`, `/openapi.json`) configuráveis por ambiente
+- **Problema:** o FastAPI expõe Swagger, ReDoc e o schema OpenAPI por padrão, sem nenhuma opção de
+  desligar por ambiente — em produção isso documenta publicamente todas as rotas, schemas de
+  request/response e mensagens de erro, um mapa pronto para quem for atacar a API.
+- **Correção:** nova config `API_DOCS_HABILITADO` (`configuracoes.py`, default `true` — dev
+  depende disso). Em `main.py`, `docs_url`/`redoc_url`/`openapi_url` da instância `FastAPI(...)`
+  viram `None` quando desligado — o FastAPI nem registra essas rotas nem gera o schema, não é só
+  uma UI escondida atrás de uma URL. Vira um flag no `.env` de produção, sem tocar código.
+- **Validado:** com o flag ligado (default), `/docs`, `/redoc` e `/openapi.json` respondem 200;
+  com `API_DOCS_HABILITADO=false` (via `docker compose up -d --force-recreate` — `restart` sozinho
+  não relê o `.env`), as três respondem 404 e o resto da API (`GET /`) continua 200 normalmente.
+  Revertido para o default (dev) ao final. `verificar-rls` OK.
+
+### Bug — Empresa da plataforma (Iugo) vazava na listagem de tenants do Superadmin
+- **Reportado pelo usuário:** a tela do Superadmin deveria mostrar só as Empresas-cliente (para
+  cadastrar Gestores), mas a própria Empresa que hospeda o Superadmin (`Iugo Performance`,
+  criada pelo bootstrap `criar-superadmin`) aparecia misturada na lista — inclusive documentado
+  como comportamento esperado em `docs/tecnico-backend.md`. Pior: a tela permite suspender
+  qualquer item da lista, então um Superadmin podia suspender a própria Iugo por engano e ficar
+  trancado para fora da plataforma.
+- **Causa raiz:** `Usuario.EmpresaID` é `NOT NULL` (regra de ouro da Fase 0.7), então a Empresa da
+  Iugo precisa existir como uma linha comum em `Empresas` — mas nada a distinguia de um tenant de
+  verdade, e `GET /plataforma/empresas` listava todas sem filtro.
+- **Correção:** nova coluna `Empresa.EhPlataforma` (bool, default `False`). O bootstrap
+  `criar-superadmin` marca `True` na Empresa que cria (e corrige instalações antigas ao reutilizar
+  a Empresa existente). `listarEmpresas` filtra `EhPlataforma=False`. `atualizarStatusEmpresa`
+  recusa (400) alterar o status dessa Empresa mesmo via chamada direta à API — defesa em
+  profundidade, não só esconder da lista.
+- **Também corrigido nesta sessão:** `backend/scripts/gerenciar_banco.py` tinha um caractere `c`
+  perdido na primeira linha (fora de qualquer comentário), quebrando `python scripts/
+  gerenciar_banco.py` com `NameError` antes mesmo de chegar no parser de argumentos — corrigido.
+- **Banco de dev resetado** a pedido do usuário: `reset` → `criar-empresa` (Cefram Demo) →
+  `criar-superadmin` (Iugo) → `semear`. Validado via curl: `GET /plataforma/empresas` como
+  Superadmin retorna só a `Cefram Demo`; `PATCH .../status` na Empresa da Iugo responde 400;
+  `verificar-rls` OK.
+
+### `S15` — Access token curto (15min) + refresh token rotativo com detecção de reuso
+- **Problema:** o access token durava 8h inteiras sem refresh token — uma janela longa demais para
+  um token roubado (XSS, infostealer) continuar valendo. Diminuir a duração sem um mecanismo de
+  renovação faria o usuário digitar a senha de novo a cada 15min, o que não é aceitável.
+- **Access token:** `JWT_EXPIRE_MINUTES` baixado de `480` para `15` (padrão atual OWASP/2026 para
+  access token; confirmado via `verificar-seguranca` antes de implementar).
+- **Refresh token opaco com rotação e família:** formato `"{ID}.{segredo}"` — o `ID` é a chave
+  primária (lookup indexado) e só o **hash sha256** do segredo fica no banco (`RefreshTokens`,
+  modelo `RefreshToken`, serviço `app/servicos/refresh.py`), no mesmo espírito de uma senha. Todo
+  refresh nascido do mesmo login compartilha um `FamiliaID`. A cada uso (`POST
+  /autenticacao/atualizar`) o token é consumido e um novo nasce na mesma família — **reuso de um
+  token já consumido revoga a família inteira** (sinal de furto/replay), não só o token usado.
+  `REFRESH_TOKEN_EXPIRE_DIAS=30` (sessão "deslizante": cada rotação renova a janela).
+- **Logout revoga a família também:** além da denylist de `jti` do access token (S14),
+  `POST /autenticacao/logout` agora também localiza e revoga toda a família do refresh token —
+  um refresh ainda válido na mão do cliente no momento do logout não pode ser usado depois.
+- **Web (`lib/api.ts`):** cookie `refresh` `HttpOnly` (emitido junto no login/refresh,
+  `servicos/sessao.py`). Num `401`, `req()` chama `/autenticacao/atualizar` automaticamente e
+  repete a requisição original uma única vez (evita loop). **Single-flight:** requisições
+  paralelas que tomam 401 ao mesmo tempo compartilham a mesma promise de renovação — chamadas
+  concorrentes ao `/atualizar` rotacionariam o mesmo refresh token duas vezes e disparariam a
+  própria detecção de reuso do backend, derrubando a sessão à toa.
+- **Mobile (`lib/api.ts`/`lib/auth.ts`):** sem cookies — `refresh_token` guardado no SecureStore e
+  reenviado no corpo de `/autenticacao/atualizar`; mesmo retry único e single-flight do web.
+- **Efeito colateral esperado:** sessões abertas antes desta mudança (sem refresh token salvo)
+  caem para login normal assim que o access token de 8h antigo expirar ou for revogado — não há
+  como "migrar" uma sessão já emitida para o novo esquema.
+- **Validado:** curl direto na API — cadeia de rotações legítimas em sequência, reuso de um token
+  já consumido derrubando a família inteira (inclusive o token novo e válido), logout revogando a
+  família. Repetido através do **proxy real do Next** (`docker compose up -d --force-recreate
+  backend` foi necessário para o container pegar o `JWT_EXPIRE_MINUTES` novo do `.env` — `restart`
+  sozinho não relê o `env_file`) confirmando cookie `refresh` + CSRF + rotação funcionando de
+  ponta a ponta. `tsc --noEmit` limpo nos dois frontends.
+
+### Bootstrap do 1º Superadmin (Iugo Performance) — subcomando `criar-superadmin`
+- **Problema (ovo e galinha):** o painel de plataforma (`/plataforma/empresas`) exige o perfil
+  `Superadmin`, e `POST /plataforma/empresas` exige um Superadmin **já autenticado**. Mas nenhum
+  usuário tinha esse perfil e **nada no backend o criava** — a varredura não encontrou nenhuma
+  atribuição `Funcao = UsuarioFuncao.Superadmin`. `criar-empresa` grava `Gestor` fixo. Também não
+  havia item de plano cobrindo isso (criado na Fase 0.7 antes da implementação).
+- **Decisão de produto (com o usuário):** a documentação posiciona a Iugo *acima* dos tenants, mas o
+  schema exige `Usuario.EmpresaID NOT NULL`. Em vez de mexer no schema (o que tocaria o invariante
+  "toda tabela tem EmpresaID"), a Iugo passa a existir como uma **Empresa** que hospeda o Superadmin.
+  Isso funciona porque a tabela `Empresas` está **fora da RLS** e `/plataforma/*` usa
+  `obterBancoDados` puro — qualquer Superadmin enxerga todos os tenants.
+- **Implementado** em `backend/scripts/gerenciar_banco.py` (CLI unificado, sem script novo):
+  `criar-superadmin "<Nome>" <email> <senha> [--empresa-nome] [--cnpj]`. **Idempotente**: reutiliza a
+  Empresa, reativa se estiver `Suspensa` (senão o próprio Superadmin tomaria 403 e ficaria trancado
+  para fora) e sai em silêncio se o Superadmin já existir.
+- **Recusa promover usuário existente.** Se o e-mail já pertence a outro perfil, aborta com exit 1.
+  Um bootstrap que transforma qualquer conta em Superadmin seria escalonamento de privilégio
+  disfarçado — quem tivesse shell promoveria o próprio Cliente.
+- **Verificado de ponta a ponta:** criação; 2ª execução idempotente (exit 0, sem duplicar); tentativa
+  de promover o Gestor → abortou com exit 1 e o Gestor continuou Gestor; login → `funcao: Superadmin`;
+  `GET /plataforma/empresas` como Superadmin → 200 com as 2 Empresas, como Supervisor → **403**;
+  `POST /plataforma/empresas` como Superadmin → 200 (tenant de teste criado e removido depois);
+  pelo proxy do Next, o cookie `funcao=Superadmin` é emitido — é o que o `middleware.ts` usa para
+  redirecionar `/painel` → `/plataforma/empresas`.
+- **CNPJ:** `unique NOT NULL`, sem validação de dígito verificador no projeto. O padrão é um
+  placeholder de dev (`00.000.000/0001-00`); `--cnpj` informa o real em produção.
+- **Ressalva registrada:** a Empresa da Iugo **aparece** na lista do painel de plataforma, porque
+  `listarEmpresas` (`Plataforma.py:64`) não filtra. Cosmético; filtrar exigiria decidir como marcar
+  a Empresa-plataforma.
+- **Docs:** `setup.md` (Passo 3), `deploy-producao.md` (bootstrap em 2 passos), `tecnico-backend.md`
+  (tabela de subcomandos + nuance de modelo).
+
+### `S14` (+ `B6`) — Logout revoga de verdade a sessão; claims `iat/iss/aud/jti` no JWT
+- **Problema:** o JWT era stateless demais — o logout só apagava os cookies do navegador, mas o
+  token em si continuava válido até expirar (até 8h). Quem já tivesse copiado o token (ex.: XSS,
+  infostealer) continuava autenticado mesmo depois do usuário "sair". O token também não carregava
+  `iat`/`iss`/`aud`/`jti`, e o hasher de senha (`PasswordHash.recommended()`) estava duplicado em
+  4 arquivos (`Autenticacao.py`, `Usuarios.py`, `Plataforma.py` — este último não constava no
+  levantamento original — e `gerenciar_banco.py`).
+- **`B6` — claims e hasher centralizado:** `criarToken` passou a incluir `iat` (emissão), `iss`
+  (`facilichat-api`) e `aud` (`facilichat-clientes`), configuráveis via `JWT_ISSUER`/`JWT_AUDIENCE`
+  (`configuracoes.py`), além do `jti` (ID único do token, pré-requisito do `S14`). O decode
+  (`_decodificarToken`) agora valida `iss`/`aud` antes de qualquer outra checagem. Hasher
+  centralizado em `app/servicos/hasher.py`, reaproveitado pelos 4 pontos que o duplicavam.
+  `@app.on_event("startup")` (deprecado no FastAPI) virou `lifespan` em `main.py`.
+- **`S14` — denylist de sessão por `jti`:** nova tabela `SessoesRevogadas` (modelo
+  `SessaoRevogada`, `app/servicos/revogacao.py`) guarda o `jti` de todo token revogado no logout.
+  `POST /autenticacao/logout` agora decodifica o token recebido e registra sua revogação (além de
+  apagar os cookies); `obterUsuarioAtual`/`obterTenantAtual` (`rotas/Autenticacao.py`) checam a
+  denylist a cada requisição autenticada, em ambas as dependências (a de tenant sozinha também,
+  não só a que carrega o `Usuario` inteiro). A limpeza de entradas vencidas é feita "na unha" (sem
+  Redis no stack): cada novo registro apaga as entradas cujo `ExpiraEm` já passou.
+  **Decisão deliberada:** `SessoesRevogadas` fica de fora da RLS — a checagem roda em
+  `obterBancoDados` puro, antes de `app.empresa_id` ser setado; com `FORCE ROW LEVEL SECURITY` a
+  query sempre veria zero linhas (fail-closed) e a revogação nunca funcionaria de verdade.
+- **Pendente (registrado no plano, não bloqueia o fechamento do que foi feito):** a exigência de
+  "revogar todas as sessões em troca/reset de senha e mudança de função" não tem endpoint para
+  acionar — o código ainda não tem rota de troca de senha nem de edição de função de um usuário.
+  Fica para quando essas rotas existirem.
+- **Efeito colateral esperado:** como o decode agora exige `iss`/`aud`, qualquer token emitido
+  antes desta mudança deixa de ser aceito — usuários com sessão aberta precisam logar de novo.
+- **Validado:** `import app.main` dentro do container, reset+seed do banco de dev (schema novo
+  aplicado), `verificar-rls` OK, e teste real via curl — login → `GET /usuarios/eu` com o token
+  (200) → `POST /autenticacao/logout` → reuso do MESMO token no `GET /usuarios/eu` (401 "Sessão
+  encerrada", não mais um 200 revogado só no cliente).
+
 ### Docs — implantação reorganizada em 3 documentos com papéis claros
 - **Motivação (pedido do usuário):** o `setup.md` tinha ~510 linhas misturando três papéis —
   onboarding de dev via Docker, onboarding manual via WSL e notas de produção acumuladas pelos

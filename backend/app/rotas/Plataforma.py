@@ -6,7 +6,6 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr
-from pwdlib import PasswordHash
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,9 +13,9 @@ from app.banco_dados import obterBancoDados
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterUsuarioAtual
+from app.servicos.hasher import pwd
 
 roteador = APIRouter(prefix="/plataforma", tags=["Plataforma"])
-pwd = PasswordHash.recommended()
 
 
 class PrimeiroGestorCriar(BaseModel):
@@ -62,7 +61,11 @@ async def listarEmpresas(
     usuarioAtual: Usuario = Depends(obterUsuarioAtual),
 ):
     exigirSuperadmin(usuarioAtual)
-    resultado = await db.execute(select(Empresa).order_by(Empresa.Criacao.desc()))
+    # A Empresa que hospeda o(s) Superadmin(s) (EhPlataforma=True) não é um tenant — fica de fora
+    # desta lista, que é onde o Superadmin cadastra/suspende Empresas-cliente e seus Gestores.
+    resultado = await db.execute(
+        select(Empresa).where(Empresa.EhPlataforma.is_(False)).order_by(Empresa.Criacao.desc())
+    )
     return resultado.scalars().all()
 
 
@@ -115,6 +118,10 @@ async def atualizarStatusEmpresa(
     empresa = resultado.scalar_one_or_none()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa nao encontrada")
+    # Defesa em profundidade: mesmo que alguém chame a API direto (sem passar pela lista, que já
+    # filtra esta Empresa), suspender a Empresa da plataforma trancaria todos os Superadmins fora.
+    if empresa.EhPlataforma:
+        raise HTTPException(status_code=400, detail="Nao e possivel alterar o status da Empresa da propria plataforma")
 
     empresa.Status = payload.Status
     await db.commit()

@@ -23,6 +23,40 @@ async function redirecionarParaLoginPorSessaoExpirada() {
   router.replace('/(auth)/login')
 }
 
+// Renovação de sessão (item S15): sem cookies no mobile, o refresh token guardado no SecureStore
+// é reenviado no corpo de POST /autenticacao/atualizar quando o access token (15min) expira.
+// Sucesso: os novos tokens substituem os antigos no SecureStore e a chamada original é repetida.
+//
+// Single-flight: várias telas podem tomar 401 ao mesmo tempo (ex.: fila + chamados carregando
+// juntos); só a primeira aciona a renovação, as demais esperam a mesma promise — chamadas
+// concorrentes ao `/atualizar` rotacionariam o MESMO refresh token duas vezes e disparariam a
+// detecção de reuso do backend, derrubando a sessão à toa.
+let renovacaoEmAndamento: Promise<boolean> | null = null
+
+async function tentarRenovarSessao(): Promise<boolean> {
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = (async () => {
+      try {
+        const refreshToken = await auth.refreshToken()
+        if (!refreshToken) return false
+        const res = await fetchOuErroDeConexao(`${BASE}/autenticacao/atualizar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (!res.ok) return false
+        await auth.salvar(await res.json() as TokenResposta)
+        return true
+      } catch {
+        return false
+      } finally {
+        renovacaoEmAndamento = null
+      }
+    })()
+  }
+  return renovacaoEmAndamento
+}
+
 // Mensagem única para falha de rede (API fora do ar, sem conexão) — o fetch do React Native
 // lança TypeError com texto em inglês ("Network request failed"), que não pode chegar ao usuário (M12).
 const ERRO_CONEXAO = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
@@ -49,8 +83,9 @@ async function fetchOuErroDeConexao(url: string, options?: RequestInit): Promise
   }
 }
 
-// Função genérica de requisição HTTP com tipagem — injeta token e trata erros da API
-async function req<T>(path: string, options?: RequestInit): Promise<T> {
+// Função genérica de requisição HTTP com tipagem — injeta token e trata erros da API.
+// `jaTentouRenovar` evita loop: só tenta renovar a sessão (item S15) UMA vez por chamada.
+async function req<T>(path: string, options?: RequestInit, jaTentouRenovar = false): Promise<T> {
   const t = await auth.token()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -60,6 +95,9 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
 
   const res = await fetchOuErroDeConexao(`${BASE}${path}`, { ...options, headers })
   if (res.status === 401) {
+    if (!jaTentouRenovar && (await tentarRenovarSessao())) {
+      return req<T>(path, options, true)
+    }
     await redirecionarParaLoginPorSessaoExpirada()
     throw new Error('Sessao expirada. Faca login novamente.')
   }

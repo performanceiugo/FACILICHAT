@@ -69,7 +69,12 @@ Toda chamada ao backend passa pela função `req<T>()` que:
   Mesma origem ⇒ o cookie de sessão é first-party e a CSP fecha em `connect-src 'self'` (S6/M6).
 - **Não** injeta credencial: o navegador envia sozinho o cookie `sessao` (`HttpOnly`).
 - Anexa o header `X-CSRF-Token` (lido do cookie `csrf_token`) em `POST`/`PUT`/`PATCH`/`DELETE`.
-- Lança erro com a mensagem do backend em caso de falha; em `401`, limpa o local e vai ao login.
+- Em `401` (access token de 15min expirado — item S15), chama `/autenticacao/atualizar`
+  automaticamente (o cookie `refresh` vai sozinho, sendo mesma origem) e repete a chamada
+  original **uma única vez**. Só se essa renovação falhar é que limpa o local e vai ao login.
+  **Single-flight:** chamadas paralelas que tomam 401 ao mesmo tempo compartilham a mesma
+  renovação em vez de cada uma tentar rotacionar o refresh token — rotações concorrentes
+  disparariam a própria detecção de reuso do backend (S15) e derrubariam a sessão à toa.
 
 > **Cuidado ao mexer no proxy:** as rotas do backend terminam em barra (`/chamados/`). O Next
 > redirecionaria (308) e, depois, o FastAPI devolveria um 307 apontando para a **origem da API** —

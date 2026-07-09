@@ -18,8 +18,14 @@ from fastapi import Response
 
 from app.configuracoes import configuracoes
 
-# Cookie da sessao: guarda o JWT. HttpOnly — JavaScript nunca enxerga.
+# Cookie da sessao: guarda o access token (JWT curto, item S15). HttpOnly — JavaScript nunca enxerga.
 COOKIE_SESSAO = "sessao"
+
+# Cookie do refresh token (item S15): guarda o valor opaco "{ID}.{segredo}" usado para trocar por
+# um access token novo sem pedir senha de novo. HttpOnly pelo mesmo motivo do cookie de sessao;
+# vive bem mais tempo (REFRESH_TOKEN_EXPIRE_DIAS) e só é lido/consumido em
+# POST /autenticacao/atualizar e /autenticacao/logout.
+COOKIE_REFRESH = "refresh"
 
 # Cookie do token CSRF: legivel por JavaScript de proposito. O cliente le este valor e o repete
 # no header `X-CSRF-Token`; o backend so aceita a requisicao se os dois baterem (double-submit).
@@ -48,7 +54,15 @@ def _maxAgeSegundos() -> int:
     return configuracoes.JWT_EXPIRE_MINUTES * 60
 
 
-# Escreve os tres cookies na resposta de login. `path="/"` para valerem em toda a navegacao.
+# Duracao do cookie de refresh (item S15) — bem maior que a do access token de proposito: e ele
+# que sustenta a sessao "deslizante" enquanto o access token de 15min e renovado em segundo plano.
+def _maxAgeRefreshSegundos() -> int:
+    return configuracoes.REFRESH_TOKEN_EXPIRE_DIAS * 86400
+
+
+# Escreve os cookies da sessao (access token, CSRF, funcao) na resposta. `path="/"` para valerem
+# em toda a navegacao. Usada no login e em /autenticacao/atualizar (troca o access token sem
+# mexer no refresh, que tem seu proprio cookie/ciclo de vida — ver definirCookieRefresh).
 def definirCookiesSessao(resposta: Response, token: str, funcao: str) -> str:
     tokenCsrf = gerarTokenCsrf()
     comum = {
@@ -65,10 +79,26 @@ def definirCookiesSessao(resposta: Response, token: str, funcao: str) -> str:
     return tokenCsrf
 
 
+# Escreve/renova o cookie do refresh token (item S15) — separado de definirCookiesSessao porque
+# tem duracao diferente e e escrito tanto no login (familia nova) quanto em cada rotacao bem-
+# sucedida (proximo elo da familia).
+def definirCookieRefresh(resposta: Response, valorRefresh: str) -> None:
+    resposta.set_cookie(
+        COOKIE_REFRESH,
+        valorRefresh,
+        httponly=True,
+        max_age=_maxAgeRefreshSegundos(),
+        path="/",
+        secure=configuracoes.COOKIE_SECURE,
+        samesite=configuracoes.COOKIE_SAMESITE,
+        domain=configuracoes.COOKIE_DOMAIN or None,
+    )
+
+
 # Remove os cookies no logout. Os atributos (path/domain/secure/samesite) precisam bater com os
 # usados na criacao — senao o navegador entende que e outro cookie e o original sobrevive.
 def limparCookiesSessao(resposta: Response) -> None:
-    for nome in (COOKIE_SESSAO, COOKIE_CSRF, COOKIE_FUNCAO):
+    for nome in (COOKIE_SESSAO, COOKIE_CSRF, COOKIE_FUNCAO, COOKIE_REFRESH):
         resposta.delete_cookie(
             nome,
             path="/",

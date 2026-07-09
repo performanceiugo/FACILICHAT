@@ -5,3 +5,5 @@ from app.modelos.Condominio import Condominio
 from app.modelos.Usuarios import Usuario
 from app.modelos.Chamados import Chamado
 from app.modelos.Mensagens import Mensagem
+from app.modelos.SessaoRevogada import SessaoRevogada
+from app.modelos.RefreshToken import RefreshToken

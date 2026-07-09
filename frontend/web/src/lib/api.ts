@@ -44,6 +44,36 @@ function redirecionarParaLoginPorSessaoExpirada() {
   }
 }
 
+// Renovação de sessão (item S15): quando o access token (15min) expira, o cookie `refresh`
+// (bem mais longo) permite trocar por um access token novo sem pedir senha de novo. `req()`
+// dispara isso automaticamente num 401 e repete a chamada original uma única vez.
+//
+// Single-flight: se várias chamadas tomam 401 ao mesmo tempo (ex.: a página dispara 3 fetches em
+// paralelo com o access token já vencido), só a PRIMEIRA aciona /autenticacao/atualizar; as
+// demais esperam a mesma promise em vez de cada uma tentar rotacionar o refresh token — rotações
+// concorrentes disparariam a própria detecção de reuso do backend e derrubariam a sessão à toa.
+let renovacaoEmAndamento: Promise<boolean> | null = null
+
+async function tentarRenovarSessao(): Promise<boolean> {
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = (async () => {
+      try {
+        const res = await fetchOuErroDeConexao(`${BASE}/autenticacao/atualizar`, {
+          method: 'POST',
+          headers: headerCsrf('POST'),
+          credentials: 'same-origin',
+        })
+        return res.ok
+      } catch {
+        return false
+      } finally {
+        renovacaoEmAndamento = null
+      }
+    })()
+  }
+  return renovacaoEmAndamento
+}
+
 // Mensagem única para falha de rede (API fora do ar, sem conexão, bloqueio de CORS) — o fetch
 // lança TypeError com texto em inglês ("Failed to fetch"), que não pode chegar ao usuário (M12).
 const ERRO_CONEXAO = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'
@@ -74,7 +104,11 @@ async function fetchOuErroDeConexao(url: string, options?: RequestInit): Promise
 // A credencial de sessão NÃO é injetada aqui: o navegador manda o cookie `HttpOnly` sozinho,
 // por ser mesma origem. `credentials: 'same-origin'` é o padrão do fetch, mas fica explícito
 // para deixar claro que a chamada é autenticada por cookie.
-async function req<T>(path: string, options?: RequestInit): Promise<T> {
+//
+// `jaTentouRenovar` evita loop: só tenta renovar a sessão UMA vez por chamada. Se o access token
+// renovado ainda assim tomar 401 (ex.: usuário foi removido, Empresa suspensa), vai direto pro
+// login em vez de tentar renovar de novo.
+async function req<T>(path: string, options?: RequestInit, jaTentouRenovar = false): Promise<T> {
   const metodo = options?.method ?? 'GET'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -88,6 +122,9 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
     credentials: 'same-origin',
   })
   if (res.status === 401) {
+    if (!jaTentouRenovar && (await tentarRenovarSessao())) {
+      return req<T>(path, options, true)
+    }
     redirecionarParaLoginPorSessaoExpirada()
     throw new Error('Sessao expirada. Faca login novamente.')
   }

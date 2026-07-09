@@ -7,21 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 import jwt
 from jwt import PyJWTError
-from pwdlib import PasswordHash
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from app.banco_dados import obterBancoDados
 from app.tempo import agoraUtc
 from app.modelos.Usuarios import Usuario
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.configuracoes import configuracoes
+from app.servicos.hasher import pwd
 from app.servicos.seguranca import aplicarRateLimitAutenticacao
-from app.servicos.sessao import COOKIE_SESSAO, definirCookiesSessao, limparCookiesSessao
+from app.servicos.sessao import COOKIE_REFRESH, COOKIE_SESSAO, definirCookieRefresh, definirCookiesSessao, limparCookiesSessao
+from app.servicos.revogacao import registrarRevogacao, tokenRevogado
+from app.servicos.refresh import RefreshInvalido, criarFamiliaRefresh, obterFamiliaPorValor, revogarFamilia, rotacionar
 import uuid
 
 roteador = APIRouter(prefix="/autenticacao", tags=["Autenticacao"])
-
-# Instância do hasher de senhas com algoritmo recomendado (argon2)
-pwd = PasswordHash.recommended()
 
 # Hash dummy usado quando o email nao existe, reduzindo diferenca de timing entre usuario existente
 # e inexistente no login. O valor representa uma senha aleatoria sem utilidade operacional.
@@ -45,19 +44,47 @@ async def obterTokenDaRequisicao(
         raise HTTPException(status_code=401, detail="Não autenticado")
     return token
 
+
+# Mesma extração acima, mas sem exigir credencial — usada no logout, que precisa aceitar chamadas
+# sem sessão (nada a revogar) sem responder 401 por isso.
+async def obterTokenOpcionalDaRequisicao(
+    request: Request,
+    tokenDoHeader: str | None = Depends(oauth2_scheme),
+) -> str | None:
+    return tokenDoHeader or request.cookies.get(COOKIE_SESSAO)
+
+
 # Gera um token JWT com o ID, função e tenant (Empresa) do usuário, válido pelo tempo configurado
 # em JWT_EXPIRE_MINUTES. O empresa_id viaja no token para que o front nunca precise informar o
 # tenant (regra da Fase 0.7 — "tenant vem do token").
 def criarToken(usuarioID: str, funcao: str, empresaID: str) -> str:
     # agoraUtc (timezone-aware) no lugar do datetime.utcnow deprecado — o PyJWT converte para epoch
-    expiracao = agoraUtc() + timedelta(minutes=configuracoes.JWT_EXPIRE_MINUTES)
+    agora = agoraUtc()
+    expiracao = agora + timedelta(minutes=configuracoes.JWT_EXPIRE_MINUTES)
     payload = {
         "sub": usuarioID,  # subject: identificador único do usuário
         "funcao": funcao,
         "empresa_id": empresaID,
-        "exp": expiracao
+        "iat": agora,                          # quando o token foi emitido
+        "exp": expiracao,
+        "iss": configuracoes.JWT_ISSUER,       # quem emitiu (item B6)
+        "aud": configuracoes.JWT_AUDIENCE,     # para quem o token vale
+        "jti": uuid.uuid4().hex,               # ID único do token — chave da revogação (item S14)
     }
     return jwt.encode(payload, configuracoes.JWT_SECRET, algorithm=configuracoes.JWT_ALGORITHM)
+
+# Decodifica e valida um JWT: assinatura, expiração e as claims `iss`/`aud` (item B6) — um token
+# emitido para outro público ou por outro emissor já é rejeitado aqui, antes de checar a denylist.
+# Centraliza os parâmetros do decode para as duas dependências abaixo não divergirem.
+def _decodificarToken(token: str) -> dict:
+    return jwt.decode(
+        token,
+        configuracoes.JWT_SECRET,
+        algorithms=[configuracoes.JWT_ALGORITHM],
+        issuer=configuracoes.JWT_ISSUER,
+        audience=configuracoes.JWT_AUDIENCE,
+    )
+
 
 # Dependência injetável — decodifica o token da requisição e retorna o usuário autenticado
 # Usada em todas as rotas protegidas com Depends(obterUsuarioAtual)
@@ -66,13 +93,17 @@ async def obterUsuarioAtual(
     db: AsyncSession = Depends(obterBancoDados)
 ):
     try:
-        payload = jwt.decode(token, configuracoes.JWT_SECRET, algorithms=[configuracoes.JWT_ALGORITHM])
+        payload = _decodificarToken(token)
         usuarioID = payload.get("sub")
         if not usuarioID:
             raise HTTPException(status_code=401, detail="Token inválido")
         usuarioUUID = uuid.UUID(usuarioID)
     except (PyJWTError, ValueError):
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+
+    # Denylist do item S14: um token só passa daqui se o seu `jti` não tiver sido revogado no logout.
+    if await tokenRevogado(db, payload.get("jti")):
+        raise HTTPException(status_code=401, detail="Sessão encerrada")
 
     resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioUUID))
     usuario = resultado.scalar_one_or_none()
@@ -87,15 +118,25 @@ async def obterUsuarioAtual(
 # Dependência leve — extrai só o tenant (EmpresaID) do token, sem carregar o Usuario inteiro do banco.
 # Existe separada de obterUsuarioAtual para rotas/serviços que só precisam do escopo do tenant
 # (ex.: filtros de query), evitando um SELECT extra quando o usuário completo não é necessário.
-async def obterTenantAtual(token: str = Depends(obterTokenDaRequisicao)) -> uuid.UUID:
+# Também checa a denylist (S14): a checagem é barata (busca por chave primária) e assim a
+# revogação vale mesmo em rotas que só dependem do tenant, sem exigir o SELECT completo do Usuario.
+async def obterTenantAtual(
+    token: str = Depends(obterTokenDaRequisicao),
+    db: AsyncSession = Depends(obterBancoDados),
+) -> uuid.UUID:
     try:
-        payload = jwt.decode(token, configuracoes.JWT_SECRET, algorithms=[configuracoes.JWT_ALGORITHM])
+        payload = _decodificarToken(token)
         empresaID = payload.get("empresa_id")
         if not empresaID:
             raise HTTPException(status_code=401, detail="Token sem tenant")
-        return uuid.UUID(empresaID)
+        empresaUUID = uuid.UUID(empresaID)
     except (PyJWTError, ValueError):
         raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+
+    if await tokenRevogado(db, payload.get("jti")):
+        raise HTTPException(status_code=401, detail="Sessão encerrada")
+
+    return empresaUUID
 
 # Dependência que entrega uma sessão de banco já escopada ao tenant via RLS (trava secundária,
 # ver backend/app/rls.sql): define a variável de sessão Postgres `app.empresa_id` a partir do
@@ -149,13 +190,20 @@ async def login(
         raise HTTPException(status_code=403, detail="Empresa suspensa")
 
     token = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
+    # Abre uma família de refresh nova para esta sessão (item S15) — é o que sustenta o usuário
+    # "logado" por dias sem repetir a senha, enquanto o access token acima dura só 15min.
+    valorRefresh = await criarFamiliaRefresh(db, usuario.ID, usuario.EmpresaID)
 
-    # Cookies da sessão web: `sessao` (HttpOnly, invisível para JavaScript), `csrf_token` e `funcao`.
+    # Cookies da sessão web: `sessao` (access, HttpOnly), `csrf_token`, `funcao` e `refresh`.
     definirCookiesSessao(resposta, token, usuario.Funcao.value)
+    definirCookieRefresh(resposta, valorRefresh)
 
     return {
         "token_acesso": token,
         "tipo_token": "bearer",
+        # O app mobile não tem cookies: guarda este valor no SecureStore e o reenvia no corpo de
+        # POST /autenticacao/atualizar. O painel web ignora este campo (usa o cookie `refresh`).
+        "refresh_token": valorRefresh,
         "funcao": usuario.Funcao.value,
         "nome": usuario.Nome,
         "empresa_id": str(usuario.EmpresaID),
@@ -163,15 +211,100 @@ async def login(
     }
 
 
-# POST /autenticacao/logout — encerra a sessão do painel web apagando os cookies.
+# Lê o refresh token de uma requisição sem exigi-lo: cookie `refresh` (web) ou campo
+# `refresh_token` no corpo JSON (mobile, sem cookies). Corpo ausente/inválido é tratado como
+# "não enviou" — usado por /logout e /atualizar, que não podem 422 por causa de um corpo vazio.
+async def _obterRefreshDaRequisicao(request: Request) -> str | None:
+    try:
+        corpo = await request.json()
+    except Exception:
+        corpo = {}
+    return (corpo or {}).get("refresh_token") or request.cookies.get(COOKIE_REFRESH)
+
+
+# POST /autenticacao/logout — encerra a sessão de verdade (itens S14/S15): além de apagar os
+# cookies do cliente, registra o `jti` do access token na denylist e revoga a FAMÍLIA inteira do
+# refresh token, então nem uma cópia do access token nem do refresh (roubados antes do logout)
+# continuam funcionando — não precisa esperar a expiração de nenhum dos dois.
 #
-# Limite conhecido e proposital: isto é logout do LADO DO CLIENTE. O JWT em si continua válido até
-# expirar — se alguém já tiver copiado o token, apagar o cookie não o invalida. A revogação real
-# (denylist por `jti`) é o item S14 do plano e depende das claims do B6. Não confunda os dois.
-#
-# Não exige autenticação: chamar logout sem sessão simplesmente não faz nada. Exigir um token válido
-# só criaria um jeito de o usuário ficar preso numa sessão expirada, sem conseguir limpar o cookie.
+# Não exige autenticação: chamar logout sem sessão simplesmente não faz nada (não há nada a
+# revogar). Exigir um token válido só criaria um jeito de o usuário ficar preso numa sessão
+# expirada, sem conseguir limpar os cookies. Tokens já expirados/inválidos são ignorados de
+# propósito — já seriam rejeitados pela expiração de qualquer forma.
 @roteador.post("/logout")
-async def logout(resposta: Response):
+async def logout(
+    request: Request,
+    resposta: Response,
+    token: str | None = Depends(obterTokenOpcionalDaRequisicao),
+    db: AsyncSession = Depends(obterBancoDados),
+):
+    if token:
+        try:
+            payload = _decodificarToken(token)
+            jti = payload.get("jti")
+            usuarioID = payload.get("sub")
+            empresaID = payload.get("empresa_id")
+            expiracao = payload.get("exp")
+            if jti and usuarioID and empresaID and expiracao:
+                await registrarRevogacao(
+                    db,
+                    uuid.UUID(empresaID),
+                    uuid.UUID(usuarioID),
+                    jti,
+                    datetime.fromtimestamp(expiracao, tz=timezone.utc),
+                )
+        except (PyJWTError, ValueError):
+            pass  # token já inválido/expirado — nada de novo a revogar
+
+    valorRefresh = await _obterRefreshDaRequisicao(request)
+    if valorRefresh:
+        familiaID = await obterFamiliaPorValor(db, valorRefresh)
+        if familiaID:
+            await revogarFamilia(db, familiaID)
+
     limparCookiesSessao(resposta)
     return {"mensagem": "Sessão encerrada"}
+
+
+# POST /autenticacao/atualizar — troca um refresh token válido por um access token novo (item
+# S15), sem pedir senha de novo. Roda a rotação (servicos/refresh.rotacionar): o token recebido é
+# consumido e um novo nasce na mesma família; reuso de um token já consumido derruba a família
+# inteira (sinal de furto). Reaplica as mesmas checagens de Empresa suspensa do login/
+# obterUsuarioAtual — um refresh não pode reviver o acesso de uma Empresa suspensa entretanto.
+@roteador.post("/atualizar")
+async def atualizarToken(
+    request: Request,
+    resposta: Response,
+    db: AsyncSession = Depends(obterBancoDados),
+):
+    valorRefresh = await _obterRefreshDaRequisicao(request)
+    if not valorRefresh:
+        raise HTTPException(status_code=401, detail="Refresh token ausente")
+
+    try:
+        novoValorRefresh, usuarioID, empresaID = await rotacionar(db, valorRefresh)
+    except RefreshInvalido:
+        limparCookiesSessao(resposta)
+        raise HTTPException(status_code=401, detail="Sessão expirada. Faça login novamente.")
+
+    resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioID))
+    usuario = resultado.scalar_one_or_none()
+    resultadoEmpresa = await db.execute(select(Empresa).where(Empresa.ID == empresaID))
+    empresa = resultadoEmpresa.scalar_one_or_none()
+    if not usuario or not empresa or empresa.Status == EmpresaStatus.Suspensa:
+        limparCookiesSessao(resposta)
+        raise HTTPException(status_code=403, detail="Empresa suspensa")
+
+    novoToken = criarToken(str(usuario.ID), usuario.Funcao.value, str(usuario.EmpresaID))
+    definirCookiesSessao(resposta, novoToken, usuario.Funcao.value)
+    definirCookieRefresh(resposta, novoValorRefresh)
+
+    return {
+        "token_acesso": novoToken,
+        "tipo_token": "bearer",
+        "refresh_token": novoValorRefresh,
+        "funcao": usuario.Funcao.value,
+        "nome": usuario.Nome,
+        "empresa_id": str(usuario.EmpresaID),
+        "empresa_nome": empresa.Nome if empresa else None,
+    }

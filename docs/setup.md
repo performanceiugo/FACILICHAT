@@ -80,11 +80,20 @@ docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nom
 # opcional: clientes, chamados e chat de demonstração (idempotente)
 docker compose exec backend python scripts/gerenciar_banco.py semear
 
+# Superadmin da plataforma (Iugo) — dá acesso a /plataforma/empresas. Idempotente.
+docker compose exec backend python scripts/gerenciar_banco.py criar-superadmin "Superadmin Iugo" superadmin@iugo.com.br SenhaForte123
+
 # se precisar zerar o banco de dev (dropa tudo, recria e aplica RLS):
 docker compose exec backend python scripts/gerenciar_banco.py reset
 ```
 
 Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe`).
+
+> **Por que existe o `criar-superadmin`:** `POST /plataforma/empresas` exige um Superadmin
+> autenticado, mas nada criava o primeiro — ovo e galinha. O comando cria a Empresa
+> `Iugo Performance` (o schema exige que todo usuário tenha uma Empresa) e o Superadmin dentro dela.
+> Ele **não promove** um usuário existente: se o e-mail já existir com outro perfil, aborta.
+> Em produção, passe o CNPJ real com `--cnpj` — o padrão é um placeholder de dev.
 
 ---
 

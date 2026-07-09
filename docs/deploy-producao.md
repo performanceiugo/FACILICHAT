@@ -26,11 +26,11 @@ docker compose exec backend python scripts/gerenciar_banco.py criar-empresa ...
 | Cookie de sessão HttpOnly + CSRF (S6) e CORS endurecido (S17) | ✅ |
 | Headers de segurança + CSP Report-Only no web (S16) | ✅ |
 | Cadastro público fechado por padrão (S3) | ✅ |
+| `/docs`/`/redoc`/`/openapi.json` configuráveis por ambiente (S8) | ✅ |
+| Revogação de sessão server-side (denylist de `jti`, S14) + refresh token com rotação/detecção de reuso (S15) | ✅ (falta só revogação em massa na troca de senha/função — sem rota ainda) |
 | Compose de produção (sem `--reload`/bind mount, usuário endurecido) | 🔜 S9 |
 | Web (Next.js) containerizado + proxy TLS com HSTS | 🔜 S9 |
 | Seeds demo bloqueados em produção | 🔜 S10 |
-| `/docs`/`/redoc` desabilitados em produção | 🔜 S8 |
-| Revogação de sessão server-side / refresh token | 🔜 S14/S15 |
 
 ---
 
@@ -91,7 +91,9 @@ Além dos secrets, confira no ambiente da API:
 | `COOKIE_DOMAIN` | Vazio (host-only), a menos que o cookie precise valer para subdomínios |
 | `CADASTRO_PUBLICO_HABILITADO` | `false` (default) até existir onboarding/convite |
 | `DEBUG` | `false` (default) — não logar SQL em produção |
-| `JWT_EXPIRE_MINUTES` | 480 hoje; encurtar quando o S15 (refresh token) entrar. O `Max-Age` do cookie acompanha automaticamente |
+| `API_DOCS_HABILITADO` | `false` — desliga `/docs`, `/redoc` e `/openapi.json` (item S8); default do código é `true` (dev depende disso) |
+| `JWT_EXPIRE_MINUTES` | `15` (default do código, item S15) — o `Max-Age` do cookie de sessão acompanha automaticamente |
+| `REFRESH_TOKEN_EXPIRE_DIAS` | `30` (default do código, item S15) — janela do refresh token, renovada a cada rotação |
 
 > **Arquitetura da sessão (S6):** o painel web autentica por cookie `HttpOnly` emitido pelo
 > backend e fala com a API pelo **proxy `/api/*` do Next** — o navegador nunca chama a API
@@ -123,9 +125,18 @@ add_header Strict-Transport-Security "max-age=31536000" always;
 ## 6. Bootstrap do banco
 
 ```bash
+# 1. Superadmin da plataforma (Iugo) — informe o CNPJ REAL; o padrão é placeholder de dev.
+#    Idempotente: pode rodar de novo. Use uma senha forte, própria deste ambiente.
+docker compose exec backend python scripts/gerenciar_banco.py criar-superadmin "<Nome>" <email> <senha-forte> --cnpj <cnpj-real-da-iugo>
+
+# 2. Primeira Empresa cliente + o Gestor dela (ou faça isso pelo painel, já logado como Superadmin)
 docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "<Empresa>" <CNPJ> "<Gestor>" <email> <senha-forte>
-docker compose exec backend python scripts/gerenciar_banco.py aplicar-rls   # se o schema nasceu pelo create_all, o criar-empresa já garante as tabelas
+
+docker compose exec backend python scripts/gerenciar_banco.py aplicar-rls   # se o schema nasceu pelo create_all, os comandos acima já garantem as tabelas
 ```
+
+> Depois do passo 1, o Superadmin consegue cadastrar as demais Empresas pelo painel
+> (`POST /plataforma/empresas`), sem shell. O passo 2 é atalho para a primeira.
 
 **Não rode `semear` em produção** — cria usuários demo com senha padrão (bloqueio automático é o
 item S10). O comando `reset` **destrói o banco** — jamais em produção.
@@ -139,8 +150,10 @@ item S10). O comando `reset` **destrói o banco** — jamais em produção.
 - [ ] Papel do banco sem superusuário e `verificar-rls` executado com sucesso contra o banco de produção vazio.
 - [ ] CSP promovida a enforce após observação (seção 4).
 - [ ] Nenhum dado demo no banco (`semear` nunca rodou).
-- [ ] Swagger (`/docs`) inacessível publicamente (🔜 S8; até lá, bloquear no proxy).
-- [ ] Logout entendido como client-side: token roubado vale até expirar (revogação real é 🔜 S14).
+- [ ] `API_DOCS_HABILITADO=false` — Swagger/ReDoc/schema inacessíveis publicamente (item S8, feito).
+- [ ] Logout revoga de verdade (S14: denylist de `jti`) e o refresh token roda com rotação +
+  detecção de reuso por família (S15) — ambos feitos; falta só revogar em massa na troca de senha
+  ou mudança de função, quando essas rotas existirem.
 
 ---
 
