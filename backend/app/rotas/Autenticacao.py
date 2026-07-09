@@ -1,7 +1,7 @@
 # Rotas de autenticação e utilitários de segurança JWT
 # Responsável por: login, geração de token e validação do usuário atual em rotas protegidas
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
@@ -13,12 +13,17 @@ from app.banco_dados import obterBancoDados
 from app.modelos.Usuarios import Usuario
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.configuracoes import configuracoes
+from app.servicos.seguranca import aplicarRateLimitAutenticacao
 import uuid
 
 roteador = APIRouter(prefix="/autenticacao", tags=["Autenticacao"])
 
 # Instância do hasher de senhas com algoritmo recomendado (argon2)
 pwd = PasswordHash.recommended()
+
+# Hash dummy usado quando o email nao existe, reduzindo diferenca de timing entre usuario existente
+# e inexistente no login. O valor representa uma senha aleatoria sem utilidade operacional.
+HASH_DUMMY_LOGIN = pwd.hash("senha-dummy-para-uniformizar-tempo-de-login")
 
 # Informa ao FastAPI onde está o endpoint de login para o fluxo OAuth2 (exibido no Swagger)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/autenticacao/login")
@@ -97,14 +102,21 @@ async def obterBancoDadosComTenant(
 # POST /autenticacao/login — recebe email e senha, retorna o token JWT e dados básicos do usuário
 @roteador.post("/login")
 async def login(
+    request: Request,
     formulario: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(obterBancoDados)
 ):
+    aplicarRateLimitAutenticacao("login", request, formulario.username)
+
     resultado = await db.execute(select(Usuario).where(Usuario.Email == formulario.username))
     usuario = resultado.scalar_one_or_none()
 
-    # Rejeita se o usuário não existe ou a senha não confere com o hash armazenado
-    if not usuario or not pwd.verify(formulario.password, usuario.SenhaHash):
+    # Usa hash real ou dummy para reduzir diferenca de timing entre email existente e inexistente.
+    hashParaVerificar = usuario.SenhaHash if usuario else HASH_DUMMY_LOGIN
+    senhaValida = pwd.verify(formulario.password, hashParaVerificar)
+
+    # Rejeita com mensagem uniforme se o usuario nao existe ou a senha nao confere.
+    if not usuario or not senhaValida:
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
     # Nome da Empresa vai junto na resposta do login (não no JWT) só para exibição na UI

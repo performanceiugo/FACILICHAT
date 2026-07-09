@@ -151,6 +151,8 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=480
 ANTHROPIC_API_KEY=sk-ant-sua-chave-aqui
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CADASTRO_PUBLICO_HABILITADO=false
+CADASTRO_PUBLICO_EMPRESA_ID=
 ```
 
 Detalhes de cada variável:
@@ -162,6 +164,8 @@ Detalhes de cada variável:
 | `JWT_EXPIRE_MINUTES` | Validade do token (minutos) | Padrão 480 (8h). |
 | `ANTHROPIC_API_KEY` | Funcionalidades de IA (Fase 5) | Ainda **não é usada** pelo código, mas é obrigatória para a app subir. Use um placeholder por enquanto. |
 | `CORS_ORIGINS` | Quais frontends podem chamar a API pelo navegador | Lista separada por vírgula. Em produção, troque pelos domínios reais. |
+| `CADASTRO_PUBLICO_HABILITADO` | Liga/desliga `POST /usuarios/` sem autenticação | Padrão seguro: `false`. Use `true` só em dev/onboarding assistido. |
+| `CADASTRO_PUBLICO_EMPRESA_ID` | Empresa única autorizada a receber cadastro público | Obrigatória quando `CADASTRO_PUBLICO_HABILITADO=true`; o `EmpresaID` do payload precisa bater exatamente com este valor. |
 
 Para gerar um `JWT_SECRET` forte (com o venv ativado):
 
@@ -215,21 +219,23 @@ O servidor estará disponível em:
 
 ---
 
-## Passo 9 — Criar o primeiro usuário Gerente
+## Passo 9 — Criar o primeiro usuário Gestor
 
-Por segurança, o cadastro público (`POST /usuarios/`) **sempre cria um Cliente**, e a criação de
-perfis privilegiados (`POST /usuarios/equipe`) exige um **Gerente já autenticado**. Logo, o primeiro
-Gerente precisa ser criado pelo script de bootstrap (rode uma única vez, com o backend já tendo subido
-ao menos uma vez para as tabelas existirem):
+Por segurança, o cadastro público (`POST /usuarios/`) fica **desabilitado por padrão** e, quando
+habilitado em dev/onboarding assistido, **sempre cria um Cliente** apenas para a Empresa definida em
+`CADASTRO_PUBLICO_EMPRESA_ID`. A criação de perfis privilegiados (`POST /usuarios/equipe`) exige um
+**Gestor já autenticado**. Logo, o primeiro Gestor precisa ser criado pelo script de bootstrap (rode
+uma única vez, com o backend já tendo subido ao menos uma vez para as tabelas existirem):
 
 ```bash
 cd backend
-python scripts/criar_gerente.py "Nome do Gestor" gestor@exemplo.com SenhaForte123
+python scripts/criar_empresa.py "Nome da Empresa" "00.000.000/0001-00" "Nome do Gestor" gestor@exemplo.com SenhaForte123
 ```
 
-Depois disso, faça login com esse Gerente para criar os demais usuários da equipe (Supervisores,
-Funcionários e outros Gerentes) via `POST /usuarios/equipe`. Clientes podem se cadastrar sozinhos
-pelo `POST /usuarios/`.
+Depois disso, faça login com esse Gestor para criar os demais usuários da equipe (Supervisores,
+Funcionários, RH, Financeiro e outros Gestores) via `POST /usuarios/equipe`. Para liberar cadastro
+público de Clientes em dev, defina `CADASTRO_PUBLICO_HABILITADO=true` e copie o ID da Empresa criada
+para `CADASTRO_PUBLICO_EMPRESA_ID`.
 
 ---
 

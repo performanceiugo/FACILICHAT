@@ -7,6 +7,23 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Segurança — `S7` parcial: rate limit e resposta menos enumerável em login/cadastro
+- Criado `backend/app/servicos/seguranca.py` com rate limit em memória por IP e e-mail para fluxos
+  públicos de autenticação (`login` e cadastro público), retornando `429` após excesso de tentativas.
+- `POST /autenticacao/login` agora sempre executa uma verificação de hash: quando o e-mail não existe,
+  usa um hash dummy para reduzir diferença de timing e mantém resposta uniforme.
+- `POST /usuarios/` passou a aplicar rate limit e deixou de responder "Email ja cadastrado",
+  reduzindo enumeração direta no cadastro público. Observação operacional: o rate limit atual é
+  por processo; produção multi-réplica deve evoluir para Redis ou mecanismo compartilhado.
+
+### Segurança — `S3` implementado: cadastro público sem escolha livre de Empresa
+- **`POST /usuarios/` agora falha fechado por padrão**: o cadastro público só funciona quando
+  `CADASTRO_PUBLICO_HABILITADO=true` e `CADASTRO_PUBLICO_EMPRESA_ID` aponta para uma Empresa ativa.
+- Mesmo habilitado, o `EmpresaID` recebido no payload precisa bater exatamente com a Empresa liberada
+  em configuração; isso remove a possibilidade de um cadastro público escolher qualquer tenant.
+- **Documentação atualizada:** `backend/.env.example`, `docs/setup.md` e `docs/tecnico-backend.md`
+  explicam o fluxo seguro e o bootstrap por `scripts/criar_empresa.py`.
+
 ### Infra/Integrações — camada local do Codex para o FaciliChat
 - **Camada `.codex/` criada no repositório** com skills/checklists equivalentes às rotinas do Claude:
   `validar-regras`, `verificar-seguranca`, `subir-projeto`, `find-docs`, `commit-sync` e

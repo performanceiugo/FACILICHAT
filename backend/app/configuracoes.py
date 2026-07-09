@@ -13,6 +13,10 @@ class Configuracoes(BaseSettings):
     # Origens (URLs de frontend) autorizadas a chamar a API via navegador, separadas por vírgula.
     # Default cobre o Next.js local; em produção, definir no .env com os domínios reais.
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # Cadastro publico fica fechado por padrao para impedir que o payload escolha qualquer EmpresaID.
+    # Quando habilitado em dev/onboarding assistido, deve apontar para uma unica Empresa ativa.
+    CADASTRO_PUBLICO_HABILITADO: bool = False
+    CADASTRO_PUBLICO_EMPRESA_ID: str | None = None
 
     # Valida o segredo usado pelo HS256 antes de a API iniciar; segredo curto ou placeholder
     # enfraquece a assinatura dos tokens e deve falhar cedo em qualquer ambiente.

@@ -93,11 +93,11 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 | Método | Rota | Descrição | Autenticação | Permissão |
 |---|---|---|---|---|
-| POST | `/usuarios/` | Cadastro público — cria **sempre** um Cliente (campo `Funcao` não é aceito) | Não | Pública |
-| POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/Gerente) | Sim | Apenas Gerente (403 caso contrário) |
+| POST | `/usuarios/` | Cadastro público controlado — fechado por padrão; quando habilitado, cria **sempre** um Cliente na Empresa liberada por `CADASTRO_PUBLICO_EMPRESA_ID` | Não | Pública controlada |
+| POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/RH/Financeiro/Gestor) | Sim | Apenas Gestor (403 caso contrário) |
 | GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim | Qualquer perfil |
 
-> **Primeiro Gerente:** como o cadastro público é Cliente-only e `/usuarios/equipe` exige um Gerente, o primeiro Gerente é criado pelo script `backend/scripts/criar_gerente.py` (ver `docs/setup.md`).
+> **Primeiro Gestor:** como o cadastro público fica fechado por padrão e `/usuarios/equipe` exige um Gestor, a primeira Empresa + primeiro Gestor são criados pelo script `backend/scripts/criar_empresa.py` (ver `docs/setup.md`).
 
 ### Chamados — `/chamados`
 
@@ -119,8 +119,9 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - JWT assinado com `HS256` e chave secreta configurável
 - Token válido por **8 horas** (configurável via `JWT_EXPIRE_MINUTES`)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use
+- Login e cadastro público têm rate limit simples por IP/e-mail; login usa hash dummy quando o e-mail não existe para reduzir enumeração por timing
 - **CORS** restrito às origens em `CORS_ORIGINS` (config/.env) — sem `"*"` junto de credenciais
-- **Cadastro público é Cliente-only**; perfis privilegiados só via `/usuarios/equipe` (Gerente)
+- **Cadastro público fechado por padrão**; quando habilitado, só aceita a Empresa configurada e cria Cliente. Perfis privilegiados só via `/usuarios/equipe` (Gestor)
 - **Alteração de status de chamado** restrita a Supervisor/Gerente (evita IDOR)
 
 ---

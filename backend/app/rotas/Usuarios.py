@@ -1,15 +1,18 @@
 # Rotas de gerenciamento de usuarios
 # Permite criar novos usuarios e consultar os dados do usuario autenticado
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from pydantic import BaseModel, ConfigDict, EmailStr
 from pwdlib import PasswordHash
 from app.banco_dados import obterBancoDados
+from app.configuracoes import configuracoes
 from app.modelos.Condominio import Condominio
+from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
+from app.servicos.seguranca import aplicarRateLimitAutenticacao
 import uuid
 
 roteador = APIRouter(prefix="/usuarios", tags=["Usuarios"])
@@ -19,10 +22,9 @@ pwd = PasswordHash.recommended()
 
 # Schema de entrada do cadastro PUBLICO - nao inclui Funcao de proposito.
 # A funcao e sempre forcada para Cliente no servidor, impedindo que alguem se cadastre como Gestor.
-# EmpresaID: como o signup publico nao e autenticado, nao ha tenant no token para resolver - por
-# ora o cliente informa a Empresa explicitamente (paliativo ate a Fase 7 trazer um fluxo real de
-# convite/onboarding por Empresa). Isso nao e escalonamento de privilegio: so define a qual Empresa
-# o novo Cliente pertence, sempre com Funcao=Cliente forcada no servidor.
+# EmpresaID permanece no contrato para compatibilidade do frontend atual, mas a rota publica nao
+# confia mais nele: quando o cadastro publico esta habilitado, ele precisa bater com a Empresa
+# explicitamente liberada em configuracao.
 class UsuarioCriar(BaseModel):
     EmpresaID: uuid.UUID
     Nome: str
@@ -120,6 +122,38 @@ async def _validarResponsavelUnicoPorCondominio(
         )
 
 
+# Resolve o unico tenant permitido para cadastro publico. A rota falha fechada por padrao e so aceita
+# EmpresaID quando ele bate exatamente com CADASTRO_PUBLICO_EMPRESA_ID, evitando signup em tenant alheio.
+async def _resolverEmpresaCadastroPublico(empresaIDPayload: uuid.UUID, db: AsyncSession) -> uuid.UUID:
+    if not configuracoes.CADASTRO_PUBLICO_HABILITADO or not configuracoes.CADASTRO_PUBLICO_EMPRESA_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Cadastro publico indisponivel; solicite convite ou acesso ao Gestor da Empresa",
+        )
+
+    try:
+        empresaIDPermitida = uuid.UUID(configuracoes.CADASTRO_PUBLICO_EMPRESA_ID)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Configuracao de cadastro publico invalida")
+
+    if empresaIDPayload != empresaIDPermitida:
+        raise HTTPException(
+            status_code=403,
+            detail="Cadastro publico indisponivel para esta Empresa",
+        )
+
+    resultado = await db.execute(
+        select(Empresa).where(Empresa.ID == empresaIDPermitida, Empresa.Status == EmpresaStatus.Ativa)
+    )
+    if not resultado.scalar_one_or_none():
+        raise HTTPException(
+            status_code=403,
+            detail="Cadastro publico indisponivel para esta Empresa",
+        )
+
+    return empresaIDPermitida
+
+
 # Serializa o usuario para a API preservando o campo textual `Condominio` como compatibilidade de
 # contrato enquanto o frontend ainda nao consome a entidade completa.
 def _serializarUsuario(usuario: Usuario, condominioNome: str | None) -> UsuarioSaida:
@@ -142,7 +176,7 @@ async def _persistirUsuario(
 ) -> tuple[Usuario, str | None]:
     resultado = await db.execute(select(Usuario).where(Usuario.Email == payload.Email))
     if resultado.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email ja cadastrado")
+        raise HTTPException(status_code=400, detail="Nao foi possivel concluir o cadastro com os dados informados")
 
     nomeCondominio = _normalizarNomeCondominio(payload.Condominio)
     _validarCondominioObrigatorioParaCliente(funcao, nomeCondominio)
@@ -167,10 +201,16 @@ async def _persistirUsuario(
 
 
 # POST /usuarios/ - cadastro PUBLICO (sem autenticacao).
-# Regra de seguranca: a funcao e SEMPRE Cliente; ninguem pode se autopromover a Gestor/Supervisor.
+# Regra de seguranca: a funcao e SEMPRE Cliente e a Empresa so pode ser a liberada em configuracao.
 @roteador.post("/", response_model=UsuarioSaida)
-async def criarUsuario(payload: UsuarioCriar, db: AsyncSession = Depends(obterBancoDados)):
-    usuario, condominioNome = await _persistirUsuario(payload, UsuarioFuncao.Cliente, payload.EmpresaID, db)
+async def criarUsuario(
+    payload: UsuarioCriar,
+    request: Request,
+    db: AsyncSession = Depends(obterBancoDados),
+):
+    aplicarRateLimitAutenticacao("signup-publico", request, payload.Email)
+    empresaID = await _resolverEmpresaCadastroPublico(payload.EmpresaID, db)
+    usuario, condominioNome = await _persistirUsuario(payload, UsuarioFuncao.Cliente, empresaID, db)
     return _serializarUsuario(usuario, condominioNome)
 
 
