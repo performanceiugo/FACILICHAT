@@ -7,6 +7,28 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Segurança — auditoria de autenticação/sessão incorporada ao plano (sem código)
+- **Auditoria completa de autenticação, sessão e cookies** feita sobre backend (FastAPI/JWT), web
+  (Next.js) e mobile (Expo), usando como referência as cheat sheets da OWASP (Session Management,
+  CSRF, XSS, Authentication) e o MDN (Set-Cookie). **Nenhum código foi alterado** — os achados
+  viraram itens do plano, seguindo a Regra de Ouro.
+- **Novos itens `S14`–`S17`** na tabela 🔐 Segurança do `plano-implementacao.md` (subtarefas criadas
+  no ClickUp sob a Fase 0.5): `S14` revogação de sessão server-side (logout hoje só limpa o cliente;
+  token roubado vale as 8h), `S15` access token curto + refresh com rotação, `S16` CSP e headers de
+  segurança no web, `S17` endurecimento do CORS (`allow_credentials` sem uso + wildcards).
+- **Escopo ampliado de itens existentes:** `S6` agora cobre também o cookie duplicado sem
+  `HttpOnly`/`Secure` criado via `document.cookie` (`auth-storage.ts`), a estratégia CSRF completa
+  (token + validação de Origin/Referer) e o middleware do Next que confia em cookies forjáveis;
+  `S7` ganhou o hash dummy contra enumeração por timing no login e resposta neutra no cadastro;
+  `B6` anotado como pré-requisito do `S14` (claim `jti`). Ordem recomendada registrada no plano:
+  `S16` → `S17` → `S7` → `S6` → `S14`(+`B6`) → `S15`.
+- **Higiene do board ClickUp (achado do usuário):** a Fase 0.6 estava ✅ concluída, mas 4 subtarefas
+  seguiam em 📋 backlog sob ela — eram os itens realocados no plano para outras fases (1 de IA →
+  Fase 5; 3 de Visita Técnica → Fase 8) sem a subtarefa acompanhar. Como a API do ClickUp não move
+  subtarefa de pai, as 4 antigas (`868k60vf2/vf7/vfc/vfg`) foram **arquivadas** com ponteiro e
+  **recriadas sob as fases corretas** (`868kahvau/vb2/vbe/vbk`); os `CU:` das Fases 5 e 8 no plano
+  foram atualizados. A Fase 0.6 agora não tem pendência real.
+
 ### Segurança — `S3` iniciado (sem código ainda)
 - Seguindo a ordem do plano ("corrigir um `S*` por vez, começando por `S1` e `S2`"), o próximo item
   da fila de segurança é o `S3`: o cadastro público (`POST /usuarios/`) aceita qualquer `EmpresaID`

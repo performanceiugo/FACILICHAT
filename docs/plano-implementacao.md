@@ -169,6 +169,11 @@
 > Itens convertidos da revisão de segurança feita sobre backend, web, mobile, Docker e dependências.
 > Como conduzir: corrigir **um `S*` por vez**, começando por `S1` e `S2`. `CU: a-criar` significa que a
 > subtarefa ainda precisa ser criada no ClickUp antes de iniciar a implementação.
+>
+> **Ampliado em 09/07/2026** pela auditoria de autenticação/sessão (referências: OWASP Session
+> Management / CSRF / XSS / Authentication Cheat Sheets e MDN Set-Cookie): novos itens `S14`–`S17` e
+> escopo ampliado de `S6`/`S7` (e `B6`). Ordem recomendada para o bloco de sessão, respeitando
+> dependências: `S16` e `S17` (baratos, independentes) → `S7` → `S6` → `S14` (com `B6` junto) → `S15`.
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
@@ -177,14 +182,18 @@
 | `[~]` | `868kaa363` | S3 | Cadastro público permite escolher qualquer `EmpresaID` no payload | Substituir por convite/onboarding por Empresa; enquanto não houver convite, restringir ou desabilitar cadastro público em produção. **Iniciado, ainda sem código**: decidir com o usuário na próxima sessão se a interina é restringir/desabilitar o cadastro público em produção ou já implementar o convite por Empresa | `backend/app/rotas/Usuarios.py` |
 | `[ ]` | `868kaa36v` | S4 | Credenciais do Postgres fixas no `docker-compose.yml` e na `DATABASE_URL` do serviço backend | Mover credenciais para `.env`/`.env.example`, rotacionar senha local e documentar separação dev/staging/prod | `docker-compose.yml`, `docs/setup.md` |
 | `[x]` | `868kaa37j` | S5 | Postgres publicado em `5432:5432`, abrindo o banco para o host/rede local | Porta presa em `127.0.0.1:5432:5432` para manter acesso local de dev sem expor o banco na rede | `docker-compose.yml`, `docs/setup.md` |
-| `[ ]` | `868kaa382` | S6 | JWT web armazenado em `localStorage`, aumentando impacto de XSS | Planejar migração para cookie `HttpOnly`, `Secure`, `SameSite` com estratégia de CSRF; manter `SecureStore` no mobile | `frontend/web/src/lib/auth.ts`, `frontend/web/src/lib/api.ts`, `backend/app/rotas/Autenticacao.py` |
-| `[ ]` | `868kaa3ax` | S7 | Login e cadastro não têm rate limit, lockout ou atraso progressivo | Adicionar rate limiting por IP/email e resposta uniforme para credenciais inválidas; cobrir login e signup público/convite | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py` |
+| `[ ]` | `868kaa382` | S6 | JWT do web acessível a JavaScript em **dois** lugares: `localStorage` **e** cookie duplicado via `document.cookie` sem `HttpOnly`/`Secure` (e com `Max-Age` de 7 dias para um token de 8h); middleware do Next confia em cookies graváveis pelo cliente (`funcao=Superadmin` forjável — inócuo hoje porque o backend revalida, mas é camada falsa) | Migrar para cookie de sessão **emitido pelo backend** (`HttpOnly; Secure; SameSite=Lax`) + proteção **CSRF** (token imprevisível + validação de `Origin`/`Referer` — nunca só `SameSite`; cobre também o login CSRF do form-urlencoded); remover token do localStorage e o cookie JS; middleware passa a validar cookie assinado; manter `SecureStore` no mobile; religar `allow_credentials` do CORS (S17) junto | `frontend/web/src/lib/auth.ts`, `auth-storage.ts`, `api.ts`, `middleware.ts`, `backend/app/rotas/Autenticacao.py` |
+| `[ ]` | `868kaa3ax` | S7 | Login e cadastro sem rate limit, lockout ou atraso progressivo; timing do login denuncia e-mail cadastrado (`pwd.verify` só roda quando o usuário existe) e o cadastro público responde "Email ja cadastrado" (enumeração) | Rate limiting por IP/email cobrindo login e signup público/convite; resposta uniforme para credenciais inválidas; **hash dummy** quando o usuário não existe (uniformiza o timing); resposta neutra no cadastro público | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py` |
 | `[ ]` | `868kaa3c6` | S8 | FastAPI expõe `/docs`, `/redoc` e `/openapi.json` por padrão | Tornar docs configuráveis por ambiente; desabilitar ou proteger em produção | `backend/app/main.py`, `backend/app/configuracoes.py` |
 | `[ ]` | `868kaa3cg` | S9 | Ambiente Docker roda backend com `--reload`, volume de código e configuração de dev | Separar compose de dev e produção; produção sem reload, sem bind mount e com usuário/processo endurecido | `docker-compose.yml`, `backend/Dockerfile`, `docs/setup.md` |
 | `[ ]` | `868kaa3ct` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Garantir que seed não rode em produção; exigir flag explícita de ambiente dev e registrar limpeza/rotação de dados demo | `backend/scripts/semear_chamados.py` |
 | `[ ]` | `868kaa3dh` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 | `[~]` | `868kaa3dz` | S12 | Dependências Python não têm auditoria automatizada no projeto | Baseline local executado com `pip-audit`; falta automatizar em CI/docs | `backend/requirements.txt`, CI/docs |
 | `[x]` | `868ka61e5` | S13 | Faltava guia de produção para o `JWT_SECRET` (como gerar por ambiente e cadastrar como secret no provedor/CI, sem passar pelo Git) | Seção "Produção — JWT_SECRET e secrets por ambiente" adicionada ao `docs/setup.md` (geração PowerShell/Python/openssl, cadastro em VPS/provedor gerenciado/GitHub Actions, aviso de rotação) | `docs/setup.md` |
+| `[ ]` | `868kahv64` | S14 | Nenhuma revogação de sessão server-side: logout só limpa o cliente; token roubado vale as 8h inteiras (sem `jti`/denylist; troca/reset de senha não revoga nada) | Endpoint `POST /autenticacao/logout` que revoga; `jti` + denylist de sessões (ou `TokenVersion` por usuário); revogar todas as sessões em troca/reset de senha e mudança de função — fazer junto do `B6` (claims) | `backend/app/rotas/Autenticacao.py`, `backend/app/modelos/Usuarios.py` |
+| `[ ]` | `868kahv6r` | S15 | Access token de 8h (`JWT_EXPIRE_MINUTES=480`) sem refresh token — janela longa para uso de token roubado (XSS/infostealer) | Access de 15–30 min + refresh token em cookie `HttpOnly` com rotação a cada uso e detecção de reuso (reuso ⇒ revogar a família); depende do `S6` | `backend/app/rotas/Autenticacao.py`, `configuracoes.py`, `frontend/web/src/lib/api.ts` |
+| `[ ]` | `868kahv8b` | S16 | Web sem CSP nem headers de segurança (`X-Content-Type-Options`, `frame-ancestors`, `Referrer-Policy`, HSTS em prod) — sem CSP, um XSS faz requisições autenticadas mesmo com cookie HttpOnly | `headers()` no `next.config.ts` com CSP em `Report-Only` → enforce; demais headers; HSTS no proxy/host de produção | `frontend/web/next.config.ts`, `docs/setup.md` |
+| `[ ]` | `868kahvad` | S17 | CORS com `allow_credentials=True` sem a API usar cookies, e wildcards em `allow_methods`/`allow_headers` | Desligar credentials até o `S6`; listas explícitas (`GET, POST, PATCH, DELETE` / `Authorization, Content-Type`); religar credentials somente junto do CSRF do `S6` | `backend/app/main.py`, `configuracoes.py` |
 
 ### 🟡 Médios
 
@@ -211,7 +220,7 @@
 | `[ ]` | `868k60vck` | B3 | Web: faltam `error.tsx` e `not-found.tsx` | Criar `app/error.tsx` e `app/not-found.tsx` | `frontend/web/src/app/` |
 | `[x]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
 | `[ ]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
-| `[ ]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud`; hasher duplicado; `@app.on_event` deprecado | Adicionar claims; centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
+| `[ ]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud/jti`; hasher duplicado; `@app.on_event` deprecado | Adicionar claims (**o `jti` é pré-requisito da revogação do `S14`** — fazer junto); centralizar hasher; migrar para `lifespan` | `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `main.py` |
 | `[ ]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | Analisar o enquadramento responsivo do painel web em telas de navegador mobile e ajustar CSS/layout | `frontend/web/src/app/painel/**` |
 
 ### 📄 Documentação (divergências com o código real)
@@ -260,7 +269,9 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 ### Refinos da Visita Técnica (MVP02) conforme o branding
 > Refinos reclassificados para a **Fase 8 — MVP 02: Visitas Técnicas**, onde a entidade/rotas de
-> visita serão implementadas de fato.
+> visita serão implementadas de fato. No ClickUp, as subtarefas antigas dessa realocação (3 de
+> visita + 1 de IA, que ficaram órfãs sob a Fase 0.6) foram **arquivadas e recriadas sob as fases
+> corretas em 09/07/2026** — os `CU:` das Fases 5 e 8 já apontam para as novas.
 
 ---
 
@@ -454,7 +465,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60w3h` | Ao atualizar status: criar `Mensagem` automática com `AutorTipo = IA` | `backend/app/rotas/Chamados.py` |
 | `[ ]` | `868k7vrxw` | **Roteamento por intenção → fila correta**, incluindo **tickets irmãos** (um aviso → N chamados) usando o vínculo de grupo da Fase 0.6 | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
 | `[ ]` | `868k60w3m` | Serviço `ia_detectar_oportunidade(mensagem)` — detecta intenção de serviço extra | `backend/app/servicos/ia.py` |
-| `[ ]` | `868k60vf2` | **Reforço do invariante da Fase 0.6:** IA detecta intenção de compra, mas **nunca inventa preço/prazo**; só sinaliza oportunidade ancorada em dados reais | `backend/app/servicos/ia.py` |
+| `[ ]` | `868kahvau` | **Reforço do invariante da Fase 0.6:** IA detecta intenção de compra, mas **nunca inventa preço/prazo**; só sinaliza oportunidade ancorada em dados reais | `backend/app/servicos/ia.py` |
 | `[ ]` | `868k7vryf` | **Portão do catálogo (obrigatório):** ao detectar intenção, consultar o `CatalogoServico` da Empresa. No catálogo → registra oportunidade; **fora → silêncio comercial** (só observação operacional) | `backend/app/servicos/ia.py` |
 | `[ ]` | `868k7vryy` | Modelo `Oportunidade` (entidade própria): `EmpresaID`, `ChamadoID`, `ServicoID`, `Status` (Nova/Vista/PropostaConstruida/Rejeitada), `Criacao`. A IA **nunca cita preço** | `backend/app/modelos/Oportunidade.py` (novo) |
 
@@ -548,8 +559,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[ ]` | `868k60wj5` | Modelo `VisitaTecnica`: SupervisorID, CondominioID, EmpresaID, DataHoraAgendada, HoraChegada, HoraSaida, Notas, Status, `ticket_id` opcional. **Duração deriva** de HoraSaida−HoraChegada | `backend/app/modelos/VisitaTecnica.py` (novo) |
-| `[ ]` | `868k60vf7` | **Refino herdado da Fase 0.6:** `Duracao` **não é coluna** — derivar de `HoraSaida − HoraChegada` | `backend/app/modelos/VisitaTecnica.py` |
-| `[ ]` | `868k60vfc` | **Refino herdado da Fase 0.6:** adicionar `ticket_id` **opcional** (vínculo a uma reclamação) | `backend/app/modelos/VisitaTecnica.py` |
+| `[ ]` | `868kahvb2` | **Refino herdado da Fase 0.6:** `Duracao` **não é coluna** — derivar de `HoraSaida − HoraChegada` | `backend/app/modelos/VisitaTecnica.py` |
+| `[ ]` | `868kahvbe` | **Refino herdado da Fase 0.6:** adicionar `ticket_id` **opcional** (vínculo a uma reclamação) | `backend/app/modelos/VisitaTecnica.py` |
 | `[ ]` | `868k60wjj` | `POST /visitas/` — agendar visita | `backend/app/rotas/Visitas.py` (novo) |
 | `[ ]` | `868k60wjq` | `PATCH /visitas/{id}/iniciar` — grava `HoraChegada` = agora | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wjv` | `PATCH /visitas/{id}/finalizar` — grava `HoraSaida`, muda status para Finalizada | `backend/app/rotas/Visitas.py` |
@@ -557,7 +568,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60wk9` | Upload de fotos da visita | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkf` | `GET /visitas/?condominio_id=` — histórico para o cliente | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkn` | `GET /visitas/?supervisor_id=me` — agenda do supervisor | `backend/app/rotas/Visitas.py` |
-| `[ ]` | `868k60vfg` | **Refino herdado da Fase 0.6:** cliente **não aprova** a visita; só recebe/consulta as evidências e o relatório | `backend/app/rotas/Visitas.py` |
+| `[ ]` | `868kahvbk` | **Refino herdado da Fase 0.6:** cliente **não aprova** a visita; só recebe/consulta as evidências e o relatório | `backend/app/rotas/Visitas.py` |
 | `[ ]` | `868k60wkq` | IA detecta acordo de visita no chat e cria visita agendada automaticamente | `backend/app/servicos/ia.py` |
 
 ### Frontend Mobile (Supervisor)
