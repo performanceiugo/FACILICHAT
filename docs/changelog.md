@@ -7,6 +7,15 @@
 
 ## [não versionado] — 9 de julho de 2026
 
+### Segurança — `S3` iniciado (sem código ainda)
+- Seguindo a ordem do plano ("corrigir um `S*` por vez, começando por `S1` e `S2`"), o próximo item
+  da fila de segurança é o `S3`: o cadastro público (`POST /usuarios/`) aceita qualquer `EmpresaID`
+  no payload, permitindo que um usuário se registre em uma Empresa que não é a dele.
+- **Nada foi alterado em código nesta entrada** — apenas o status do item foi movido para
+  "em andamento" para retomar na próxima sessão. Decisão pendente com o usuário: aplicar a correção
+  interina (restringir/desabilitar o cadastro público em produção) ou já partir para o convite/
+  onboarding por Empresa, que é a correção definitiva.
+
 ### Frontend web — polimento visual das telas existentes (continuação da A5)
 - **Objetivo:** aproximar o visual das telas que já existem no código (login, sidebar do painel,
   lista de chamados) do protótipo comercial em `docs/FaciliChat-Regras/FaciliChat-Apresentacao.html`
