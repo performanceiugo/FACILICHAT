@@ -30,6 +30,20 @@ continua sendo a fonte dos detalhes por fase e dos `CU:`.
 | `BE-CHAT-003` | `[ ]` | `868k7vrte` | Confirmacao automatica "Recebido" |
 | `BE-CHAT-004` | `[ ]` | `868k7vrtu` | Mensagens de texto/audio/imagem como primeira classe |
 
+## Multicanal — WhatsApp como porta de entrada (Fase 1.5, nova em 10/07/2026)
+
+> WhatsApp e adaptador de entrada; o nucleo permanece independente do canal. Detalhe completo,
+> criterios de aceite e decisoes pendentes na Fase 1.5 do `docs/plano-implementacao.md`
+> (CU pai `868kb75yf`). Inbound roda apos `BE-CHAT-001`; outbound so depois da IA (Fase 5).
+
+| Novo ID | Status | CUs | Entrega |
+|---------|--------|-----|---------|
+| `BE-CANAL-001` | `[ ]` | `868kb77b5`, `868kb77jm`, `868kb77m6`, `868kb77pw` | Modelos: CanalOrigem, ContatoCanal, correlacao externa idempotente (wamid) e auditoria de eventos |
+| `BE-CANAL-002` | `[ ]` | `868kb77rb`, `868kb77u1`, `868kb77vb` | Entrada normalizada (adaptador → DTO neutro) + webhook GET/POST com assinatura X-Hub-Signature-256 |
+| `BE-CANAL-003` | `[ ]` | `868kb77zj`, `868kb781w`, `868kb783m`, `868kb7855` | Resolucao de tenant/contato, criacao de chamado, midia (depende Fase 9) e status externos |
+| `BE-CANAL-004` | `[ ]` | `868kb786k`, `868kb788v`, `868kb78ar` | Testes de robustez (duplicado/ordem/assinatura/tenant), observabilidade/reprocessamento e docs |
+| `BE-CANAL-005` | `[ ]` | `868kb78gx`–`868kb78y9` | Outbound (janela 24h, templates, opt-in, numeros, custos) — posterior a Fase 5 |
+
 ## Chamados, fila e operacao
 
 | Novo ID | Status | CUs | Entrega |

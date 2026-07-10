@@ -113,6 +113,12 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gerente vê todos |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gerente (403 caso contrário); chamado finalizado não reabre (409) |
 
+### Relatórios — `/relatorios`
+
+| Método | Rota | Descrição | Autenticação | Permissão |
+|---|---|---|---|---|
+| GET | `/relatorios/visao-geral` | Total de chamados abertos, SLA vencido, primeira resposta média e resolução média; tempos em minutos e `null` quando não há amostra | Sim | Apenas Gestor; dados filtrados pela Empresa do token e protegidos por RLS |
+
 ---
 
 ## Segurança
@@ -204,7 +210,8 @@ Rode a partir de `backend/` ou via `docker compose exec backend python scripts/g
 | `reset [--semear]` | Dropa o schema inteiro, recria as tabelas (a partir dos modelos) e aplica a RLS. Com `--semear`, também popula os dados de demonstração. É o jeito correto de aplicar mudança de schema em dev. |
 | `criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>` | Cria a 1ª Empresa (tenant) + o 1º Gestor numa transação só. **Não** é idempotente. |
 | `criar-superadmin "<Nome>" <email> <senha> [--empresa-nome N] [--cnpj C]` | Cria a Empresa `Iugo Performance` (se faltar) + o 1º **Superadmin** da plataforma. **Idempotente.** Aborta se o e-mail já pertence a outro perfil — nunca promove usuário existente. |
-| `semear` | Popula clientes, supervisor, chamados e chat de demonstração na 1ª Empresa (idempotente). |
+| `semear` | Popula clientes, supervisor, chamados e chat de demonstração na 1ª Empresa (idempotente). **Recusa rodar se `AMBIENTE=producao`** (item S10) — usuários demo nascem com senha padrão, inaceitável fora de dev/staging. |
+| `limpar-demo` | Remove os usuários de demonstração (marcados pelo domínio `DOMINIO_DEMO`) e tudo que depende deles — chamados, mensagens, refresh tokens, sessões revogadas (idempotente). Item S10: rotação/limpeza dos dados demo em ambientes compartilhados (staging). |
 | `aplicar-rls` | (Re)aplica só as políticas de `app/rls.sql`. |
 | `verificar-rls` | Testa o isolamento multi-tenant (filtros por `EmpresaID` + RLS do Postgres). |
 

@@ -83,6 +83,7 @@
 | 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo e tickets irmãos concluídos; regras/refinos na fila · **PRIORITÁRIO** |
 | 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | ✅ Concluída |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
+| 1.5 | Fundação Multicanal — WhatsApp como porta de entrada | `868kb75yf` | ⬜ Na fila · **NOVA (10/07/2026)** |
 | 2 | Criar chamado e detalhe (cliente) | `868k60vvt` | ⬜ Na fila |
 | 3 | Fila e operação do supervisor (mobile) | `868k60vx4` | ⬜ Na fila |
 | 4 | Dashboard do gestor (web) | `868k60w16` | ⬜ Na fila |
@@ -97,11 +98,12 @@
 | 11 | Experiência do Funcionário (canal único, voz/foto, sensor de campo) | `868k7vr1k` | ⬜ Na fila · **NOVA (discovery)** |
 | — | Adiados (pós-MVP): privacidade por tópico, integração ERP | `868k7vr1q` | ⬜ Registrado |
 
-> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1–4 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
+> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1 → 1.5 (inbound) → 2–4 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
 > encaixando as correções pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são
 > fundação e vêm antes das features. As Fases 4.5, 5.5 e 11 saíram do material de discovery (jornadas +
-> How Might We + Governança de IA em `docs/FaciliChat-Regras/`) revisado em 02/07/2026. O detalhe de
-> cada fase está na Parte 2.
+> How Might We + Governança de IA em `docs/FaciliChat-Regras/`) revisado em 02/07/2026. A Fase 1.5
+> (10/07/2026) entra logo após a base de mensagens da Fase 1 e antes da IA; o **bloco outbound** dela
+> (respostas/templates/envio ativo) fica para **depois da Fase 5/5.5**. O detalhe de cada fase está na Parte 2.
 
 > **⚠️ Convenção de nomes (ler antes de modelar qualquer coisa desta revisão):** os documentos de
 > discovery usam **personas e exemplos ilustrativos** (nomes de pessoas, de serviços, de parceiros,
@@ -198,7 +200,7 @@
 | `[x]` | `868kaa3ax` | S7 | Login e cadastro sem rate limit, lockout ou atraso progressivo; timing do login denuncia e-mail cadastrado (`pwd.verify` só roda quando o usuário existe) e o cadastro público responde "Email ja cadastrado" (enumeração) | Fechado em 09/07/2026 (verificação de código): rate limit em memória por IP/e-mail no login e signup público (`seguranca.py`, 5 tentativas/5min, bloqueio 15min), hash dummy no login uniformizando o timing e respostas neutras ("Email ou senha incorretos"; cadastro público não revela e-mail já cadastrado). Evoluções registradas para não se perder: rate limit compartilhado (Redis) para multi-réplica → endurecimento de produção do `S9`; resposta neutra no fluxo de convite/onboarding → quando ele existir (evolução do `S3`) | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py`, `backend/app/servicos/seguranca.py` |
 | `[x]` | `868kaa3c6` | S8 | FastAPI expõe `/docs`, `/redoc` e `/openapi.json` por padrão | Nova config `API_DOCS_HABILITADO` (default `true`); `false` zera `docs_url`/`redoc_url`/`openapi_url` no `FastAPI(...)`, então as rotas nem são registradas. Validado com `docker compose up -d --force-recreate` nos dois estados (200 ligado, 404 desligado) e revertido para dev ao final | `backend/app/main.py`, `backend/app/configuracoes.py`, `backend/.env.example`, `docs/deploy-producao.md` |
 | `[x]` | `868kaa3cg` | S9 | Ambiente Docker roda backend com `--reload`, volume de código e configuração de dev; não existe compose de produção e o web (Next.js) só roda com `npm run dev` fora do Docker | Fechado em 10/07/2026: `docker-compose.prod.yml` (backend sem reload/bind mount como `appuser` não-root + `--proxy-headers`; web via build standalone do Next como `node` não-root; Caddy único serviço com portas públicas, TLS Let's Encrypt + HSTS via `deploy/Caddyfile`; Postgres sem `ports:`); `.env.prod.example`; backup diário `deploy/backup-banco.sh` (+ cópia externa rclone); runbook `docs/deploy-producao.md` completado (deploy em ~4 comandos). Validado localmente: build das 2 imagens, healthchecks `healthy`, `whoami` non-root, `GET /` 200, `/docs` 404, `/login` 200, `caddy validate` ok. Bug achado na validação: composes de dev/prod sem `name:` disputavam o mesmo projeto Docker (um recriava os containers do outro) — corrigido com `name: facilichat`/`facilichat_prod`. Pendência única: emissão real do certificado TLS exige VPS com DNS público (não testável localmente) | `docker-compose.prod.yml` (novo), `backend/Dockerfile`, `frontend/web/Dockerfile` (novo), `frontend/web/.dockerignore` (novo), `deploy/Caddyfile` (novo), `deploy/backup-banco.sh` (novo), `.env.prod.example` (novo), `docker-compose.yml`, `docs/deploy-producao.md` |
-| `[ ]` | `868kaa3ct` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Garantir que seed não rode em produção; exigir flag explícita de ambiente dev e registrar limpeza/rotação de dados demo | `backend/scripts/gerenciar_banco.py` (subcomando `semear`) |
+| `[x]` | `868kaa3ct` | S10 | Scripts de seed criam usuários demo com senha padrão `Senha123` | Nova config `AMBIENTE` (`dev`/`staging`/`producao`, default `dev`, validada); `semear` recusa rodar com `AMBIENTE=producao` (sai com erro, sem tocar no banco); `.env.prod.example` passa a exigir `AMBIENTE=producao`. Novo subcomando `limpar-demo` remove usuários demo + tudo que depende deles (chamados, mensagens, refresh tokens, sessões revogadas), para rotação/limpeza em staging. Validado de ponta a ponta: bloqueio confirmado com `AMBIENTE=producao` (exit 1, banco intacto); `limpar-demo` rodado de verdade (removeu 5 usuários/14 chamados), confirmado vazio via API, idempotência confirmada (2ª chamada não encontra nada), e `semear` restaurou os 12 chamados originais | `backend/app/configuracoes.py`, `backend/scripts/gerenciar_banco.py`, `.env.prod.example`, `backend/.env.example` |
 | `[ ]` | `868kaa3dh` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 | `[x]` | `868kaa3dz` | S12 | Dependências Python não têm auditoria automatizada no projeto | Baseline local executado com `pip-audit` (limpo após migração para `PyJWT`); automatizado em 10/07/2026: workflow `.github/workflows/auditoria-python.yml` (primeiro CI do projeto) roda `pip-audit` em push/PR que toque o `requirements.txt` + semanalmente (pega CVE nova sem commit) + manual; rotina local e resposta a vulnerabilidade documentadas no `setup.md` | `.github/workflows/auditoria-python.yml` (novo), `docs/setup.md`, `docs/tecnico-backend.md` |
 | `[x]` | `868ka61e5` | S13 | Faltava guia de produção para o `JWT_SECRET` (como gerar por ambiente e cadastrar como secret no provedor/CI, sem passar pelo Git) | Seção "Produção — JWT_SECRET e secrets por ambiente" adicionada ao `docs/setup.md` (geração PowerShell/Python/openssl, cadastro em VPS/provedor gerenciado/GitHub Actions, aviso de rotação) | `docs/setup.md` |
@@ -383,6 +385,78 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 ---
 
+## Fase 1.5 — Fundação Multicanal: WhatsApp como porta de entrada 🆕 · CU: `868kb75yf`
+
+> **Origem:** decisão de produto de 10/07/2026, já prevista no material comercial
+> (`FaciliChat-Apresentacao.html`: "o WhatsApp vira um canal, nunca o dono dos seus dados").
+> **Princípio arquitetural:** o WhatsApp é um **adaptador de entrada**. O núcleo (Mensagem, Chamado,
+> tickets irmãos, IA, auditoria, isolamento por Empresa) permanece independente do canal.
+> Fluxo: `WhatsApp / App / Web → entrada normalizada → Mensagem → Chamado(s) → operação FaciliChat`.
+>
+> **Posição:** o bloco inbound roda logo **após a Fase 1** (depende da base de mensagens) e **antes
+> da Fase 5** (a IA passa a rotear mensagens de qualquer canal). O bloco outbound fica para **depois
+> da Fase 5/5.5**. Dependências registradas no ClickUp: Fase 1.5 ← Fase 1 (`868k60vny`); MC10 ←
+> Fase 9 (`868k60wn5`); Fase 5 (`868k60w34`) ← Fase 1.5; Outbound ← Inbound + Fase 5.
+>
+> **Referências técnicas confirmadas em 10/07/2026 (Meta WhatsApp Cloud API):** webhook com
+> verificação GET (`hub.challenge`/verify token) e eventos POST assinados com `X-Hub-Signature-256`
+> (HMAC-SHA256 do corpo bruto com o App Secret); entrega **at-least-once** — duplicatas são condição
+> normal (dedup por `wamid` obrigatório; retries por até 7 dias); responder 200 rápido e processar
+> assíncrono; mídia baixada via Graph API com URL efêmera; janela de atendimento de 24h (fora dela,
+> só template aprovado); pricing por mensagem desde 07/2025 e mensagens de serviço passam a ser
+> cobradas em 01/10/2026.
+>
+> **Invariantes preservados:** toda entidade nova tem `EmpresaID` + RLS; nada se perde (mensagem sem
+> destino conhecido vai para triagem, nunca é descartada); evento duplicado não cria nada duplicado;
+> números/templates são dados por Empresa (nunca hard-coded); o FaciliChat continua funcionando se a
+> Meta cair (o canal para, o produto não).
+
+### 📥 Bloco A — Inbound (MVP) · CU: `868kb76xr`
+
+| Status | CU | ID | Item | Arquivo(s) |
+|--------|----|----|------|-----------|
+| `[ ]` | `868kb77b5` | MC1 | Enum `CanalOrigem` (App/Web/WhatsApp) em `Mensagem` e `Chamado` (derivado da 1ª mensagem); defaults preservam comportamento atual; tipos do front sincronizados | `backend/app/modelos/Mensagens.py`, `Chamados.py` |
+| `[ ]` | `868kb77jm` | MC2 | Modelo `ContatoCanal` — vínculo (Canal, IdentificadorExterno E.164) ↔ Empresa/Usuário/Condomínio, com unicidade por tenant e RLS | `backend/app/modelos/ContatoCanal.py` (novo), `rls.sql` |
+| `[ ]` | `868kb77m6` | MC3 | Correlação externa e idempotência: `MensagemExternaID` (wamid) **UNIQUE**, `ConversaExternaID`, `StatusExterno` (Recebido/Enviado/Entregue/Lido/Falhou) | `backend/app/modelos/MensagemCanal.py` (novo) |
+| `[ ]` | `868kb77pw` | MC4 | Auditoria `EventosWebhook` (payload bruto + resultado), retenção **configurável** (política = decisão D4) | `backend/app/modelos/EventoWebhook.py` (novo) |
+| `[ ]` | `868kb77rb` | MC5 | Camada de entrada normalizada: adaptador (payload Meta → DTO neutro) + núcleo neutro que reusa serviços existentes (incl. `montarChamadosIrmaos`); adaptador sem regra de negócio | `backend/app/servicos/canais.py`, `adaptadores/whatsapp.py` (novos) |
+| `[ ]` | `868kb77u1` | MC6 | Webhook `GET /webhooks/whatsapp` (verificação) + `POST` (eventos) com 200 imediato e processamento assíncrono | `backend/app/rotas/WebhooksWhatsApp.py` (novo) |
+| `[ ]` | `868kb77vb` | MC7 | Validação `X-Hub-Signature-256` (HMAC do corpo bruto, tempo constante; inválida → 403 + auditoria) | `backend/app/servicos/webhook_assinatura.py` (novo) |
+| `[ ]` | `868kb77zj` | MC8 | Resolução segura de tenant/contato: `phone_number_id` → Empresa; `wa_id` → ContatoCanal; desconhecido segue política D2/D3 (**bloqueado pelas decisões MC-D**) | `backend/app/servicos/canais.py` |
+| `[ ]` | `868kb781w` | MC9 | Criação/associação de chamado a partir da mensagem (conversa ativa anexa; sem chamado cria `Recebido`); compatível com tickets irmãos | `backend/app/servicos/canais.py` |
+| `[ ]` | `868kb783m` | MC10 | Texto no MVP; áudio/imagem via Graph API (URL efêmera) — **depende da Fase 9** (`868k60wn5`); até lá, mídia fica pendente sem perder o evento | `backend/app/adaptadores/whatsapp.py` |
+| `[ ]` | `868kb7855` | MC11 | Status externos (`statuses`: sent/delivered/read/failed) atualizam `MensagemCanal`; fora de ordem não regride estado | `backend/app/servicos/canais.py` |
+| `[ ]` | `868kb786k` | MC12 | Testes de robustez: wamid duplicado, fora de ordem, assinatura inválida, tenant errado, payload malformado — nada duplica nem vaza entre Empresas | `backend/scripts/` (verificador) |
+| `[ ]` | `868kb788v` | MC13 | Observabilidade + reprocessamento de evento falho a partir da auditoria (idempotente, seguro re-rodar) | `backend/app/servicos/canais.py`, logs |
+| `[ ]` | `868kb78ar` | MC14 | Documentação: arquitetura multicanal, webhook, env vars Meta, setup de dev (número de teste) | `docs/arquitetura.md`, `tecnico-backend.md`, `setup.md` |
+
+### 📤 Bloco B — Outbound (posterior — executar após a Fase 5/5.5) · CU: `868kb7701`
+
+| Status | CU | ID | Item | Arquivo(s) |
+|--------|----|----|------|-----------|
+| `[ ]` | `868kb78gx` | MO1 | Resposta do atendente pelo WhatsApp na janela de 24h (free-form); custo: Meta cobra mensagens de serviço a partir de 01/10/2026 | backend |
+| `[ ]` | `868kb78jn` | MO2 | Rastreio da janela de atendimento por conversa; painel indica quando só template é possível | backend + web |
+| `[ ]` | `868kb78nd` | MO3 | Templates aprovados (utility/marketing/auth) geridos **por Empresa como dado no banco** | backend |
+| `[ ]` | `868kb78qv` | MO4 | Mensagens iniciadas pela empresa + opt-in/opt-out persistido e honrado imediatamente | backend |
+| `[ ]` | `868kb78v0` | MO5 | Onboarding/gestão de números (WABA, verificação, display name, tiers) — depende de D1/D5 | docs + ops |
+| `[ ]` | `868kb78wq` | MO6 | Custos, limites e monitoramento de qualidade (quality rating, messaging limits, alertas) | backend |
+| `[ ]` | `868kb78y9` | MO7 | Campanhas/recursos comerciais (futuro, se aprovado; liga com a Fase 6) | backend |
+
+### ❓ Decisões pendentes de validação humana · CU: `868kb7937`
+
+> Precisam de confirmação do usuário/comercial **antes do MC8** (que está bloqueado por elas no ClickUp):
+
+| ID | Decisão | Afeta |
+|----|---------|-------|
+| D1 | Um número WhatsApp por Empresa vs número compartilhado da plataforma | MC8, MO5 |
+| D2 | Contato desconhecido → pré-cadastro, chamado pendente ou fila de triagem | MC8, MC9 |
+| D3 | Mesmo telefone representando 2+ condomínios → bot pergunta ou triagem humana | MC8 |
+| D4 | Retenção do payload bruto (LGPD): 30/90 dias | MC4 |
+| D5 | Meta Cloud API direta vs BSP (Twilio/360dialog/Infobip) | MC6, MO5 |
+| D6 | Escopo do outbound no MVP: nada / só resposta na janela / também templates | fronteira A×B |
+
+---
+
 ## Fase 2 — Criar chamado e detalhe (cliente) · CU: `868k60vvt`
 
 ### Backend
@@ -442,7 +516,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
-| `[ ]` | `868k60w1b` | `GET /relatorios/visao-geral` — total abertos, SLA estourado, 1ª resposta média, resolução média | `backend/app/rotas/Relatorios.py` (novo) |
+| `[x]` | `868k60w1b` | `GET /relatorios/visao-geral` — total abertos, SLA estourado, 1ª resposta média, resolução média; exclusivo do Gestor, escopado por Empresa/RLS, médias em minutos e `null` sem amostra | `backend/app/rotas/Relatorios.py` (novo) |
 | `[ ]` | `868k60w1e` | `GET /relatorios/supervisores` — supervisores com abertos, atrasados, 1ª resposta média | `backend/app/rotas/Relatorios.py` |
 | `[ ]` | `868k60w1g` | `GET /chamados/?supervisor_id={id}` — fila de um supervisor específico (visão do gestor) | `backend/app/rotas/Chamados.py` |
 | `[ ]` | `868k7vrvm` | **Alerta de gargalo "parado há tempo demais"** — limite **configurável por Empresa** (não hard-coded); "tempo parado" é **derivado** de `Atualizacao` | `backend/app/rotas/Relatorios.py` |

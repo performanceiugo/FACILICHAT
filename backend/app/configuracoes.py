@@ -28,6 +28,10 @@ class Configuracoes(BaseSettings):
     # Origens (URLs de frontend) autorizadas a chamar a API via navegador, separadas por vírgula.
     # Default cobre o Next.js local; em produção, definir no .env com os domínios reais.
     DEBUG: bool = False
+    # Ambiente de execução (item S10) — usado por scripts de dev (ex.: `gerenciar_banco.py semear`)
+    # para recusar rodar contra produção. Default "dev" de propósito: só produção precisa declarar
+    # `AMBIENTE=producao` explicitamente no `.env`; nada muda para quem já roda em dev/staging hoje.
+    AMBIENTE: str = "dev"
     # Swagger (/docs), ReDoc (/redoc) e o schema (/openapi.json) — item S8. Documentam a API
     # publicamente (rotas, schemas de request/response) e ajudam quem for atacar a mapear a
     # superfície antes de tentar algo. Ligado por padrão (dev depende disso); desligar em produção
@@ -62,6 +66,16 @@ class Configuracoes(BaseSettings):
         normalizado = valor.strip().lower()
         if normalizado not in {"lax", "strict", "none"}:
             raise ValueError('COOKIE_SAMESITE deve ser "lax", "strict" ou "none"')
+        return normalizado
+
+    # Valida o valor de AMBIENTE (item S10) — um typo aqui poderia deixar produção rodando
+    # scripts de dev por engano, ou vice-versa; falha cedo em vez de aceitar qualquer string.
+    @field_validator("AMBIENTE")
+    @classmethod
+    def validar_ambiente(cls, valor: str) -> str:
+        normalizado = valor.strip().lower()
+        if normalizado not in {"dev", "staging", "producao"}:
+            raise ValueError('AMBIENTE deve ser "dev", "staging" ou "producao"')
         return normalizado
 
     # Valida o segredo usado pelo HS256 antes de a API iniciar; segredo curto ou placeholder

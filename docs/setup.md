@@ -80,6 +80,9 @@ docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nom
 # opcional: clientes, chamados e chat de demonstração (idempotente)
 docker compose exec backend python scripts/gerenciar_banco.py semear
 
+# remove os dados de demonstração acima (idempotente) — útil para rotacionar/limpar em staging
+docker compose exec backend python scripts/gerenciar_banco.py limpar-demo
+
 # Superadmin da plataforma (Iugo) — dá acesso a /plataforma/empresas. Idempotente.
 docker compose exec backend python scripts/gerenciar_banco.py criar-superadmin "Superadmin Iugo" superadmin@iugo.com.br SenhaForte123
 
@@ -94,6 +97,12 @@ Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe
 > `Iugo Performance` (o schema exige que todo usuário tenha uma Empresa) e o Superadmin dentro dela.
 > Ele **não promove** um usuário existente: se o e-mail já existir com outro perfil, aborta.
 > Em produção, passe o CNPJ real com `--cnpj` — o padrão é um placeholder de dev.
+
+> **`semear` nunca roda em produção (item S10):** os usuários de demonstração nascem com a mesma
+> senha padrão (`Senha123`) em toda instalação — inaceitável fora de dev/staging. O comando recusa
+> rodar (sai com erro, sem tocar no banco) quando `AMBIENTE=producao` no `.env` — ver
+> `.env.prod.example`. Em staging, se os dados demo precisarem ser rotacionados/removidos, use
+> `limpar-demo` (apaga os usuários demo e tudo que depende deles — chamados, mensagens, sessões).
 
 ---
 

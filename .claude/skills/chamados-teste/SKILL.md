@@ -46,12 +46,16 @@ status).
      -H "Content-Type: application/x-www-form-urlencoded" \
      | grep -o '"token_acesso":"[^"]*"' | cut -d'"' -f4)
    ```
-2. Criar o chamado:
+2. Criar o chamado — **se `Categoria`/`Resumo` tiverem acento (ã, ç, é...), não use `-d '{...}'`
+   direto**: o Bash deste ambiente corrompe a codificação e a API responde
+   `"There was an error parsing the body"`. Escreva o JSON num arquivo (Write, UTF-8) e envie com
+   `--data-binary @arquivo`:
    ```bash
    curl -s -X POST http://localhost:8000/chamados/ \
      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"Fila":"Operacional","Categoria":"<categoria>","Resumo":"<resumo>","Prioridade":"<prioridade>"}'
+     --data-binary "@/caminho/scratchpad/chamado.json"
    ```
+   Sem acento nenhum no payload, `-d '{...}'` inline funciona normalmente.
 3. Se o usuário não especificar algum campo, preencha com bom senso (não pergunte de volta por
    detalhe menor — é o motivo desta skill existir): `Fila: Operacional` e `Prioridade: Media` como
    padrão neutro; só suba para `Alta`/`Critica` se o pedido sugerir urgência ("crítico", "urgente",

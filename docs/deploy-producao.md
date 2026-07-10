@@ -95,6 +95,7 @@ Além dos secrets, confira no ambiente da API:
 
 | Variável | Valor em produção |
 |---|---|
+| `AMBIENTE` | `producao` — **obrigatório** (item S10); sem isso, `gerenciar_banco.py semear` recusa rodar e nada impede alguém de criar usuários demo com senha padrão no banco de produção |
 | `DATABASE_URL` | URL do banco gerenciado, com TLS (`?ssl=require`) |
 | `CORS_ORIGINS` | Domínio(s) reais do painel — o middleware CSRF valida `Origin` contra eles |
 | `COOKIE_SECURE` | `true` (default) — cookie de sessão só por HTTPS |

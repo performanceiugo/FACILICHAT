@@ -7,6 +7,51 @@
 
 ## [não versionado] — 10 de julho de 2026
 
+### Fase 1.5 criada — Fundação Multicanal (WhatsApp como porta de entrada) — só planejamento
+- **Decisão do usuário (10/07/2026):** incluir o WhatsApp como porta de entrada do sistema de
+  chamados, sem parar nem reestruturar o projeto — o material comercial já previa ("o WhatsApp vira
+  um canal, nunca o dono dos seus dados"). **Nenhum código foi implementado**: esta entrada registra
+  apenas análise arquitetural, roadmap e sincronização com o ClickUp.
+- **Posicionamento:** nova Fase 1.5 entre a Fase 1 (base de mensagens) e a Fase 2; a IA (Fase 5)
+  passa a depender dela. Dois blocos: **📥 Inbound MVP** (MC1–MC14: enum de canal, `ContatoCanal`,
+  correlação externa idempotente por `wamid`, auditoria de payload, entrada normalizada com
+  adaptador sem regra de negócio, webhook GET/POST com `X-Hub-Signature-256`, resolução de tenant,
+  mídia dependente da Fase 9, status externos, testes de robustez, observabilidade, docs) e
+  **📤 Outbound posterior** (MO1–MO7: janela de 24h, templates por Empresa, opt-in/opt-out,
+  onboarding de números, custos/qualidade, campanhas) — outbound só depois da Fase 5/5.5.
+- **Confirmado na documentação da Meta (10/07/2026):** entrega at-least-once (dedup por `wamid`
+  obrigatório; retries até 7 dias), assinatura HMAC-SHA256 do corpo bruto, resposta 200 rápida com
+  processamento assíncrono, URL de mídia efêmera, janela de 24h com templates fora dela, pricing
+  por mensagem desde 07/2025 e cobrança de mensagens de serviço a partir de 01/10/2026.
+- **Decisões pendentes de validação humana (bloqueiam o MC8 no ClickUp):** número por Empresa vs
+  compartilhado; contato desconhecido (pré-cadastro/pendente/triagem); multi-condomínio; retenção
+  LGPD do payload; Meta direta vs BSP; escopo do outbound no MVP.
+- **ClickUp:** tarefa-pai `868kb75yf` + 2 grupos + 22 subtarefas criadas com tags do padrão do
+  Space; dependências registradas (Fase 1.5 ← Fase 1; MC10 ← Fase 9; Fase 5 ← Fase 1.5;
+  Outbound ← Inbound + Fase 5; MC8 ← decisões).
+
+### Visão geral operacional do Gestor — endpoint de relatório
+- Criado `GET /relatorios/visao-geral`, exclusivo do Gestor e escopado à Empresa autenticada por
+  filtro explícito e RLS. A resposta consolida chamados abertos, SLA vencido, primeira resposta
+  humana interna média e resolução média em minutos; médias sem amostra retornam `null`.
+- O novo roteador foi registrado na aplicação e seu contrato foi validado no OpenAPI dentro do
+  contêiner do backend.
+
+### `S10` — Seed nunca roda em produção; limpeza de dados demo (fechado)
+- **Problema:** `gerenciar_banco.py semear` cria usuários de demonstração com a mesma senha padrão
+  (`Senha123`) em toda instalação — nada impedia rodar isso contra o banco de produção, e não
+  havia jeito documentado de rotacionar/remover esses dados num ambiente compartilhado (staging).
+- **Feito:** nova config `AMBIENTE` (`dev`/`staging`/`producao`, default `dev`, validada — falha
+  cedo num typo). `_semear()` recusa rodar (sai com erro, sem tocar no banco) quando
+  `AMBIENTE=producao`; `.env.prod.example` passa a declarar `AMBIENTE=producao` explicitamente.
+  Novo subcomando `limpar-demo`: apaga os usuários demo (marcados pelo domínio `DOMINIO_DEMO`) e
+  tudo que depende deles (chamados, mensagens, refresh tokens, sessões revogadas), respeitando a
+  ordem das foreign keys; idempotente.
+- **Validado de ponta a ponta:** rodei `semear` com `AMBIENTE=producao` de verdade — recusou (exit
+  1) sem tocar no banco. Rodei `limpar-demo` de verdade (removeu 5 usuários e 14 chamados),
+  confirmei via API que a lista ficou vazia, rodei de novo para confirmar a idempotência (nada a
+  fazer), e por fim `semear` restaurou os 12 chamados originais do seed.
+
 ### Atualização automática (polling) da Visão geral e da lista de Chamados
 - **Pedido do usuário:** ao criar um chamado direto no banco para testar, percebeu que o painel só
   refletia depois de um reload manual — pediu algo "estilo Power BI", atualizando sozinho.

@@ -3,6 +3,10 @@
 > Documento para acompanhamento dos donos da empresa.
 > Atualizado a cada alteração realizada no sistema.
 
+O painel do Gestor já dispõe de um resumo operacional por Empresa com chamados abertos, SLA vencido,
+tempo médio até a primeira resposta humana interna e tempo médio de resolução. Quando ainda não há
+dados suficientes para uma média, o sistema informa ausência de amostra em vez de estimar um valor.
+
 ---
 
 ## O que é o FaciliChat?

@@ -11,7 +11,8 @@
 #   python scripts/gerenciar_banco.py reset [--semear]     # zera o banco: dropa tudo, recria e aplica RLS
 #   python scripts/gerenciar_banco.py criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>
 #   python scripts/gerenciar_banco.py criar-superadmin "<Nome>" <email> <senha>   # Superadmin da Iugo
-#   python scripts/gerenciar_banco.py semear               # popula dados de demonstração (idempotente)
+#   python scripts/gerenciar_banco.py semear               # popula dados de demonstração (idempotente; recusa em AMBIENTE=producao)
+#   python scripts/gerenciar_banco.py limpar-demo          # remove usuários/chamados de demonstração (idempotente)
 #   python scripts/gerenciar_banco.py aplicar-rls          # (re)aplica as políticas de app/rls.sql
 #   python scripts/gerenciar_banco.py verificar-rls        # testa o isolamento multi-tenant
 #
@@ -33,10 +34,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import delete, func, select, text
 
 from app.banco_dados import AsyncSessionLocal, Base, engine
+from app.configuracoes import configuracoes
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus
 from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Mensagens import AutorTipo, Mensagem
+from app.modelos.RefreshToken import RefreshToken
+from app.modelos.SessaoRevogada import SessaoRevogada
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.servicos.hasher import pwd  # mesmo hasher (argon2) usado pelas rotas de autenticação
 from app.tempo import agoraUtc
@@ -514,6 +518,13 @@ async def cmd_criar_superadmin(args) -> None:
 # `semear` — popula os dados de demonstração (clientes, supervisor, chamados e histórico de chat)
 # na primeira Empresa existente. Idempotente: não semeia de novo se já houver chamados demo.
 async def _semear() -> None:
+    # Guarda de ambiente (item S10): usuários demo nascem com SENHA_PADRAO, previsível e igual em
+    # toda instalação — inaceitável em produção. Falha cedo, sem sequer tocar no banco, em vez de
+    # confiar em alguém lembrar de não rodar este comando lá.
+    if configuracoes.AMBIENTE == "producao":
+        print("Recusado: AMBIENTE=producao. `semear` só roda em dev/staging (ver docs/setup.md).")
+        sys.exit(1)
+
     await criar_tabelas()
 
     async with AsyncSessionLocal() as db:
@@ -590,6 +601,43 @@ async def _semear() -> None:
 
 async def cmd_semear(args) -> None:
     await _semear()
+
+
+# `limpar-demo` — apaga os usuários de demonstração (marcados pelo domínio DOMINIO_DEMO) e tudo que
+# depende deles (chamados, mensagens, refresh tokens, sessões revogadas). Item S10: existe para dar
+# um jeito documentado de rotacionar/remover os dados de seed em ambientes compartilhados (ex.:
+# staging), sem precisar resetar o banco inteiro. Idempotente: rodar sem usuários demo não faz nada.
+async def _limpar_demo() -> None:
+    async with AsyncSessionLocal() as db:
+        resultado = await db.execute(select(Usuario.ID).where(Usuario.Email.like(f"%{DOMINIO_DEMO}")))
+        ids_demo = [linha[0] for linha in resultado.all()]
+        if not ids_demo:
+            print("Nenhum usuário de demonstração encontrado — nada a limpar (idempotente).")
+            return
+
+        # Chamados onde um usuário demo é o Cliente OU o Supervisor (o supervisor de demonstração
+        # também é um usuário demo, então este filtro cobre os dois lados do seed).
+        resultado_chamados = await db.execute(
+            select(Chamado.ID).where(
+                Chamado.ClienteID.in_(ids_demo) | Chamado.SupervisorID.in_(ids_demo)
+            )
+        )
+        ids_chamados = [linha[0] for linha in resultado_chamados.all()]
+
+        # Ordem respeita as foreign keys: mensagens e chamados antes dos usuários que eles referenciam.
+        if ids_chamados:
+            await db.execute(delete(Mensagem).where(Mensagem.ChamadoID.in_(ids_chamados)))
+            await db.execute(delete(Chamado).where(Chamado.ID.in_(ids_chamados)))
+        await db.execute(delete(RefreshToken).where(RefreshToken.UsuarioID.in_(ids_demo)))
+        await db.execute(delete(SessaoRevogada).where(SessaoRevogada.UsuarioID.in_(ids_demo)))
+        await db.execute(delete(Usuario).where(Usuario.ID.in_(ids_demo)))
+        await db.commit()
+
+    print(f"Limpeza concluída: {len(ids_demo)} usuários demo e {len(ids_chamados)} chamados removidos.")
+
+
+async def cmd_limpar_demo(args) -> None:
+    await _limpar_demo()
 
 
 # `aplicar-rls` — (re)aplica só as políticas de app/rls.sql (útil após mexer no arquivo de políticas
@@ -683,8 +731,11 @@ def construir_parser() -> argparse.ArgumentParser:
     )
     p_super.set_defaults(func=cmd_criar_superadmin)
 
-    p_semear = sub.add_parser("semear", help="Popula dados de demonstração (idempotente)")
+    p_semear = sub.add_parser("semear", help="Popula dados de demonstração (idempotente; recusa em AMBIENTE=producao)")
     p_semear.set_defaults(func=cmd_semear)
+
+    p_limpar_demo = sub.add_parser("limpar-demo", help="Remove usuários/chamados de demonstração (idempotente)")
+    p_limpar_demo.set_defaults(func=cmd_limpar_demo)
 
     p_rls = sub.add_parser("aplicar-rls", help="(Re)aplica as políticas de app/rls.sql")
     p_rls.set_defaults(func=cmd_aplicar_rls)
