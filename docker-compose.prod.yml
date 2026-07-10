@@ -1,0 +1,128 @@
+# Ambiente de PRODUÇÃO do FaciliChat (item S9) — VPS com Docker Compose.
+# Uso:  docker compose -f docker-compose.prod.yml up -d --build
+#
+# Diferenças em relação ao docker-compose.yml de dev:
+#   - backend SEM `--reload` e SEM bind mount: roda o código copiado na imagem, como
+#     usuário não-root (ver backend/Dockerfile), com `--proxy-headers` para enxergar o
+#     IP/esquema reais vindos do Caddy (o rate limit por IP depende disso).
+#   - web (Next.js) containerizado: build standalone (frontend/web/Dockerfile).
+#   - Caddy na frente de tudo: é o ÚNICO serviço com portas publicadas (80/443).
+#     db, backend e web só existem na rede interna do compose — de fora do VPS
+#     ninguém alcança Postgres nem as portas 8000/3000 (portas internas protegidas).
+#   - Postgres com volume persistente próprio (pgdata_prod) e backup diário
+#     agendado no host (ver deploy/backup-banco.sh e docs/deploy-producao.md).
+#
+# Configuração: TODAS as variáveis vêm do arquivo `.env` ao lado deste compose
+# (modelo: .env.prod.example). A sintaxe `${VAR:?}` derruba a subida com mensagem
+# clara se um valor obrigatório faltar — nunca sobe com default fraco.
+#
+# `name:` explícito: sem isso, o Compose usa o nome da PASTA como projeto — o mesmo nome que o
+# docker-compose.yml de dev usaria por padrão, fazendo os dois brigarem pelos mesmos containers
+# `db`/`backend` (um recria/substitui os do outro). Nomes de projeto diferentes isolam os ambientes.
+name: facilichat_prod
+
+services:
+  # --- Banco de dados -----------------------------------------------------------------
+  db:
+    image: postgres:16
+    container_name: facilichat_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env (veja .env.prod.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (veja .env.prod.example)}
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB no .env (veja .env.prod.example)}
+    # SEM `ports:` — o banco não é alcançável nem do host nem da internet;
+    # só os containers desta rede falam com ele (item S5 levado ao extremo em prod)
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --- API FastAPI --------------------------------------------------------------------
+  backend:
+    build: ./backend
+    container_name: facilichat_backend_prod
+    restart: unless-stopped
+    environment:
+      # Montada das mesmas variáveis do serviço db — a senha existe num lugar só
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (veja .env.prod.example)}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no .env (placeholder aceito enquanto a IA não é usada)}
+      # O CSRF valida o header Origin contra esta lista — precisa ser o domínio real do painel
+      CORS_ORIGINS: https://${DOMINIO_PAINEL:?defina DOMINIO_PAINEL no .env (veja .env.prod.example)}
+      # Endurecimento de produção: sem Swagger/ReDoc (S8), sem SQL nos logs (M4),
+      # cadastro público fechado (S3). Cookies já nascem seguros por default (S6).
+      API_DOCS_HABILITADO: "false"
+      DEBUG: "false"
+      CADASTRO_PUBLICO_HABILITADO: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    # `--proxy-headers` + `--forwarded-allow-ips`: atrás do Caddy, o uvicorn passa a ler
+    # X-Forwarded-For/-Proto — sem isso o rate limit do login (S7) veria o IP do Caddy
+    # para todo mundo e bloquearia todos os usuários juntos. O valor "*" é seguro aqui
+    # porque a porta 8000 não é publicada: só o Caddy (rede interna) alcança o backend.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips "*"
+    # Verificação simples de funcionamento: a rota raiz responde 200 quando a API está de pé
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # --- Painel web (Next.js standalone) ------------------------------------------------
+  web:
+    build:
+      context: ./frontend/web
+      args:
+        # Destino do proxy /api/* do Next (resolvido no BUILD, ver frontend/web/Dockerfile).
+        # Aponta para o serviço backend pela rede interna — o navegador nunca vê essa URL.
+        NEXT_PUBLIC_API_URL: http://backend:8000
+    container_name: facilichat_web_prod
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Verificação simples de funcionamento: o server.js standalone responde na porta 3000
+    # (busybox wget da imagem alpine; --spider não baixa o corpo, só confere a resposta)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  # --- Proxy TLS (Caddy) ---------------------------------------------------------------
+  # Única porta de entrada do VPS: obtém e renova sozinho os certificados Let's Encrypt
+  # para os dois domínios e envia o header HSTS (configuração em deploy/Caddyfile).
+  caddy:
+    image: caddy:2
+    container_name: facilichat_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"        # necessário para o desafio ACME do Let's Encrypt + redirect para HTTPS
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    environment:
+      # Domínios e e-mail usados dentro do Caddyfile (avisos de expiração do Let's Encrypt)
+      DOMINIO_PAINEL: ${DOMINIO_PAINEL:?defina DOMINIO_PAINEL no .env}
+      DOMINIO_API: ${DOMINIO_API:?defina DOMINIO_API no .env}
+      ACME_EMAIL: ${ACME_EMAIL:?defina ACME_EMAIL no .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificados TLS — persistir evita re-emissão a cada restart
+      - caddy_config:/config
+    depends_on:
+      - web
+      - backend
+
+volumes:
+  # Dados do Postgres de produção. NUNCA rode `docker compose down -v` em produção —
+  # o `-v` apaga este volume (o banco inteiro). Backup diário: deploy/backup-banco.sh
+  pgdata_prod:
+  caddy_data:
+  caddy_config:

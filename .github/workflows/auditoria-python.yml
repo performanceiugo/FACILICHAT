@@ -1,0 +1,53 @@
+# Auditoria automatizada das dependências Python do backend (item S12 do plano).
+# Roda o pip-audit contra backend/requirements.txt e FALHA o workflow se alguma
+# dependência tiver vulnerabilidade conhecida (bases PyPI Advisory / OSV).
+#
+# Gatilhos:
+#   - push / pull_request que altere o requirements.txt (ou este workflow)
+#   - agendamento semanal: pega CVE publicada depois do último commit,
+#     mesmo sem nenhuma mudança no código
+#   - workflow_dispatch: permite disparar manualmente pela aba Actions
+
+name: Auditoria de dependências Python
+
+on:
+  push:
+    paths:
+      - "backend/requirements.txt"
+      - ".github/workflows/auditoria-python.yml"
+  pull_request:
+    paths:
+      - "backend/requirements.txt"
+      - ".github/workflows/auditoria-python.yml"
+  schedule:
+    # Toda segunda-feira às 09:00 UTC (06:00 em Brasília)
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+# O job só precisa ler o repositório — nenhuma permissão de escrita
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      # Baixa o código do repositório
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Mesma versão de Python do Dockerfile do backend (python:3.12-slim)
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Instala apenas a ferramenta de auditoria — as dependências do projeto
+      # não precisam ser instaladas: o pip-audit resolve o requirements.txt sozinho
+      - name: Instalar pip-audit
+        run: python -m pip install pip-audit
+
+      # Audita as versões fixadas no requirements.txt.
+      # Qualquer vulnerabilidade conhecida derruba o job (exit code != 0).
+      - name: Auditar backend/requirements.txt
+        run: python -m pip_audit -r backend/requirements.txt

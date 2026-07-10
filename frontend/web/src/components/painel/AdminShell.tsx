@@ -31,6 +31,17 @@ const IconChamados = () => (
   </svg>
 )
 
+// Icone da visao geral: representa o painel executivo com blocos de metricas.
+const IconVisaoGeral = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 17h7" />
+    <path d="M14 21h7" />
+  </svg>
+)
+
 // Deriva as iniciais do nome para o avatar circular do rodapé (ex.: "Edson Gestor" → "EG")
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/)
@@ -79,6 +90,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className={styles.nav}>
+          <Link
+            href="/painel/visao-geral"
+            className={pathname === '/painel/visao-geral' || pathname === '/painel' ? styles.linkAtivo : styles.link}
+          >
+            <span className={styles.navIcone}><IconVisaoGeral /></span>
+            Visao geral
+          </Link>
+
           <Link
             href="/painel/chamados"
             className={pathname?.startsWith('/painel/chamados') ? styles.linkAtivo : styles.link}

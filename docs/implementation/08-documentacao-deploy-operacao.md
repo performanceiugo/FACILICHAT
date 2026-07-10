@@ -37,9 +37,9 @@ Esta trilha garante que cada entrega seja operavel, verificavel e compreensivel 
 |---------|--------|--------|---------|
 | `OPS-SEC-001` | `[x]` | `S13` | Guia de `JWT_SECRET` e secrets por ambiente |
 | `OPS-SEC-002` | `[x]` | `S16` | Headers, CSP e HSTS documentados |
-| `OPS-SEC-003` | `[ ]` | `S4`/`S9` | Compose e credenciais separados por ambiente |
+| `OPS-SEC-003` | `[x]` | `S4`/`S9` | Compose e credenciais separados por ambiente (S4 fechado antes; S9 fechado 10/07: compose prod + Caddy + backup, runbook completo) |
 | `OPS-SEC-004` | `[ ]` | `S10` | Seeds demo bloqueados em producao |
-| `OPS-QA-001` | `[~]` | `S12` | Auditoria Python automatizada |
+| `OPS-QA-001` | `[x]` | `S12` | Auditoria Python automatizada |
 
 ## Regra de manutencao
 

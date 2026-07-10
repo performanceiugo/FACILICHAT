@@ -2,6 +2,16 @@
 # As credenciais do banco NÃO ficam neste arquivo: vêm do `.env` da raiz (ignorado pelo Git),
 # cujo modelo é o `.env.example`. A sintaxe `${VAR:?mensagem}` faz o compose falhar cedo,
 # com mensagem clara, se a variável não estiver definida — em vez de subir com um default fraco.
+#
+# `name:` explícito (item S9): sem isso, o Compose usa o nome da PASTA como projeto — o mesmo
+# nome que o docker-compose.prod.yml usaria por padrão. Isso faz o Compose achar que os serviços
+# `db`/`backend` de um arquivo são "o mesmo serviço" do outro e RECRIA (substitui) os containers
+# do outro compose ao subir este. Nomes de projeto diferentes isolam os dois ambientes de vez.
+# Mantido igual ao nome de projeto implícito anterior (nome da pasta, "facilichat") de propósito:
+# um valor diferente mudaria o nome real do volume `pgdata` (viraria `<novo-nome>_pgdata`), órfão
+# de todo o volume `facilichat_pgdata` já existente com dados de dev.
+name: facilichat
+
 services:
   db:
     image: postgres:16

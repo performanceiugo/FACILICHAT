@@ -38,6 +38,10 @@ frontend/web/src/
     │       └── login.module.css
     └── painel/              ← pasta real (não route group), URLs /painel/*
         ├── layout.tsx       ← delega para <AdminShell> (proteção de rota + sidebar)
+        ├── page.tsx         ← redireciona /painel → /painel/visao-geral
+        ├── visao-geral/
+        │   ├── page.tsx     ← visão executiva com KPIs e agregações dos chamados existentes
+        │   └── visao-geral.module.css
         └── chamados/
             ├── page.tsx     ← listagem de chamados
             └── chamados.module.css
@@ -61,6 +65,13 @@ como `--font-figtree`/`--font-sans`.
 2. Criar `page.tsx` com `'use client'` se tiver interação
 3. A proteção de rota já é feita automaticamente pelo `AdminShell` (via `painel/layout.tsx`)
 4. Adicionar o link na sidebar dentro de `components/painel/AdminShell.tsx`
+
+### Visão geral do painel (`/painel/visao-geral`)
+
+A visão geral é um recorte visual da Fase 4 que consome apenas `api.chamados.listar()`.
+Ela agrega no frontend os dados já disponíveis: chamados abertos, prioridades alta/crítica, concluídos,
+distribuição por status, volume por fila e categorias vindas dos dados reais. Métricas que ainda não
+existem no backend (SLA, primeira resposta média e resolução média) não são simuladas.
 
 ### Padrão do cliente HTTP (`lib/api.ts`)
 
@@ -126,6 +137,16 @@ enviado pelo Next — fica no proxy HTTPS de produção (ver `docs/deploy-produc
 > **Atenção ao rodar `next build` localmente:** pare o `next dev` antes. Os dois compartilham a
 > pasta `.next/` e um build feito com o dev server ativo sai contaminado com artefatos de dev
 > (sintoma: `EvalError: Code generation from strings disallowed` no middleware ao usar `next start`).
+
+### Imagem de produção (item S9)
+
+`output: 'standalone'` no `next.config.ts` faz o `next build` gerar um servidor Node autocontido em
+`.next/standalone` (só o `server.js` + os `node_modules` realmente usados). `frontend/web/Dockerfile`
+(novo) usa isso num build de dois estágios: o primeiro compila com `npm ci` + `next build`, o
+segundo copia só o resultado standalone e roda como usuário não-root `node`. `NEXT_PUBLIC_API_URL`
+entra como build-arg (resolvida em tempo de build, não de runtime) apontando para o serviço
+`backend` na rede interna do `docker-compose.prod.yml`. Dev continua usando `npm run dev` fora do
+Docker — esta imagem só existe para produção. Passo a passo completo: `docs/deploy-producao.md`.
 
 ---
 
@@ -234,6 +255,7 @@ isolados. O que muda nos frontends:
 - [ ] Tela de chat/mensagens dentro de um chamado (web e mobile)
 - [ ] Tela de criação de chamado (formulário) no mobile
 - [ ] Tela de usuários no painel web (para Gerentes)
+- [ ] Completar a visão geral com endpoints reais de relatório (SLA, primeira resposta e resolução média)
 - [ ] Filtros e busca na listagem de chamados
 - [ ] Notificações push no mobile
 - [ ] Indicadores visuais de IA nas mensagens automáticas

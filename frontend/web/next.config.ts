@@ -31,6 +31,12 @@ const csp = [
 ].join('; ')
 
 const nextConfig: NextConfig = {
+  // Build "standalone" (item S9): o `next build` gera em .next/standalone um servidor Node
+  // autocontido (server.js + só os node_modules realmente usados), que é o que a imagem Docker
+  // de produção copia — a imagem final não precisa do node_modules inteiro nem do código-fonte.
+  // Não afeta `next dev` nem o `next start` usado fora do Docker.
+  output: 'standalone',
+
   // Por padrão o Next redireciona (308) qualquer URL terminada em "/" para a versão sem barra.
   // As rotas do backend usam barra final (`/chamados/`), então esse redirecionamento quebraria o
   // proxy: o fetch seguiria para `/api/chamados` e o método/corpo do POST se perderiam no caminho.

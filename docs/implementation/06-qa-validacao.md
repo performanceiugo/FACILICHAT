@@ -21,7 +21,7 @@ QA deve acompanhar cada entrega, com validacao especifica para multi-tenant, seg
 | `QA-WEB-001` | `[~]` | `B7` / `868k7vx0v` | Validar painel web em navegador mobile |
 | `QA-LAYOUT-001` | `[~]` | Revisao layout 09/07 | Validar desktop/mobile/Expo apos ajustes visuais |
 | `QA-DOC-001` | `[ ]` | `D8` / `868kaa3h4` | Checklist de aceite dos HTMLs de branding |
-| `QA-SEC-001` | `[~]` | `S12` / `868kaa3dz` | Automatizar auditoria Python em CI/docs |
+| `QA-SEC-001` | `[x]` | `S12` / `868kaa3dz` | Automatizar auditoria Python em CI/docs |
 | `QA-MOB-001` | `[ ]` | `S11` / `868kaa3dh` | Audit mobile reproduzivel com lockfile |
 
 ## Checklist de saida de uma entrega

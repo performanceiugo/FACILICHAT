@@ -166,6 +166,15 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
   controla `docs_url`/`redoc_url`/`openapi_url` na instância `FastAPI(...)` (`main.py`). Com
   `false`, o FastAPI nem registra `/docs`, `/redoc` ou `/openapi.json` — não gera o schema, não é
   só uma UI escondida. Ligado em dev, desligado em produção (`docs/deploy-producao.md`).
+- **Auditoria automatizada de dependências (item S12):** o workflow
+  `.github/workflows/auditoria-python.yml` roda `pip-audit -r backend/requirements.txt` em todo
+  push/PR que altere o arquivo e semanalmente (segunda 09:00 UTC) — CVE nova em versão já fixada
+  derruba o CI mesmo sem commit. Rotina local e o que fazer quando acusar vulnerabilidade:
+  seção "Auditoria de dependências Python" do `docs/setup.md`.
+- **Imagem de produção endurecida (item S9):** `backend/Dockerfile` roda como usuário não-root
+  (`appuser`, via `useradd --system`) — a mesma imagem serve dev e produção; só o
+  `docker-compose.prod.yml` muda o comando (sem `--reload`, com `--proxy-headers` atrás do Caddy) e
+  remove o bind mount do código. Passo a passo completo de deploy: `docs/deploy-producao.md`.
 
 ## Data/hora — sempre UTC timezone-aware (M5)
 

@@ -5,6 +5,85 @@
 
 ---
 
+## [não versionado] — 10 de julho de 2026
+
+### `S9` — Compose de produção (backend + web containerizados + proxy TLS)
+- **Problema:** não existia forma de rodar o FaciliChat em produção — o backend só tinha o compose
+  de dev (`--reload`, bind mount do código) e o painel web só rodava com `npm run dev` fora do
+  Docker, sem TLS/HSTS na frente.
+- **Feito nesta sessão (o código já existia, sem commit; a entrega desta sessão foi validar e
+  fechar):**
+  - `backend/Dockerfile` endurecido: usuário não-root `appuser` (`useradd --system`), mesma imagem
+    para dev e produção — só o `command`/volume do compose muda.
+  - `frontend/web/Dockerfile` (novo): build em dois estágios usando `output: 'standalone'` do Next
+    (`next.config.ts`), imagem final roda como usuário `node` sem código-fonte/toolchain.
+  - `docker-compose.prod.yml` (novo): `db` sem `ports:` (só rede interna), `backend` sem
+    `--reload`/bind mount e com `--proxy-headers` (IP real do cliente atrás do Caddy, necessário
+    para o rate limit do `S7`), serviço `web` (Next standalone) e **Caddy** como único serviço com
+    portas publicadas (80/443/443-udp) — TLS automático via Let's Encrypt (`deploy/Caddyfile`) com
+    HSTS, para os domínios `DOMINIO_PAINEL`/`DOMINIO_API`.
+  - `deploy/backup-banco.sh` (novo): dump diário comprimido do Postgres de produção + cópia externa
+    opcional via `rclone`; retenção configurável.
+  - `.env.prod.example` (novo): modelo do `.env` de produção (domínios, ACME, Postgres, JWT).
+  - `docs/deploy-producao.md`: runbook atualizado de "em construção" para concluído — status de
+    cada item, seção nova de backup/restauração e nota sobre nomes de projeto Docker (ver bug
+    abaixo).
+- **Bug encontrado e corrigido durante a validação:** nem `docker-compose.yml` nem
+  `docker-compose.prod.yml` declaravam `name:` — o Compose usa o nome da pasta como projeto por
+  padrão, então os dois arquivos competiam pelo **mesmo projeto Docker**. Ao validar o compose de
+  produção localmente, o Compose **recriou (substituiu) os containers `facilichat_db`/
+  `facilichat_backend` do dev** pelos containers `_prod`. Nenhum dado foi perdido — o volume do
+  Postgres de dev (`facilichat_pgdata`) tem nome próprio, diferente do `pgdata_prod` — mas o
+  incidente expôs um risco real para quem rodar os dois composes na mesma máquina. Corrigido com
+  `name: facilichat` (dev, igual ao nome de projeto implícito anterior — preserva o volume
+  existente) e `name: facilichat_prod` (produção) explícitos nos dois arquivos.
+- **Validado (localmente, sem VPS/DNS real):**
+  - `docker build` das duas imagens de produção limpo.
+  - `docker compose -f docker-compose.prod.yml config` sem erros (todas as variáveis obrigatórias
+    resolvidas via `.env` de teste).
+  - Subida isolada (`docker compose -p facilichat_prod_validacao ...`) de `db`+`backend`+`web`:
+    todos os healthchecks ficaram `healthy`; `whoami` dentro dos containers confirmou `appuser`
+    (backend) e `node` (web); `GET /` da API respondeu `200`; `GET /docs` respondeu `404`
+    (`API_DOCS_HABILITADO=false`); `GET /login` do web respondeu `200`.
+  - `caddy validate` confirmou o `Caddyfile` sintaticamente válido (a emissão real de certificado
+    Let's Encrypt exige DNS público, não reproduzível localmente).
+  - Após o incidente do `name:`, o dev foi restaurado (`docker compose up -d`) e a contagem de
+    linhas em `Usuarios` conferida (7, igual a antes) antes de devolver os containers ao estado
+    parado original.
+- **Pendente:** rodar de fato num VPS com DNS público para confirmar a emissão do certificado TLS
+  (não é possível validar isso localmente); item `S10` (bloquear seed em produção) continua em
+  aberto.
+
+### Fase 4 — Recorte visual da visão geral do painel web
+- **Implementado:** nova rota `/painel/visao-geral`, com cards de indicadores derivados dos chamados
+  existentes, painel "O que precisa da sua atenção", gráfico de fluxo por status, volume por fila e
+  volume por categoria vindo dos dados reais.
+- **Navegação:** `/painel` agora redireciona para `/painel/visao-geral`, e a sidebar ganhou o link
+  "Visao geral" mantendo "Chamados" para a fila detalhada.
+- **Escopo deliberado:** a tela não inventa SLA, tempo de primeira resposta nem resolução média. Esses
+  pontos continuam dependentes dos endpoints de relatório da Fase 4; por isso os itens relacionados
+  ficaram parcialmente em andamento no plano.
+- **Validado:** `tsc --noEmit` e `npm run build` do frontend web passaram limpos.
+
+### `S12` — Auditoria de dependências Python automatizada (primeiro CI do projeto)
+- **Problema:** o baseline do `pip-audit` tinha sido rodado uma única vez, manualmente (encontrou e
+  resolveu o `ecdsa`/`python-jose` → `PyJWT`), mas nada garantia que a auditoria voltasse a rodar —
+  uma CVE publicada amanhã numa versão já fixada passaria despercebida.
+- **Correção:** criado `.github/workflows/auditoria-python.yml`, o primeiro workflow de CI do
+  repositório. Roda `pip-audit -r backend/requirements.txt` (Python 3.12, igual ao Dockerfile) em
+  todo push/PR que altere o `requirements.txt` ou o próprio workflow, **toda segunda-feira às
+  09:00 UTC** (agendamento pega CVE nova sem precisar de commit) e sob demanda
+  (`workflow_dispatch`). Vulnerabilidade conhecida = job vermelho. Permissões do job restritas a
+  `contents: read`.
+- **Documentado:** nova seção "Auditoria de dependências Python (`pip-audit`)" no `docs/setup.md`
+  (rotina local + passo a passo quando o CI acusar vulnerabilidade) e item na seção Segurança do
+  `docs/tecnico-backend.md`.
+- **Validado:** `python -m pip_audit -r backend/requirements.txt` local retornou
+  `No known vulnerabilities found` (baseline segue limpo). O workflow em si roda no primeiro push
+  para o GitHub (o gatilho inclui o próprio arquivo do workflow).
+
+---
+
 ## [não versionado] — 9 de julho de 2026
 
 ### `S7` — Fechado após verificação (sem mudança de código nesta sessão)

@@ -1,22 +1,32 @@
 # FaciliChat — Runbook de Produção
 
 > Passo-a-passo único "do servidor vazio ao app no ar". Consolida as regras de produção que antes
-> viviam espalhadas no `setup.md` (itens S3/S4/S5/S6/S13/S16/S17 do plano).
+> viviam espalhadas no `setup.md` (itens S3/S4/S5/S6/S9/S13/S16/S17 do plano).
 >
-> ⚠️ **Documento em construção proposital:** o produto ainda está em fase de fundação (sem chat,
-> IA e storage) e o item **S9** do plano — compose de produção — ainda não foi executado. As seções
-> marcadas com 🔜 dependem dele. O objetivo final é o deploy caber em ~4 comandos (ver "Processo-alvo").
+> ⚠️ **Ainda não validado num VPS real** — o compose de produção (`S9`) foi criado e validado
+> **localmente** (build das duas imagens, containers non-root, `/docs` desligado, web respondendo,
+> `Caddyfile` sintaticamente válido). Falta apenas rodar de verdade num servidor com DNS público
+> para o desafio ACME do Let's Encrypt emitir os certificados (não reproduzível em ambiente local).
+> O item **S10** (bloquear seed em produção) ainda está pendente — ver tabela abaixo.
 
 ---
 
-## Processo-alvo (quando o S9 fechar)
+## Processo de deploy (item S9 concluído)
 
 ```bash
 git clone <repo> && cd FACILICHAT
 cp .env.prod.example .env && nano .env    # preencher os secrets (seção 2)
 docker compose -f docker-compose.prod.yml up -d --build
-docker compose exec backend python scripts/gerenciar_banco.py criar-empresa ...
+docker compose exec backend python scripts/gerenciar_banco.py criar-superadmin ...   # seção 6
 ```
+
+> **Nomes de projeto Docker isolados:** tanto `docker-compose.yml` (dev) quanto
+> `docker-compose.prod.yml` declaram `name:` explícito (`facilichat` e `facilichat_prod`). Sem
+> isso, dois composes na mesma pasta sem `name:` competem pelo mesmo projeto Docker padrão (nome da
+> pasta) e o Compose pode **recriar/substituir os containers um do outro** ao subir qualquer um
+> deles — descoberto ao validar este item. Se for rodar o compose de produção lado a lado com o de
+> dev (ex.: numa mesma máquina de teste), confirme com `docker compose config` que os nomes de
+> projeto continuam diferentes antes de subir.
 
 ## O que já está pronto vs pendente
 
@@ -28,8 +38,9 @@ docker compose exec backend python scripts/gerenciar_banco.py criar-empresa ...
 | Cadastro público fechado por padrão (S3) | ✅ |
 | `/docs`/`/redoc`/`/openapi.json` configuráveis por ambiente (S8) | ✅ |
 | Revogação de sessão server-side (denylist de `jti`, S14) + refresh token com rotação/detecção de reuso (S15) | ✅ (falta só revogação em massa na troca de senha/função — sem rota ainda) |
-| Compose de produção (sem `--reload`/bind mount, usuário endurecido) | 🔜 S9 |
-| Web (Next.js) containerizado + proxy TLS com HSTS | 🔜 S9 |
+| Compose de produção (sem `--reload`/bind mount, usuário endurecido) | ✅ (S9 — validado localmente: build ok, `whoami` = `appuser`/`node`) |
+| Web (Next.js) containerizado (build standalone) + proxy TLS (Caddy) com HSTS | ✅ (S9 — `Caddyfile` validado com `caddy validate`; emissão real de certificado depende de DNS público, não testável localmente) |
+| Backup diário do Postgres + cópia externa opcional via rclone | ✅ (S9 — `deploy/backup-banco.sh`) |
 | Seeds demo bloqueados em produção | 🔜 S10 |
 
 ---
@@ -102,9 +113,13 @@ Além dos secrets, confira no ambiente da API:
 
 ## 4. Web (Next.js)
 
-- `NEXT_PUBLIC_API_URL` com a **URL HTTPS real da API** — ela entra no `connect-src` da CSP;
-  se ficar errada, todo `fetch` do painel vira violação.
-- Build de produção: `npm run build` + `npm start` (🔜 S9: virar serviço no compose de produção).
+- `NEXT_PUBLIC_API_URL` — no compose de produção é um **build-arg** do serviço `web`
+  (`frontend/web/Dockerfile`), resolvido durante o `next build`; aponta para o backend pela rede
+  interna do compose (`http://backend:8000`), nunca exposta ao navegador (o proxy `/api/*` do
+  próprio Next é quem fala com ela).
+- Build de produção: `frontend/web/Dockerfile` gera o build `standalone` do Next em dois estágios
+  e roda como usuário não-root (`node`) — já containerizado no serviço `web` do
+  `docker-compose.prod.yml` (item S9).
 - **CSP:** hoje sai em `Content-Security-Policy-Report-Only` (só registra violações no console).
   Promover a enforce após período de uso sem violações legítimas:
   1. Navegar pelo painel inteiro com o DevTools aberto e confirmar zero mensagens `[Report Only]`
@@ -115,7 +130,14 @@ Além dos secrets, confira no ambiente da API:
 ## 5. Proxy TLS + HSTS
 
 `Strict-Transport-Security` **não** é enviado pelo Next de propósito (em dev gravaria exigência de
-HTTPS para `localhost`). Configure no proxy TLS (exemplo nginx, dentro do bloco TLS):
+HTTPS para `localhost`). O compose de produção (item S9) já traz **Caddy** (`deploy/Caddyfile`)
+como proxy: obtém e renova sozinho os certificados Let's Encrypt para `DOMINIO_PAINEL`/`DOMINIO_API`
+e envia o header HSTS — só exige que o DNS de cada domínio aponte para o IP do VPS e as portas
+80/443 estejam livres. Validado localmente com `caddy validate` (sintaxe); a emissão real do
+certificado só ocorre com DNS público de verdade, então só é confirmável no próprio servidor.
+
+Se preferir outro proxy (nginx, Cloudflare Tunnel etc.) no lugar do Caddy do compose, o
+equivalente do header HSTS é:
 
 ```nginx
 # Começar SEM includeSubDomains/preload; adicionar depois que todos os subdomínios tiverem TLS
@@ -141,6 +163,24 @@ docker compose exec backend python scripts/gerenciar_banco.py aplicar-rls   # se
 **Não rode `semear` em produção** — cria usuários demo com senha padrão (bloqueio automático é o
 item S10). O comando `reset` **destrói o banco** — jamais em produção.
 
+## 6.1 Backup do banco
+
+`deploy/backup-banco.sh` (item S9) gera um dump comprimido diário do Postgres de produção e,
+opcionalmente, envia uma cópia para armazenamento externo via `rclone` (`BACKUP_RCLONE_DESTINO`
+no `.env`) — um backup que mora no mesmo disco do banco não sobrevive à falha desse disco.
+
+```bash
+# Manual
+./deploy/backup-banco.sh
+
+# Agendado (crontab -e no VPS)
+0 3 * * * /caminho/FACILICHAT/deploy/backup-banco.sh >> /var/log/facilichat-backup.log 2>&1
+```
+
+Restauração: `docker compose -f docker-compose.prod.yml exec -T db psql -U <user> -d <db> < dump_descomprimido.sql`
+(descomprimir o `.sql.gz` com `gunzip` antes). Teste a restauração num banco de staging antes de
+precisar dela de verdade em produção.
+
 ## 7. Checklist final antes de liberar usuários
 
 - [ ] 100% do tráfego por HTTPS; HSTS ativo no proxy (seção 5).
@@ -154,7 +194,12 @@ item S10). O comando `reset` **destrói o banco** — jamais em produção.
 - [ ] Logout revoga de verdade (S14: denylist de `jti`) e o refresh token roda com rotação +
   detecção de reuso por família (S15) — ambos feitos; falta só revogar em massa na troca de senha
   ou mudança de função, quando essas rotas existirem.
+- [ ] Backup diário agendado (`deploy/backup-banco.sh` no crontab) e cópia externa via rclone
+  configurada (`BACKUP_RCLONE_DESTINO`) — sem ela, o backup mora no mesmo disco do banco.
+- [ ] `docker compose config` confirma nomes de projeto (`name:`) diferentes entre
+  `docker-compose.yml` e `docker-compose.prod.yml`, caso os dois rodem na mesma máquina.
+- [ ] `semear` nunca rodou contra este banco (item S10 — bloqueio automático ainda pendente).
 
 ---
 
-*Mantido por: Claude Code (agente de desenvolvimento). Este runbook fecha de vez junto com o item S9 do plano.*
+*Mantido por: Claude Code (agente de desenvolvimento).*

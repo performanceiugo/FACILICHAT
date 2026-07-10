@@ -1,0 +1,9 @@
+# Arquivos que NÃO devem entrar na imagem do web
+# .env* nunca entra na imagem — configuração de build vem por build-arg (NEXT_PUBLIC_API_URL)
+node_modules/
+.next/
+.env
+.env.*
+tsconfig.tsbuildinfo
+Dockerfile
+.dockerignore

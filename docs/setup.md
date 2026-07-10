@@ -128,6 +128,29 @@ cd frontend/web && npm run dev     # web
 
 ---
 
+## Auditoria de dependências Python (`pip-audit`)
+
+As dependências do backend são auditadas de duas formas (item `S12` do plano):
+
+- **Automática (CI):** o workflow `.github/workflows/auditoria-python.yml` roda o `pip-audit`
+  contra `backend/requirements.txt` em todo push/PR que altere o arquivo **e toda segunda-feira**
+  (pega CVE publicada depois do último commit). Vulnerabilidade conhecida = workflow vermelho.
+- **Local (antes de mudar dependência):**
+
+```bash
+python -m pip install pip-audit          # uma vez
+python -m pip_audit -r backend/requirements.txt
+```
+
+**Quando a auditoria acusar vulnerabilidade:**
+1. Veja no relatório qual pacote/versão e o aviso (`PYSEC-*`/`CVE-*`) — ele indica a versão corrigida.
+2. Atualize a versão fixada no `backend/requirements.txt` (ou troque o pacote, como foi feito com
+   `python-jose` → `PyJWT`) e rode a auditoria de novo até ficar limpa.
+3. Reconstrua o container (`docker compose up --build -d`) e valide a API.
+4. Registre a correção no `docs/changelog.md`.
+
+---
+
 ## Solução de problemas comuns
 
 | Problema | Causa | Solução |
