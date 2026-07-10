@@ -86,6 +86,17 @@ def _decodificarToken(token: str) -> dict:
     )
 
 
+# Dependência leve — decodifica o token e devolve o payload cru (jti/exp), sem consultar o banco.
+# Usada por rotas que precisam revogar a PRÓPRIA sessão atual (item S14, ex.: troca de senha) além
+# do usuário autenticado — decodifica de novo (barato, sem I/O) em vez de mudar a assinatura de
+# `obterUsuarioAtual` e arriscar quebrar as dezenas de rotas que já dependem dela.
+async def obterPayloadTokenAtual(token: str = Depends(obterTokenDaRequisicao)) -> dict:
+    try:
+        return _decodificarToken(token)
+    except PyJWTError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+
+
 # Dependência injetável — decodifica o token da requisição e retorna o usuário autenticado
 # Usada em todas as rotas protegidas com Depends(obterUsuarioAtual)
 async def obterUsuarioAtual(

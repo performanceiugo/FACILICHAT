@@ -7,6 +7,80 @@
 
 ## [não versionado] — 10 de julho de 2026
 
+### Atualização automática (polling) da Visão geral e da lista de Chamados
+- **Pedido do usuário:** ao criar um chamado direto no banco para testar, percebeu que o painel só
+  refletia depois de um reload manual — pediu algo "estilo Power BI", atualizando sozinho.
+- **Decisão técnica (confirmada com o usuário):** polling simples via `setInterval`, sem adotar
+  SWR/React Query (nenhuma dependência nova) — as duas páginas já usavam `useEffect` +
+  `fetch` direto, então o padrão mais simples de manter é reaproveitar isso com um hook.
+- **Feito:** novo hook `frontend/web/src/lib/useAtualizacaoPeriodica.ts` — reexecuta uma função de
+  busca a cada 20s enquanto a aba está visível (Page Visibility API pausa o polling em segundo
+  plano e busca na hora ao voltar, em vez de esperar o próximo tick). `visao-geral` e `chamados`
+  passaram a usá-lo; a tela só mostra "Carregando..."/erro na carga inicial — atualizações de
+  fundo trocam os dados em silêncio e mantêm a última leitura boa se uma falhar.
+- **Validado com Playwright** (instalado no S14/B7 anterior): abri o painel, criei um chamado via
+  API sem tocar na página, e confirmei que os dados mudaram sozinhos — KPI "Chamados abertos" de
+  10→11 na visão geral e total de 14→15 na lista de chamados, ambos sem reload.
+
+### Script de consultas manuais ao banco (dev)
+- Movido `backend/scripts/consultas/consultas-facilichat.sql` (antes um arquivo temporário de
+  scratchpad) para dentro do repositório, versionado. Referência de conexão local (host/porta/
+  banco/usuário) e SELECTs genéricos prontos para as 7 tabelas reais do projeto, para quem quiser
+  consultar o Postgres de dev diretamente (DBeaver, TablePlus, psql etc.) sem depender da API. Não
+  é executado por nenhum script/CI — é só material de consulta manual.
+
+### `S14` — Revogação de sessão em troca de senha e mudança de função (fechado)
+- **Problema:** o logout já revogava a sessão de verdade (denylist de `jti` + família de refresh),
+  mas não havia onde acionar isso em troca de senha ou mudança de função — essas rotas não
+  existiam no código.
+- **Feito:** `PATCH /usuarios/eu/senha` (exige `SenhaAtual`, seguindo a OWASP Authentication Cheat
+  Sheet) e `PATCH /usuarios/{usuarioID}/funcao` (só Gestor, mesma Empresa). Ao trocar a própria
+  senha, denylista o `jti` da sessão atual e revoga **todas** as famílias de refresh do usuário —
+  força novo login em todo dispositivo, incluindo o que fez a troca. Ao mudar a função de outro
+  usuário, revoga todas as famílias de refresh dele; o access token que ele já tem em mãos continua
+  válido até expirar (no máximo 15min, janela curta do `S15`), já que não há como localizar o `jti`
+  de um dispositivo que não é o da requisição atual. Novo helper
+  `revogarTodasFamiliasDoUsuario` em `app/servicos/refresh.py`.
+- **Consultado `verificar-seguranca` antes de implementar:** OWASP Session Management Cheat Sheet
+  recomenda regenerar/invalidar sessão em troca de senha e mudança de privilégio; Authentication
+  Cheat Sheet recomenda exigir a senha atual — abordagem planejada já batia com a recomendação
+  atual, sem necessidade de mudar a regra antes de codar.
+- **Validado com curl:** senha errada → 400; senha certa → sessão atual revogada na hora (`401
+  "Sessão encerrada"` reusando o token antigo); login com senha antiga falha, com a nova funciona;
+  troca de função de outro usuário → `401` ao ele tentar `/autenticacao/atualizar`; 403 para
+  quem não é Gestor; 404 para usuário inexistente ou de outra Empresa.
+- **Bug de ambiente encontrado durante a validação:** o hot-reload do `uvicorn --reload` (bind
+  mount do Docker Desktop no Windows) perdeu a mudança de um dos três arquivos editados
+  (`Autenticacao.py`) — as rotas novas só apareceram no `/openapi.json` depois de um
+  `docker compose restart backend`. Não é um problema do código; é uma limitação do watcher sobre
+  bind mount nesse ambiente.
+
+### Reorganização do board da Fase 0.5 (grupos por categoria no ClickUp)
+- **Problema:** as ~50 subtarefas da Fase 0.5 pendente (`868k60v1m`) estavam todas soltas, direto
+  sob a fase, misturando Altos/Segurança/Médios/Baixos/Documentação/Versões.
+- **Limitação encontrada:** o MCP do ClickUp disponível não tem operação de reparentar uma tarefa
+  existente (só define `parent` na criação; `move_task` só move entre listas) nem de criar tag nova
+  no Space (`add_tag_to_task` exige tag já existente). Por isso não deu para mover os itens já
+  existentes automaticamente.
+- **Feito:** criados 6 grupos vazios como subtarefas de `868k60v1m` — 🟠 Altos (`868kb37kx`),
+  🔐 Segurança (`868kb37me`), 🟡 Médios (`868kb37nf`), 🟢 Baixos (`868kb37nt`),
+  📄 Documentação (`868kb37p9`), 🔄 Atualização de versões (`868kb37q9`). Os CUs foram anotados ao
+  lado do cabeçalho de cada categoria em `docs/plano-implementacao.md`.
+- **Pendente (ação manual do usuário):** arrastar as subtarefas existentes (A/S/M/B/D/V) para dentro
+  do grupo correspondente na UI do ClickUp — a API não permite fazer isso de fora.
+
+### `B7` — Validação visual de responsividade do painel web (mobile)
+- **Problema:** o CSS responsivo do painel (`AdminShell`, lista de chamados) já tinha sido aplicado,
+  mas nunca houve uma validação visual real em viewport mobile — só inspeção de código.
+- **Feito:** instalado Playwright (Chromium) como devDependency em `frontend/web` (fica disponível
+  para validações futuras); script temporário logou como Gestor Demo e tirou screenshots de
+  `/painel/chamados`, `/painel/supervisores` e `/painel/visao-geral` em 390×844 (mobile) e
+  1440×900 (desktop). Resultado: sem overflow horizontal em nenhuma página/viewport, sidebar
+  colapsa para o topo em mobile, cards empilham em coluna única, sem erros de console. Screenshots
+  eram temporários (scratchpad da sessão) e foram apagados após a checagem.
+- **Pendência separada:** a mesma validação no app mobile (Expo) não foi feita agora — exige
+  emulador/dispositivo, fora do escopo desta checagem de browser.
+
 ### `S9` — Compose de produção (backend + web containerizados + proxy TLS)
 - **Problema:** não existia forma de rodar o FaciliChat em produção — o backend só tinha o compose
   de dev (`--reload`, bind mount do código) e o painel web só rodava com `npm run dev` fora do
@@ -65,6 +139,17 @@
   ficaram parcialmente em andamento no plano.
 - **Validado:** `tsc --noEmit` e `npm run build` do frontend web passaram limpos.
 
+### Fase 4 — Página Supervisores (`868k60w2a`, frontend-first)
+- **Implementado:** nova rota `/painel/supervisores`, com cabeçalho executivo, resumo da supervisão,
+  contrato visual de cards expansíveis e estrutura da fila de cada supervisor.
+- **Sem dados fictícios:** enquanto o endpoint `GET /relatorios/supervisores` (`868k60w1e`) não existe,
+  a página mostra indicadores indisponíveis, skeletons neutros e uma mensagem explícita de integração.
+  Nomes, carga, atrasos e tempo de primeira resposta não são simulados.
+- **Responsividade e acessibilidade:** expansão preparada como botão navegável por teclado, com
+  `aria-expanded`/`aria-controls`, foco visível e layouts próprios para desktop, tablet e mobile.
+- **Validado:** `npm run build` passou e registrou a rota estática `/painel/supervisores`. A inspeção
+  visual no navegador integrado ficou pendente porque nenhum navegador estava disponível na sessão.
+
 ### `S12` — Auditoria de dependências Python automatizada (primeiro CI do projeto)
 - **Problema:** o baseline do `pip-audit` tinha sido rodado uma única vez, manualmente (encontrou e
   resolveu o `ecdsa`/`python-jose` → `PyJWT`), mas nada garantia que a auditoria voltasse a rodar —
@@ -81,6 +166,28 @@
 - **Validado:** `python -m pip_audit -r backend/requirements.txt` local retornou
   `No known vulnerabilities found` (baseline segue limpo). O workflow em si roda no primeiro push
   para o GitHub (o gatilho inclui o próprio arquivo do workflow).
+
+### Sincronização ClickUp — correção de 8 subtarefas desatualizadas
+- **Problema:** validação cruzada entre `docs/plano-implementacao.md`, o código e o board do
+  ClickUp (via MCP) encontrou subtarefas cujo status no board estava atrás do plano/código —
+  nenhum caso inverso (ClickUp nunca estava mais avançado que o plano). A lista bateu com o
+  checklist manual deixado em `.codex/clickup-sync-pendencias.md` por uma sessão do Codex sem
+  MCP do ClickUp disponível (8 itens registrados ali; a primeira rodada desta sessão moveu 7 e
+  deixou o `S9` passar — corrigido na sequência ao cruzar com esse arquivo).
+- **Corrigido no ClickUp** (sem nenhuma mudança de conteúdo do plano, só sincronização de status):
+  - Para `✅ concluída`: `868kaa3cg` (`S9`), `868kaa3dz` (`S12`), `868k60w1k` (redirect `/painel`),
+    `868k60w26` (Volume por categoria), `868k7vrwr` (Hierarquia do painel).
+  - Para `🚧 em andamento`: `868k60w1r` (KPIs da visão geral), `868k7vrx5` (painel "O que precisa
+    da sua atenção"), `868k60w2w` (links do sidebar).
+- **Confirmado no código antes de mover** o `S9`/`S12` (`docker-compose.prod.yml` e
+  `.github/workflows/auditoria-python.yml` existem) e os itens de Fase 4
+  (`frontend/web/src/app/painel/visao-geral/page.tsx` implementa KPIs, volume por categoria e
+  hierarquia do painel).
+- **Board confirmado no lugar certo:** `clickup_get_workspace_hierarchy` e `clickup_get_task`
+  confirmaram a lista em `Operações Internas` → `FaciliChat - Desenvolvimento` →
+  `Roadmap de Implementacao` (`list_id 901114027434`) — bate com o board documentado no plano e
+  com o `.codex/clickup-sync-pendencias.md`. "Iugo Performance" que aparece junto é o nome do
+  criador/workspace da tarefa, não um board diferente.
 
 ---
 

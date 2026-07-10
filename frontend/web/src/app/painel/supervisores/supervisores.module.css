@@ -1,0 +1,320 @@
+/* Tela de supervisores do painel do Gestor.
+   Mantém a linguagem discreta do FaciliChat e diferencia claramente dados reais de prévia. */
+
+/* Estrutura principal limita a largura para preservar leitura confortável em telas grandes. */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: 1180px;
+}
+
+/* Cabeçalho equilibra contexto operacional e acesso à lista geral de chamados. */
+.cabecalho {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--sp-6);
+  justify-content: space-between;
+}
+
+/* Etiqueta identifica a área da aplicação sem competir com o título. */
+.etiqueta {
+  color: var(--blue-700);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+}
+
+/* Título usa a hierarquia tipográfica executiva do painel. */
+.titulo {
+  color: var(--text-strong);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-h2);
+  margin-top: var(--sp-1);
+}
+
+/* Subtítulo explica o valor da tela com linguagem direta. */
+.subtitulo {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-top: var(--sp-2);
+  max-width: 640px;
+}
+
+/* Ação secundária reaproveita o padrão discreto de botão do dashboard. */
+.acaoSecundaria {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  color: var(--text-default);
+  display: inline-flex;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--sp-4);
+  white-space: nowrap;
+}
+
+/* Resumo prepara a leitura dos indicadores antes dos cards individuais. */
+.resumo {
+  display: grid;
+  gap: var(--sp-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Cada indicador mantém os valores indisponíveis visualmente neutros. */
+.resumoItem {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--blue-500);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-height: 112px;
+  padding: var(--sp-4);
+}
+
+/* O indicador de atenção reserva a semântica âmbar para riscos operacionais. */
+.resumoAtencao { border-left-color: var(--warning-500); }
+
+/* Labels e observações mantêm contraste secundário. */
+.resumoItem span,
+.resumoItem small {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Valor principal recebe destaque mesmo quando ainda é um travessão. */
+.resumoItem strong {
+  color: var(--text-strong);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+}
+
+/* Observação fica no rodapé visual do indicador. */
+.resumoItem small {
+  font-size: var(--fs-xs);
+  margin-top: auto;
+}
+
+/* Grade comporta os cards reais quando o backend estiver conectado. */
+.grade {
+  display: grid;
+  gap: var(--sp-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Card agrupa cabeçalho clicável e fila expandida. */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+/* Botão ocupa todo o card e mantém semântica correta para expansão por teclado. */
+.cardBotao {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: var(--sp-4);
+  grid-template-columns: 44px minmax(130px, 1fr) minmax(250px, 1.4fr) 24px;
+  padding: var(--sp-5);
+  text-align: left;
+  width: 100%;
+}
+
+/* Hover e foco indicam interação sem deslocar o conteúdo. */
+.cardBotao:hover { background: var(--blue-50); }
+.cardBotao:focus-visible { outline: 3px solid var(--border-focus); outline-offset: -3px; }
+
+/* Avatar usa apenas iniciais derivadas de dados reais. */
+.avatar {
+  align-items: center;
+  background: var(--blue-50);
+  border-radius: var(--r-full);
+  color: var(--blue-700);
+  display: flex;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+/* Identidade e métricas organizam texto em dois níveis. */
+.identidade,
+.metricas span {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Nome e valores são os pontos de maior contraste do card. */
+.identidade strong,
+.metricas strong {
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+
+/* Textos auxiliares contextualizam sem competir com números. */
+.identidade small,
+.metricas small {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* Métricas ficam alinhadas em três colunas previsíveis. */
+.metricas {
+  display: grid;
+  gap: var(--sp-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Atrasos ganham vermelho somente quando o valor é maior que zero. */
+.metricaCritica strong { color: var(--danger-700); }
+
+/* Indicador de expansão usa forma simples e acessível. */
+.chevron {
+  color: var(--blue-700);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+
+/* Fila expandida separa os chamados do cabeçalho do supervisor. */
+.fila {
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-2) var(--sp-5) var(--sp-4);
+}
+
+/* Linha do chamado oferece contexto rápido sem reproduzir a tela de tickets. */
+.chamado {
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: var(--sp-4);
+  justify-content: space-between;
+  padding: var(--sp-3) 0;
+}
+
+/* Conteúdo textual do chamado permanece legível e truncável. */
+.chamado div { display: flex; flex-direction: column; min-width: 0; }
+.chamado strong { color: var(--text-strong); font-size: var(--fs-sm); }
+.chamado div span { color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Metadados resumem urgência e estado atual. */
+.chamadoMeta,
+.filaVazia {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* Estado de integração usa um painel real, não uma página vazia ou dados inventados. */
+.integracao {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+/* Prévia mostra a anatomia dos cards com skeletons neutros. */
+.preview {
+  display: grid;
+  gap: var(--sp-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: var(--sp-5);
+}
+
+/* Cada skeleton preserva proporções do card final. */
+.previewCard {
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  display: grid;
+  gap: var(--sp-3);
+  grid-template-columns: 40px 1fr;
+  min-height: 132px;
+  padding: var(--sp-4);
+}
+
+/* Blocos cinza deixam evidente que não são conteúdo real. */
+.previewAvatar,
+.previewTexto span,
+.previewMetricas span {
+  background: var(--bg-muted);
+  display: block;
+}
+
+/* Avatar skeleton replica a forma circular do componente final. */
+.previewAvatar { border-radius: var(--r-full); height: 40px; width: 40px; }
+
+/* Linhas skeleton simulam somente hierarquia de texto. */
+.previewTexto { display: flex; flex-direction: column; gap: var(--sp-2); }
+.previewTexto span { border-radius: var(--r-full); height: 8px; width: 85%; }
+.previewTexto span:last-child { width: 55%; }
+
+/* Métricas skeleton ocupam a largura inferior do card. */
+.previewMetricas {
+  display: grid;
+  gap: var(--sp-2);
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, 1fr);
+}
+.previewMetricas span { border-radius: var(--r-sm); height: 34px; }
+
+/* Mensagem explica a dependência sem linguagem técnica para a equipe de demonstração. */
+.integracaoMensagem {
+  align-items: flex-start;
+  background: var(--blue-50);
+  border-top: 1px solid var(--blue-100);
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+}
+
+/* Ícone circular sugere sincronização futura, não erro. */
+.integracaoIcone {
+  align-items: center;
+  background: var(--bg-surface);
+  border-radius: var(--r-full);
+  color: var(--blue-700);
+  display: flex;
+  flex: 0 0 32px;
+  font-size: var(--fs-lg);
+  height: 32px;
+  justify-content: center;
+}
+
+/* Título e descrição mantêm contraste acessível sobre o fundo sutil. */
+.integracaoMensagem h2 { color: var(--text-strong); font-size: var(--fs-base); }
+.integracaoMensagem p { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--sp-1); max-width: 720px; }
+
+/* Tablet empilha grade de cards e reduz a prévia para duas colunas. */
+@media (max-width: 980px) {
+  .grade { grid-template-columns: 1fr; }
+  .preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Mobile transforma métricas e cabeçalho em fluxos verticais confortáveis para toque. */
+@media (max-width: 680px) {
+  .cabecalho { flex-direction: column; }
+  .acaoSecundaria { width: 100%; }
+  .resumo { grid-template-columns: 1fr; }
+  .cardBotao { grid-template-columns: 44px 1fr 24px; }
+  .metricas { grid-column: 1 / -1; }
+  .preview { grid-template-columns: 1fr; }
+  .chamado { align-items: flex-start; flex-direction: column; }
+}

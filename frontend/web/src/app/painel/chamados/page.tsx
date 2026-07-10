@@ -3,9 +3,10 @@
 // Página de listagem de chamados do painel web
 // Gestores e supervisores veem todos os chamados; clientes veem apenas os seus (filtro no backend)
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
 import type { Chamado } from '@/types'
 import styles from './chamados.module.css'
 
@@ -44,15 +45,35 @@ export default function ChamadosPage() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
+  const montadoRef = useRef(true)
 
-  // Busca os chamados ao montar o componente
-  useEffect(() => {
-    setEmpresaNome(auth.empresaNome())
+  // Busca os chamados. `mostrarCarregando` so vale true na carga inicial — a atualizacao
+  // automatica em segundo plano (useAtualizacaoPeriodica) troca a lista sem piscar loading nem
+  // erro, mantendo a ultima lista boa na tela se uma atualizacao falhar.
+  const buscarChamados = useCallback((mostrarCarregando: boolean) => {
+    if (mostrarCarregando) setCarregando(true)
     api.chamados.listar()
-      .then(setChamados)
-      .catch(err => setErro(err.message))
-      .finally(() => setCarregando(false))
+      .then(lista => {
+        if (!montadoRef.current) return
+        setChamados(lista)
+        if (mostrarCarregando) setErro('')
+      })
+      .catch(err => {
+        if (montadoRef.current && mostrarCarregando) setErro(err.message)
+      })
+      .finally(() => {
+        if (montadoRef.current && mostrarCarregando) setCarregando(false)
+      })
   }, [])
+
+  useEffect(() => {
+    montadoRef.current = true
+    setEmpresaNome(auth.empresaNome())
+    buscarChamados(true)
+    return () => { montadoRef.current = false }
+  }, [buscarChamados])
+
+  useAtualizacaoPeriodica(() => buscarChamados(false))
 
   if (carregando) return <p className={styles.info}>Carregando chamados...</p>
   if (erro) return <p className={styles.erro}>{erro}</p>

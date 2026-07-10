@@ -4,10 +4,11 @@
 // Este recorte visual usa apenas os chamados ja disponiveis para mostrar a direcao do produto
 // sem depender dos endpoints de relatorio da Fase 4 que ainda serao implementados no backend.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
 import type { Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus } from '@/types'
 import styles from './visao-geral.module.css'
 
@@ -67,23 +68,38 @@ export default function VisaoGeralPage() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
+  const ativoRef = useRef(true)
+
+  // Busca os chamados. `mostrarCarregando` so vale true na carga inicial — a atualizacao
+  // automatica em segundo plano (useAtualizacaoPeriodica) troca os dados sem piscar loading nem
+  // erro, mantendo a ultima leitura boa na tela se uma atualizacao falhar.
+  const buscarChamados = useCallback((mostrarCarregando: boolean) => {
+    if (mostrarCarregando) setCarregando(true)
+    api.chamados.listar()
+      .then(resultado => {
+        if (!ativoRef.current) return
+        setChamados(resultado)
+        if (mostrarCarregando) setErro('')
+      })
+      .catch(err => {
+        if (ativoRef.current && mostrarCarregando) {
+          setErro(err instanceof Error ? err.message : 'Nao foi possivel carregar a visao geral.')
+        }
+      })
+      .finally(() => {
+        if (ativoRef.current && mostrarCarregando) setCarregando(false)
+      })
+  }, [])
 
   // Carrega a Empresa de exibicao e a lista de chamados ao montar a tela.
   useEffect(() => {
-    let ativo = true
+    ativoRef.current = true
     setEmpresaNome(auth.empresaNome())
-    api.chamados.listar()
-      .then(resultado => {
-        if (ativo) setChamados(resultado)
-      })
-      .catch(err => {
-        if (ativo) setErro(err instanceof Error ? err.message : 'Nao foi possivel carregar a visao geral.')
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false)
-      })
-    return () => { ativo = false }
-  }, [])
+    buscarChamados(true)
+    return () => { ativoRef.current = false }
+  }, [buscarChamados])
+
+  useAtualizacaoPeriodica(() => buscarChamados(false))
 
   // Agrega os chamados em estruturas de exibicao para KPIs, graficos e atencoes.
   const resumo = useMemo(() => {

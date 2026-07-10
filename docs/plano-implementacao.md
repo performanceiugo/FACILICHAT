@@ -164,7 +164,7 @@
 > **Como conduzir:** corrigir **um item por vez**. Ao iniciar, `[ ]` → `[~]`; ao concluir, `[~]` → `[x]`
 > (mover a linha para a Parte 1) e registrar no `changelog.md`. Cada ID (ex.: `A1`) serve de referência na conversa.
 
-### 🟠 Altos
+### 🟠 Altos · CU: `868kb37kx`
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
@@ -176,7 +176,7 @@
 | `[x]` | `868k60v2k` | A7 | Link `/usuarios` no sidebar sem página correspondente → 404 | Criar a página ou esconder o link até existir | `frontend/web/src/components/painel/AdminShell.tsx` |
 | `[x]` | `868k60v2r` | A8 | Mobile: React 18.3 / expo-router 4 incompatíveis com Expo SDK 53 | Rodar `npx expo install --fix`; alinhar React 19 / router 5 | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 
-### 🔐 Segurança (levantamento de 08/07/2026)
+### 🔐 Segurança (levantamento de 08/07/2026) · CU: `868kb37me`
 
 > Itens convertidos da revisão de segurança feita sobre backend, web, mobile, Docker e dependências.
 > Como conduzir: corrigir **um `S*` por vez**, começando por `S1` e `S2`. `CU: a-criar` significa que a
@@ -202,12 +202,27 @@
 | `[ ]` | `868kaa3dh` | S11 | App mobile não tem lockfile, então `npm audit` não roda de forma reproduzível | Gerar e versionar lockfile do gerenciador escolhido; rodar audit e corrigir vulnerabilidades | `frontend/mobile/package.json`, `frontend/mobile/package-lock.json` |
 | `[x]` | `868kaa3dz` | S12 | Dependências Python não têm auditoria automatizada no projeto | Baseline local executado com `pip-audit` (limpo após migração para `PyJWT`); automatizado em 10/07/2026: workflow `.github/workflows/auditoria-python.yml` (primeiro CI do projeto) roda `pip-audit` em push/PR que toque o `requirements.txt` + semanalmente (pega CVE nova sem commit) + manual; rotina local e resposta a vulnerabilidade documentadas no `setup.md` | `.github/workflows/auditoria-python.yml` (novo), `docs/setup.md`, `docs/tecnico-backend.md` |
 | `[x]` | `868ka61e5` | S13 | Faltava guia de produção para o `JWT_SECRET` (como gerar por ambiente e cadastrar como secret no provedor/CI, sem passar pelo Git) | Seção "Produção — JWT_SECRET e secrets por ambiente" adicionada ao `docs/setup.md` (geração PowerShell/Python/openssl, cadastro em VPS/provedor gerenciado/GitHub Actions, aviso de rotação) | `docs/setup.md` |
-| `[~]` | `868kahv64` | S14 | Nenhuma revogação de sessão server-side: logout só limpa o cliente; token roubado vale as 8h inteiras (sem `jti`/denylist; troca/reset de senha não revoga nada) | Feito: `POST /autenticacao/logout` revoga de verdade — `jti` do token vai para uma denylist (`SessoesRevogadas`, checada em `obterUsuarioAtual`/`obterTenantAtual` a cada requisição); validado com curl (token válido antes do logout, `401 "Sessão encerrada"` reusando o mesmo token depois). Pendente: "revogar todas as sessões em troca/reset de senha e mudança de função" não tem onde ser acionado — essas rotas (alterar a própria senha, editar função de um usuário) ainda não existem no código; fechar quando existirem | `backend/app/rotas/Autenticacao.py`, `backend/app/modelos/SessaoRevogada.py` (novo), `backend/app/servicos/revogacao.py` (novo) |
+| `[x]` | `868kahv64` | S14 | Nenhuma revogação de sessão server-side: logout só limpa o cliente; token roubado vale as 8h inteiras (sem `jti`/denylist; troca/reset de senha não revoga nada) | `POST /autenticacao/logout` revoga de verdade (denylist do `jti` + família de refresh). Fechado nesta sessão: `PATCH /usuarios/eu/senha` (exige senha atual, denylista o `jti` da sessão atual e revoga todas as famílias de refresh do usuário) e `PATCH /usuarios/{usuarioID}/funcao` (só Gestor, mesma Empresa; revoga todas as famílias de refresh do alvo). Validado com curl: senha errada (400), senha certa revoga a sessão atual (`401 "Sessão encerrada"` reusando o token antigo), login com senha antiga falha e com a nova funciona; troca de função de outro usuário revoga o refresh dele (`401` ao tentar `/autenticacao/atualizar`); 403 para não-Gestor; 404 para alvo inexistente/de outra Empresa. Consultado `verificar-seguranca` antes de implementar (OWASP Session Management + Authentication Cheat Sheets) — abordagem já alinhada, sem necessidade de mudar a regra | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Usuarios.py`, `backend/app/servicos/refresh.py`, `backend/app/modelos/SessaoRevogada.py`, `backend/app/servicos/revogacao.py` |
 | `[x]` | `868kahv6r` | S15 | Access token de 8h (`JWT_EXPIRE_MINUTES=480`) sem refresh token — janela longa para uso de token roubado (XSS/infostealer) | Access token encurtado para 15min (`JWT_EXPIRE_MINUTES=15`); refresh token opaco (`{ID}.{segredo}`, só o hash sha256 do segredo fica no banco) com rotação a cada uso e detecção de reuso por família (`RefreshTokens`, `app/servicos/refresh.py`) — reuso de um token já consumido revoga a família inteira. Web: cookie `refresh` `HttpOnly` (`REFRESH_TOKEN_EXPIRE_DIAS=30`) + retry transparente single-flight em `lib/api.ts` num 401. Mobile: `refresh_token` no SecureStore + mesmo retry via `POST /autenticacao/atualizar`. Logout revoga a família também (não só o access token do S14). Validado via curl (rotação em cadeia, reuso derrubando a família, logout revogando) e através do proxy real do Next (cookie+CSRF) | `backend/app/servicos/refresh.py` (novo), `backend/app/modelos/RefreshToken.py` (novo), `backend/app/rotas/Autenticacao.py`, `backend/app/servicos/sessao.py`, `backend/app/configuracoes.py`, `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts`, `lib/auth.ts` (mobile) |
 | `[x]` | `868kahv8b` | S16 | Web sem CSP nem headers de segurança (`X-Content-Type-Options`, `frame-ancestors`, `Referrer-Policy`, HSTS em prod) — sem CSP, um XSS faz requisições autenticadas mesmo com cookie HttpOnly | `headers()` no `next.config.ts`: CSP em `Report-Only` (promover a enforce após observação — guia no `setup.md`), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`; HSTS documentado para o proxy HTTPS de produção; validado com `next build` + `next start` (headers conferidos na resposta real, variantes dev/prod) | `frontend/web/next.config.ts`, `docs/setup.md`, `docs/tecnico-frontend.md` |
 | `[x]` | `868kahvad` | S17 | CORS com `allow_credentials=True` sem a API usar cookies, e wildcards em `allow_methods`/`allow_headers` | `allow_credentials=False`; listas explícitas `CORS_METODOS_PERMITIDOS` (`GET, POST, PATCH, OPTIONS` — a API não expõe `PUT`/`DELETE`) e `CORS_HEADERS_PERMITIDOS` (`Authorization, Content-Type`); `configuracoes.py` não precisou mudar. Validado com preflights reais (método/header/origem indevidos → 400) e fluxo autenticado preservado. **Religar credentials é tarefa do `S6`, junto do CSRF** | `backend/app/main.py`, `docs/tecnico-backend.md` |
 
-### 🟡 Médios
+### 🔄 Atualização de versões (auditoria de 10/07/2026) · CU: `868kb37q9`
+
+> Origem: auditoria de atualidade de dependências pedida pelo usuário e verificada contra o projeto
+> real (nenhuma vulnerabilidade ativa hoje — `npm audit`/`pip-audit` limpos — mas versões atrasadas
+> em graus variados). Skill de apoio para rodadas futuras: `/verificar-versoes`.
+
+| Status | CU | ID | Problema | Correção | Arquivo(s) |
+|--------|----|----|----------|----------|-----------|
+| `[ ]` | `868kb32ap` | V1 | Docker Engine 29.5.3 desatualizado; 29.6.1 traz correções de segurança do Engine | Atualizar Docker Desktop/Engine para 29.6.1 | máquina local (fora do repositório) |
+| `[ ]` | `868kb32cg` | V2 | Web: `npm run lint` não roda automatizado (config interativa); `next lint` será removido no Next 16 | Criar config ESLint explícita e trocar o script por `eslint .` — pode ser feito ainda no Next 15 | `frontend/web/package.json`, `eslint.config.*` (novo) |
+| `[ ]` | `868kb32gb` | V3 | Mobile: Expo SDK 53 (4 SDKs atrás); `npm audit` acusa 13 vulnerabilidades moderadas transitivas cuja correção exige SDK 57 | Migração sequencial 53→54→55→56→57 rodando `expo-doctor` a cada etapa; React/React Native acompanham o SDK | `frontend/mobile/package.json` |
+| `[ ]` | `868kb32ph` | V4 | Sem `.nvmrc`/`.python-version`/`engines`; Docker/CI usam Node 22/Python 3.12 e as máquinas locais podem divergir | Declarar oficialmente Node 22 (ou 24) e Python 3.12 para desenvolvimento via arquivos de pinagem | raiz do repositório (novos arquivos) |
+| `[ ]` | `868kb32v1` | V5 | Next.js 15.5.20 desatualizado (atual 16.2.10) — não urgente, ainda em Maintenance LTS e sem vulnerabilidades | Planejar migração separadamente após V2: `middleware.ts`→`proxy.ts`, remoção do `next lint`, Turbopack padrão, revisão do `next.config.ts` | `frontend/web/**` |
+| `[ ]` | `868kb32wc` | V6 | Backend: 11 pacotes Python com versões menores mais novas (FastAPI, Uvicorn, SDK Anthropic, Alembic, AnyIO etc.), sem vulnerabilidade conhecida | Atualizar no `requirements.txt` após rodar a suíte de testes do backend | `backend/requirements.txt` |
+
+### 🟡 Médios · CU: `868kb37nf`
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
@@ -224,7 +239,7 @@
 | `[x]` | `868k60vbz` | M11 | Mobile: paleta fora dos tokens; Figtree não carregada | Substituir pelos tokens Ink; carregar Figtree via `expo-font` | `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts`, `frontend/mobile/app/_layout.tsx` |
 | `[x]` | `868kakk65` | M12 | Mensagens de erro em inglês vazam ao usuário: 422 do Pydantic (`Field required` etc., com `detail` em lista que o front exibe como `[object Object]`) e falha de rede do fetch (`Failed to fetch`) | Handler de `RequestValidationError` no backend traduz os tipos comuns para PT e devolve `detail` como string; web/mobile ganharam `extrairDetail` (string/lista) e `fetchOuErroDeConexao` (falha de rede → mensagem PT); validado com curl (422/401 em PT) e `tsc --noEmit` nos dois fronts | `backend/app/main.py`, `frontend/web/src/lib/api.ts`, `frontend/mobile/lib/api.ts` |
 
-### 🟢 Baixos
+### 🟢 Baixos · CU: `868kb37nt`
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
@@ -234,7 +249,7 @@
 | `[x]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
 | `[ ]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
 | `[x]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud/jti`; hasher duplicado (achado um 4º ponto em `Plataforma.py` além dos 3 do levantamento original); `@app.on_event` deprecado | Claims `iat/iss/aud/jti` no token (`criarToken`) e validadas no decode (`_decodificarToken`, com `issuer`/`audience`); hasher centralizado em `app/servicos/hasher.py` e reaproveitado por `Autenticacao.py`, `Usuarios.py`, `Plataforma.py` e `gerenciar_banco.py`; `@app.on_event("startup")` migrado para `lifespan`. Validado com `import app.main`, reset+seed do banco e `verificar-rls` | `backend/app/servicos/hasher.py` (novo), `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `Plataforma.py`, `backend/app/main.py`, `backend/scripts/gerenciar_banco.py` |
-| `[~]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | CSS responsivo aplicado no `AdminShell` e na lista de chamados; falta validação visual final em navegador mobile | `frontend/web/src/app/painel/**` |
+| `[x]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | Validado com Playwright (Chromium) em viewport mobile (390×844) e desktop (1440×900), autenticado como Gestor Demo: `/painel/chamados`, `/painel/supervisores` e `/painel/visao-geral` sem overflow horizontal, sidebar colapsa para o topo em mobile, cards empilham em coluna única, sem erros de console | `frontend/web/src/app/painel/**` |
 
 ### Revisão de layouts web/mobile — 09/07/2026
 
@@ -243,9 +258,9 @@
 | `[x]` | 1 | Mapear fontes de design, tokens, telas, navegação e estilos globais existentes | `docs/FaciliChat-Regras/`, `docs/tecnico-frontend.md`, `frontend/web/src/app/globals.css`, `frontend/mobile/lib/theme.ts` |
 | `[x]` | 2 | Padronizar raios, estados de botão e breakpoints das telas web existentes | `frontend/web/src/app/**/*.css`, `frontend/web/src/components/**/*.css` |
 | `[x]` | 3 | Remover cores, tamanhos e espaçamentos soltos das telas mobile já existentes | `frontend/mobile/app/**`, `frontend/mobile/lib/theme.ts` |
-| `[~]` | 4 | Validar visualmente em navegador desktop/mobile e em Expo após build/typecheck | web/mobile |
+| `[~]` | 4 | Validar visualmente em navegador desktop/mobile e em Expo após build/typecheck | web validado (Playwright, ver B7); falta Expo (emulador/dispositivo) |
 
-### 📄 Documentação (divergências com o código real)
+### 📄 Documentação (divergências com o código real) · CU: `868kb37p9`
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
@@ -444,9 +459,10 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[x]` | `868k60w26` | Seção "Volume por categoria" — categorias vêm **dos dados** (agregação real), não de lista fixa | (dentro de visao-geral) |
 | `[x]` | `868k7vrwr` | **Hierarquia do painel: urgente → tendência → detalhe** — ação agora primeiro; tendência em 2º nível; detalhe sob demanda | (dentro de visao-geral) |
 | `[~]` | `868k7vrx5` | **Painel "O que precisa da sua atenção"** — alertas (crítico/atenção/oportunidade) com atalho direto ao chamado | (dentro de visao-geral) |
-| `[ ]` | `868k60w2a` | Página `supervisores` — cards clicáveis; clique expande a fila daquele supervisor | `frontend/web/src/app/(painel)/supervisores/page.tsx` (novo) |
+| `[~]` | `868k60w2a` | Página `supervisores` — cards clicáveis; clique expande a fila daquele supervisor | `frontend/web/src/app/(painel)/supervisores/page.tsx` (novo) |
 | `[ ]` | `868k60w2j` | Página `tickets` — tabela com filtros: período, supervisor, status, categoria; busca por cliente | `frontend/web/src/app/(painel)/tickets/page.tsx` (novo) |
 | `[~]` | `868k60w2w` | Adicionar links no sidebar: Visão geral / Supervisores / Todos os tickets / Alertas | `frontend/web/src/app/(painel)/layout.tsx` |
+| `[x]` | `868kb4ga6` | **Atualização automática (polling)** — Visão geral e lista de Chamados refazem o fetch sozinhas a cada ~20s (estilo painel de BI), pausando quando a aba está em segundo plano; hook reutilizável, sem nova dependência (SWR/React Query ficam de fora por ora) | Hook `useAtualizacaoPeriodica` (setInterval de 20s + Page Visibility API); as duas páginas só reexibem "Carregando..."/erro na carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se uma falhar. Validado com Playwright: criei um chamado via API enquanto a página estava aberta e sem dar reload — KPI "Chamados abertos" foi de 10→11 e o total da lista de 14→15, ambos sozinhos | `frontend/web/src/lib/useAtualizacaoPeriodica.ts` (novo), `frontend/web/src/app/painel/visao-geral/page.tsx`, `frontend/web/src/app/painel/chamados/page.tsx` |
 
 ---
 

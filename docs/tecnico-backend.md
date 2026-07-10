@@ -99,6 +99,8 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | POST | `/usuarios/` | Cadastro público controlado — fechado por padrão; quando habilitado, cria **sempre** um Cliente na Empresa liberada por `CADASTRO_PUBLICO_EMPRESA_ID` | Não | Pública controlada |
 | POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/RH/Financeiro/Gestor) | Sim | Apenas Gestor (403 caso contrário) |
 | GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim | Qualquer perfil |
+| PATCH | `/usuarios/eu/senha` | Troca a própria senha (exige `SenhaAtual`); revoga **todas** as sessões do usuário — denylist do `jti` atual + todas as famílias de refresh (item S14) | Sim | Qualquer perfil |
+| PATCH | `/usuarios/{usuarioID}/funcao` | Muda a função de outro usuário da mesma Empresa; revoga todas as famílias de refresh do usuário-alvo (item S14) | Sim | Apenas Gestor (403 caso contrário); 404 se o alvo não existir ou for de outra Empresa |
 
 > **Primeiro Gestor:** como o cadastro público fica fechado por padrão e `/usuarios/equipe` exige um Gestor, a primeira Empresa + primeiro Gestor são criados por `python scripts/gerenciar_banco.py criar-empresa ...` (ver a seção "Scripts do banco" abaixo e `docs/setup.md`).
 
@@ -147,9 +149,17 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
   access nem do refresh (roubados antes do logout) continuam funcionando. `obterUsuarioAtual` e
   `obterTenantAtual` checam a denylist do access token a cada requisição autenticada. Ambas as
   tabelas (`SessoesRevogadas`, `RefreshTokens`) ficam deliberadamente fora da RLS (a checagem roda
-  antes de `app.empresa_id` ser setado; com RLS a query veria sempre zero linhas). **Pendente:**
-  revogar todas as sessões de um usuário em troca/reset de senha ou mudança de função ainda não
-  tem onde ser acionado — essas rotas não existem no código hoje.
+  antes de `app.empresa_id` ser setado; com RLS a query veria sempre zero linhas).
+- **Revogação em troca de senha e mudança de função (item S14, fechado):** `PATCH
+  /usuarios/eu/senha` exige a senha atual (OWASP Authentication Cheat Sheet) e, ao trocar,
+  denylista o `jti` da sessão atual **e** revoga todas as famílias de refresh do usuário
+  (`app/servicos/refresh.revogarTodasFamiliasDoUsuario`) — forçando novo login em todos os
+  dispositivos, incluindo o que fez a troca. `PATCH /usuarios/{usuarioID}/funcao` (só Gestor, mesma
+  Empresa) revoga todas as famílias de refresh do usuário-alvo ao mudar sua função — o access
+  token que o alvo já tem em mãos continua válido até expirar (no máximo 15min, janela curta do
+  S15), porque não há como localizar o `jti` de um dispositivo que não é o da requisição atual.
+  Segue a recomendação da OWASP Session Management Cheat Sheet de invalidar sessões em troca de
+  senha e em mudança de privilégio.
 - Cookie configurável por ambiente: `COOKIE_SECURE`, `COOKIE_SAMESITE`, `COOKIE_DOMAIN`
   (defaults seguros; `SameSite=none` sem `Secure` falha na subida)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use

@@ -4,14 +4,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from datetime import datetime, timezone
 from app.banco_dados import obterBancoDados
 from app.configuracoes import configuracoes
 from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa, EmpresaStatus
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
-from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
+from app.rotas.Autenticacao import obterBancoDadosComTenant, obterPayloadTokenAtual, obterUsuarioAtual
 from app.servicos.hasher import pwd
+from app.servicos.revogacao import registrarRevogacao
+from app.servicos.refresh import revogarTodasFamiliasDoUsuario
 from app.servicos.seguranca import aplicarRateLimitAutenticacao
 import uuid
 
@@ -34,6 +37,18 @@ class UsuarioCriar(BaseModel):
 # Schema de entrada da criacao INTERNA (somente Gestor) - aqui a Funcao pode ser definida,
 # permitindo cadastrar perfis privilegiados (Supervisor, Funcionario, RH, Financeiro, Gestor)
 class UsuarioCriarEquipe(UsuarioCriar):
+    Funcao: UsuarioFuncao
+
+
+# Schema de entrada da troca da propria senha (item S14) - exige a senha atual (Authentication
+# Cheat Sheet da OWASP) para confirmar que quem esta trocando e o dono legitimo da conta.
+class SenhaAlterar(BaseModel):
+    SenhaAtual: str
+    SenhaNova: str = Field(min_length=8)
+
+
+# Schema de entrada da troca de funcao de um usuario (item S14) - so o Gestor usa esta rota.
+class FuncaoAlterar(BaseModel):
     Funcao: UsuarioFuncao
 
 
@@ -238,3 +253,73 @@ async def obterEu(
         resultado = await db.execute(select(Condominio.Nome).where(Condominio.ID == usuarioAtual.CondominioID))
         condominioNome = resultado.scalar_one_or_none() or condominioNome
     return _serializarUsuario(usuarioAtual, condominioNome)
+
+
+# PATCH /usuarios/eu/senha - troca a propria senha (item S14, parte final do S14).
+# Regra de seguranca: exige a senha atual antes de aceitar a nova (OWASP Authentication Cheat
+# Sheet). Ao concluir, revoga TODAS as sessoes do usuario - a que fez a troca (denylist do jti
+# atual) e qualquer outro dispositivo logado (todas as familias de refresh) - forcando um novo
+# login em todo lugar. Segue a recomendacao da OWASP Session Management Cheat Sheet de invalidar
+# sessoes existentes numa troca de senha.
+@roteador.patch("/eu/senha")
+async def alterarSenha(
+    payload: SenhaAlterar,
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    payloadToken: dict = Depends(obterPayloadTokenAtual),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+):
+    if not pwd.verify(payload.SenhaAtual, usuarioAtual.SenhaHash):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta")
+
+    usuarioAtual.SenhaHash = pwd.hash(payload.SenhaNova)
+    await db.commit()
+
+    jti = payloadToken.get("jti")
+    expiracao = payloadToken.get("exp")
+    if jti and expiracao:
+        await registrarRevogacao(
+            db,
+            usuarioAtual.EmpresaID,
+            usuarioAtual.ID,
+            jti,
+            datetime.fromtimestamp(expiracao, tz=timezone.utc),
+        )
+    await revogarTodasFamiliasDoUsuario(db, usuarioAtual.ID)
+
+    return {"mensagem": "Senha alterada. Faca login novamente."}
+
+
+# PATCH /usuarios/{usuarioID}/funcao - troca a funcao de outro usuario (item S14, parte final).
+# Regra de negocio: so o Gestor pode mudar funcao, e somente dentro da propria Empresa (tenant) -
+# `obterBancoDadosComTenant` ja escopa a query via RLS, e o check explicito abaixo e defesa em
+# profundidade (mesmo padrao usado no item S2/C7), nunca alterando usuario de outra Empresa.
+# Ao concluir, revoga todas as familias de refresh do usuario-alvo (OWASP: invalidar sessao em
+# mudanca de privilegio) - o access token que ele ja tem em maos continua valendo ate expirar (no
+# maximo 15min, janela curta do S15), pois nao temos o jti de um dispositivo que nao e o desta
+# requisicao.
+@roteador.patch("/{usuarioID}/funcao", response_model=UsuarioSaida)
+async def alterarFuncao(
+    usuarioID: uuid.UUID,
+    payload: FuncaoAlterar,
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+):
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail="Apenas o Gestor pode alterar a funcao de um usuario")
+
+    resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioID))
+    usuarioAlvo = resultado.scalar_one_or_none()
+    if not usuarioAlvo or usuarioAlvo.EmpresaID != usuarioAtual.EmpresaID:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    usuarioAlvo.Funcao = payload.Funcao
+    await db.commit()
+    await db.refresh(usuarioAlvo)
+
+    await revogarTodasFamiliasDoUsuario(db, usuarioAlvo.ID)
+
+    condominioNome = usuarioAlvo.Condominio
+    if usuarioAlvo.CondominioID:
+        resultado = await db.execute(select(Condominio.Nome).where(Condominio.ID == usuarioAlvo.CondominioID))
+        condominioNome = resultado.scalar_one_or_none() or condominioNome
+    return _serializarUsuario(usuarioAlvo, condominioNome)

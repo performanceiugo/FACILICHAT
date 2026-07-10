@@ -42,9 +42,12 @@ frontend/web/src/
         ├── visao-geral/
         │   ├── page.tsx     ← visão executiva com KPIs e agregações dos chamados existentes
         │   └── visao-geral.module.css
-        └── chamados/
+        ├── chamados/
             ├── page.tsx     ← listagem de chamados
             └── chamados.module.css
+        └── supervisores/
+            ├── page.tsx     ← cards expansíveis da equipe (frontend-first)
+            └── supervisores.module.css
 ```
 
 ### Design system (tokens)
@@ -72,6 +75,25 @@ A visão geral é um recorte visual da Fase 4 que consome apenas `api.chamados.l
 Ela agrega no frontend os dados já disponíveis: chamados abertos, prioridades alta/crítica, concluídos,
 distribuição por status, volume por fila e categorias vindas dos dados reais. Métricas que ainda não
 existem no backend (SLA, primeira resposta média e resolução média) não são simuladas.
+
+**Atualização automática (`useAtualizacaoPeriodica`):** esta página e a de Chamados (abaixo)
+reexecutam o fetch a cada ~20s, estilo painel de BI, em vez de exigir reload manual — hook em
+`frontend/web/src/lib/useAtualizacaoPeriodica.ts`, sem dependência nova (SWR/React Query ficaram de
+fora por decisão de escopo). O hook pausa o polling quando a aba fica em segundo plano (Page
+Visibility API) e busca na hora ao voltar. Nas duas páginas, `carregando`/`erro` só aparecem na
+carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se
+uma falhar.
+
+### Supervisores (`/painel/supervisores`)
+
+A página de supervisores é o recorte frontend-first do item `868k60w2a`. O componente já contém o
+contrato visual dos cards expansíveis, métricas de carga/atraso/primeira resposta e a fila resumida
+de cada supervisor. Até o endpoint `GET /relatorios/supervisores` (`868k60w1e`) ser implementado, a
+tela exibe um estado de integração com skeletons e travessões — nunca fixtures, nomes ou números
+fictícios que possam ser confundidos com dados da Empresa.
+
+O link na sidebar permanece separado porque pertence ao item `868k60w2w`; durante este recorte a
+rota pode ser acessada diretamente em `/painel/supervisores`.
 
 ### Padrão do cliente HTTP (`lib/api.ts`)
 

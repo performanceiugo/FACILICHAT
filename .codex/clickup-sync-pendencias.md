@@ -9,11 +9,11 @@ Atualizado em: 2026-07-10
 
 ## Alteracoes pendentes
 
-Registradas em 10/07/2026 (sessao Claude Code SEM MCP ClickUp autenticado — sincronizar na
-proxima sessao com acesso ao board):
+Nenhuma. Todas as 8 registradas em 10/07/2026 foram aplicadas no board via MCP ClickUp na sessao
+de 10/07/2026 (validacao cruzada plano x codigo x ClickUp):
 
-| CU | Item | Status alvo |
-|----|------|-------------|
+| CU | Item | Status aplicado |
+|----|------|------------------|
 | `868kaa3cg` | S9 — compose de producao (backend/web/Caddy/backup) | `✅ concluída` |
 | `868kaa3dz` | S12 — auditoria Python automatizada (CI pip-audit) | `✅ concluída` |
 | `868k60w1k` | Fase 4 — `/painel` redireciona para `/painel/visao-geral` | `✅ concluída` |
@@ -32,4 +32,3 @@ Ultima sincronizacao real aplicada em 09/07/2026 (sessao Claude Code, via MCP Cl
 2. Mover a subtarefa para o status alvo indicado no `docs/plano-implementacao.md`.
 3. Se possivel, comentar no ClickUp o resumo tecnico correspondente.
 4. Depois da sincronizacao real, remover a linha da tabela acima ou marcar como resolvida.
-

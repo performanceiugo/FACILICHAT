@@ -102,6 +102,24 @@ async def revogarFamilia(db: AsyncSession, familiaID: uuid.UUID) -> None:
     await db.commit()
 
 
+# Revoga TODAS as famílias de refresh de um usuário (item S14: troca de senha e mudança de
+# função) — diferente de `revogarFamilia`, que só encerra UMA sessão/dispositivo, esta encerra
+# TODOS os dispositivos logados daquele usuário de uma vez. Usada quando o nível de acesso do
+# usuário muda (OWASP Session Management Cheat Sheet: regenerar/invalidar sessão em troca de
+# senha e em mudança de privilégio). Não revoga o `jti` do access token em uso agora — quem chama
+# esta função também deve denylistar o `jti` da própria requisição quando o tiver à mão (ver
+# `servicos/revogacao.py`); sem isso, o access token do usuário-alvo permanece válido até expirar
+# (no máximo 15min, pela janela curta do item S15).
+async def revogarTodasFamiliasDoUsuario(db: AsyncSession, usuarioID: uuid.UUID) -> None:
+    agora = agoraUtc()
+    resultado = await db.execute(
+        select(RefreshToken).where(RefreshToken.UsuarioID == usuarioID, RefreshToken.RevogadoEm.is_(None))
+    )
+    for registro in resultado.scalars():
+        registro.RevogadoEm = agora
+    await db.commit()
+
+
 # Localiza a família a partir do valor bruto do token, sem rotacionar nada — usada pelo logout,
 # que recebe o refresh token ainda "vivo" e só precisa do FamiliaID para revogar tudo.
 async def obterFamiliaPorValor(db: AsyncSession, valorRecebido: str) -> uuid.UUID | None:
