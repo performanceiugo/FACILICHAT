@@ -79,6 +79,11 @@ classifica cada item como OK/ATENÇÃO/CRÍTICO.
    da edição e diga qual item/`CU:` será alterado.
 4. Nunca reorganize, compacte, renomeie ou "limpe" o plano por iniciativa própria.
 5. O `CU:` do ClickUp é a chave de rastreabilidade; nunca remova nem substitua sem confirmação.
+6. **Toda subtarefa nova criada no ClickUp precisa sair classificada com as tags do padrão já em
+   uso** (`backend`, `frontend-web`, `frontend-mobile`, `seguranca`, `qa-validacao`,
+   `docs-operacao`, `manutencao-versoes`, etc.) — confira com `clickup_get_task`/`clickup_search`
+   quais tags já existem no Space e siga o mesmo padrão, em vez de deixar a tarefa sem classificação
+   ou inventar uma tag nova sem necessidade.
 
 **Frase mínima antes de editar o plano:**
 ```text
