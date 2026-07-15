@@ -1,35 +1,14 @@
 'use client'
 
 // Página de supervisores do painel do Gestor.
-// O layout já representa a experiência final, mas mantém um estado de integração honesto
-// enquanto o endpoint de métricas por supervisor (item 868k60w1e) não está disponível.
+// Compara métricas reais da equipe e busca a fila individual somente ao expandir um card.
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { api } from '@/lib/api'
+import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
+import type { Chamado, SupervisorRelatorio } from '@/types'
 import styles from './supervisores.module.css'
-
-// Contrato visual esperado do relatório; será movido para os tipos globais quando o backend existir.
-interface SupervisorResumo {
-  ID: string
-  Nome: string
-  Abertos: number
-  Atrasados: number
-  PrimeiraRespostaMinutos: number | null
-  Chamados: SupervisorChamadoResumo[]
-}
-
-// Recorte mínimo de um chamado exibido ao expandir o card de um supervisor.
-interface SupervisorChamadoResumo {
-  ID: string
-  Categoria: string
-  Resumo: string | null
-  Prioridade: 'Baixa' | 'Media' | 'Alta' | 'Critica'
-  Status: 'Recebido' | 'EmAndamento' | 'Agendado' | 'Concluido' | 'Cancelado'
-}
-
-// A lista permanece vazia até que o item de backend 868k60w1e forneça dados reais do tenant.
-// Não usamos fixtures: a demonstração visual não pode ser confundida com informação operacional.
-const SUPERVISORES: SupervisorResumo[] = []
 
 // Gera iniciais neutras para o avatar usando somente o nome retornado pelo backend.
 function obterIniciais(nome: string): string {
@@ -41,23 +20,100 @@ function obterIniciais(nome: string): string {
     .join('') || '?'
 }
 
-// Formata a métrica de primeira resposta sem fabricar um valor quando não houver lastro.
+// Formata a média sem fabricar um valor quando não houver resposta registrada.
 function formatarPrimeiraResposta(minutos: number | null): string {
   return minutos === null ? '—' : `${minutos} min`
 }
 
-export default function SupervisoresPage() {
-  // Guarda qual card está expandido; clicar novamente recolhe a fila daquele supervisor.
-  const [supervisorAbertoID, setSupervisorAbertoID] = useState<string | null>(null)
-
-  // Alterna a expansão sem navegar para uma rota que ainda depende do filtro do backend.
-  function alternarSupervisor(supervisorID: string) {
-    setSupervisorAbertoID(atual => atual === supervisorID ? null : supervisorID)
+// Traduz valores técnicos do status para a linguagem exibida no painel.
+function formatarStatus(status: Chamado['Status']): string {
+  const rotulos: Record<Chamado['Status'], string> = {
+    Recebido: 'Recebido',
+    EmAndamento: 'Em andamento',
+    Agendado: 'Agendado',
+    Concluido: 'Concluído',
+    Cancelado: 'Cancelado',
   }
+  return rotulos[status]
+}
+
+export default function SupervisoresPage() {
+  // Estado principal conserva a última leitura boa durante atualizações automáticas silenciosas.
+  const [supervisores, setSupervisores] = useState<SupervisorRelatorio[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
+  const ativoRef = useRef(true)
+  const cargaInicialConcluidaRef = useRef(false)
+
+  // Filas são armazenadas por supervisor para não refazer a chamada ao recolher e reabrir o card.
+  const [supervisorAbertoID, setSupervisorAbertoID] = useState<string | null>(null)
+  const [filas, setFilas] = useState<Record<string, Chamado[]>>({})
+  const [filasCarregando, setFilasCarregando] = useState<Record<string, boolean>>({})
+  const [errosFila, setErrosFila] = useState<Record<string, string>>({})
+
+  // Busca métricas iniciais e atualizações periódicas sem apagar dados bons quando uma falhar.
+  const buscarSupervisores = useCallback(async () => {
+    try {
+      const dados = await api.relatorios.supervisores()
+      if (!ativoRef.current) return
+      setSupervisores(dados)
+      setErro('')
+    } catch (e) {
+      if (ativoRef.current && !cargaInicialConcluidaRef.current) {
+        setErro(e instanceof Error ? e.message : 'Não foi possível carregar os supervisores.')
+      }
+    } finally {
+      if (ativoRef.current) {
+        cargaInicialConcluidaRef.current = true
+        setCarregando(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    ativoRef.current = true
+    buscarSupervisores()
+    return () => { ativoRef.current = false }
+  }, [buscarSupervisores])
+
+  useAtualizacaoPeriodica(buscarSupervisores)
+
+  // Carrega a fila real na primeira abertura; tentativas com erro podem ser refeitas ao clicar.
+  async function carregarFila(supervisorID: string) {
+    setFilasCarregando(atual => ({ ...atual, [supervisorID]: true }))
+    setErrosFila(atual => ({ ...atual, [supervisorID]: '' }))
+    try {
+      const chamados = await api.chamados.listarPorSupervisor(supervisorID)
+      if (ativoRef.current) setFilas(atual => ({ ...atual, [supervisorID]: chamados }))
+    } catch (e) {
+      if (ativoRef.current) {
+        setErrosFila(atual => ({
+          ...atual,
+          [supervisorID]: e instanceof Error ? e.message : 'Não foi possível carregar esta fila.',
+        }))
+      }
+    } finally {
+      if (ativoRef.current) setFilasCarregando(atual => ({ ...atual, [supervisorID]: false }))
+    }
+  }
+
+  // Alterna o card e dispara a busca sob demanda quando a fila ainda não está em cache.
+  function alternarSupervisor(supervisorID: string) {
+    if (supervisorAbertoID === supervisorID) {
+      setSupervisorAbertoID(null)
+      return
+    }
+    setSupervisorAbertoID(supervisorID)
+    if (!filas[supervisorID] || errosFila[supervisorID]) carregarFila(supervisorID)
+  }
+
+  // Indicadores de topo são somas transparentes das métricas retornadas pelo relatório.
+  const totalAbertos = supervisores.reduce((total, supervisor) => total + supervisor.Abertos, 0)
+  const totalAtrasados = supervisores.reduce((total, supervisor) => total + supervisor.Atrasados, 0)
 
   return (
     <div className={styles.pagina}>
-      {/* Cabeçalho apresenta a finalidade operacional da tela sem prometer tempo real. */}
+      {/* Cabeçalho apresenta a finalidade operacional e o acesso à lista geral. */}
       <header className={styles.cabecalho}>
         <div>
           <p className={styles.etiqueta}>Operação</p>
@@ -66,35 +122,40 @@ export default function SupervisoresPage() {
             Compare a carga da equipe e abra a fila de cada supervisor em um só lugar.
           </p>
         </div>
-        <Link href="/painel/chamados" className={styles.acaoSecundaria}>
-          Ver todos os chamados
-        </Link>
+        <Link href="/painel/chamados" className={styles.acaoSecundaria}>Ver todos os chamados</Link>
       </header>
 
-      {/* Resumo mantém a hierarquia da tela final; travessões indicam métricas ainda sem fonte. */}
+      {/* Resumo usa somente contagens reais da Empresa autenticada. */}
       <section className={styles.resumo} aria-label="Resumo da supervisão">
         <article className={styles.resumoItem}>
-          <span>Supervisores ativos</span>
-          <strong>—</strong>
-          <small>Aguardando integração</small>
+          <span>Supervisores</span><strong>{carregando ? '—' : supervisores.length}</strong>
+          <small>Na equipe cadastrada</small>
         </article>
         <article className={styles.resumoItem}>
-          <span>Chamados atribuídos</span>
-          <strong>—</strong>
-          <small>Aguardando integração</small>
+          <span>Chamados atribuídos</span><strong>{carregando ? '—' : totalAbertos}</strong>
+          <small>Em filas abertas</small>
         </article>
         <article className={`${styles.resumoItem} ${styles.resumoAtencao}`}>
-          <span>Precisam de atenção</span>
-          <strong>—</strong>
-          <small>Aguardando integração</small>
+          <span>Precisam de atenção</span><strong>{carregando ? '—' : totalAtrasados}</strong>
+          <small>Com SLA atrasado</small>
         </article>
       </section>
 
-      {/* Cards reais serão renderizados assim que o relatório por supervisor estiver disponível. */}
-      {SUPERVISORES.length > 0 ? (
+      {carregando && <p className={styles.estado} role="status">Carregando supervisores...</p>}
+      {!carregando && erro && <p className={styles.estadoErro} role="alert">{erro}</p>}
+      {!carregando && !erro && supervisores.length === 0 && (
+        <section className={styles.estadoVazio}>
+          <h2>Nenhum supervisor cadastrado</h2>
+          <p>Quando a equipe for cadastrada, a carga operacional aparecerá aqui.</p>
+        </section>
+      )}
+
+      {/* Cada card abre sua fila real sem bloquear ou recarregar a página inteira. */}
+      {!carregando && !erro && supervisores.length > 0 && (
         <section className={styles.grade} aria-label="Lista de supervisores">
-          {SUPERVISORES.map(supervisor => {
+          {supervisores.map(supervisor => {
             const aberto = supervisorAbertoID === supervisor.ID
+            const fila = filas[supervisor.ID]
             return (
               <article key={supervisor.ID} className={styles.card}>
                 <button
@@ -106,67 +167,44 @@ export default function SupervisoresPage() {
                 >
                   <span className={styles.avatar}>{obterIniciais(supervisor.Nome)}</span>
                   <span className={styles.identidade}>
-                    <strong>{supervisor.Nome}</strong>
-                    <small>Ver fila do supervisor</small>
+                    <strong>{supervisor.Nome}</strong><small>Ver fila do supervisor</small>
                   </span>
                   <span className={styles.metricas}>
                     <span><strong>{supervisor.Abertos}</strong><small>abertos</small></span>
                     <span className={supervisor.Atrasados > 0 ? styles.metricaCritica : undefined}>
                       <strong>{supervisor.Atrasados}</strong><small>atrasados</small>
                     </span>
-                    <span><strong>{formatarPrimeiraResposta(supervisor.PrimeiraRespostaMinutos)}</strong><small>1ª resposta</small></span>
+                    <span>
+                      <strong>{formatarPrimeiraResposta(supervisor.PrimeiraRespostaMediaMinutos)}</strong>
+                      <small>1ª resposta</small>
+                    </span>
                   </span>
                   <span className={styles.chevron} aria-hidden="true">{aberto ? '−' : '+'}</span>
                 </button>
 
                 {aberto && (
                   <div id={`fila-supervisor-${supervisor.ID}`} className={styles.fila}>
-                    {supervisor.Chamados.length === 0 ? (
-                      <p className={styles.filaVazia}>Nenhum chamado aberto para este supervisor.</p>
-                    ) : (
-                      supervisor.Chamados.map(chamado => (
-                        <div key={chamado.ID} className={styles.chamado}>
-                          <div>
-                            <strong>{chamado.Categoria}</strong>
-                            <span>{chamado.Resumo ?? 'Chamado sem resumo informado.'}</span>
-                          </div>
-                          <span className={styles.chamadoMeta}>{chamado.Prioridade} · {chamado.Status}</span>
-                        </div>
-                      ))
+                    {filasCarregando[supervisor.ID] && <p className={styles.filaVazia} role="status">Carregando fila...</p>}
+                    {errosFila[supervisor.ID] && (
+                      <div className={styles.filaErro} role="alert">
+                        <span>{errosFila[supervisor.ID]}</span>
+                        <button type="button" onClick={() => carregarFila(supervisor.ID)}>Tentar novamente</button>
+                      </div>
                     )}
+                    {!filasCarregando[supervisor.ID] && !errosFila[supervisor.ID] && fila?.length === 0 && (
+                      <p className={styles.filaVazia}>Nenhum chamado atribuído a este supervisor.</p>
+                    )}
+                    {!filasCarregando[supervisor.ID] && !errosFila[supervisor.ID] && fila?.map(chamado => (
+                      <div key={chamado.ID} className={styles.chamado}>
+                        <div><strong>{chamado.Categoria}</strong><span>{chamado.Resumo ?? 'Chamado sem resumo informado.'}</span></div>
+                        <span className={styles.chamadoMeta}>{chamado.Prioridade} · {formatarStatus(chamado.Status)}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </article>
             )
           })}
-        </section>
-      ) : (
-        <section className={styles.integracao} aria-labelledby="integracao-titulo">
-          {/* Prévia sem dados mostra a anatomia dos cards sem simular pessoas ou indicadores. */}
-          <div className={styles.preview} aria-hidden="true">
-            {[0, 1, 2].map(indice => (
-              <div key={indice} className={styles.previewCard}>
-                <span className={styles.previewAvatar} />
-                <span className={styles.previewTexto}>
-                  <span />
-                  <span />
-                </span>
-                <span className={styles.previewMetricas}>
-                  <span /><span /><span />
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className={styles.integracaoMensagem}>
-            <span className={styles.integracaoIcone} aria-hidden="true">↻</span>
-            <div>
-              <h2 id="integracao-titulo">Dados da equipe em preparação</h2>
-              <p>
-                A página está pronta para receber supervisores, carga, atrasos e primeira resposta
-                assim que o relatório da operação for conectado.
-              </p>
-            </div>
-          </div>
         </section>
       )}
     </div>

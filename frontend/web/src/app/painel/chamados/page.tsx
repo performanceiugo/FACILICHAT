@@ -102,7 +102,7 @@ export default function ChamadosPage() {
       ) : (
         <div className={styles.lista}>
           {chamados.map(c => (
-            <div key={c.ID} className={styles.card}>
+            <div key={c.ID} id={`chamado-${c.ID}`} className={styles.card}>
               {/* Topo do card: categoria e fila */}
               <div className={styles.cardTopo}>
                 <span className={styles.categoria}>{c.Categoria}</span>

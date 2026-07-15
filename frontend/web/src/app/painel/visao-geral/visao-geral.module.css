@@ -108,13 +108,50 @@
 
 .painelAtencao,
 .painelGrafico,
-.painelLista {
+.painelLista,
+.painelDesempenho {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-xs);
   padding: var(--sp-5);
 }
+
+/* Tabela de desempenho ocupa a largura e mantém leitura horizontal segura em telas estreitas. */
+.painelDesempenho { padding: var(--sp-5); }
+.tabelaContainer { margin-top: var(--sp-4); overflow-x: auto; }
+.tabelaDesempenho { border-collapse: collapse; min-width: 680px; width: 100%; }
+.tabelaDesempenho th,
+.tabelaDesempenho td {
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-default);
+  font-size: var(--fs-sm);
+  padding: var(--sp-3);
+  text-align: left;
+}
+.tabelaDesempenho th { color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
+.tabelaDesempenho td:first-child { display: flex; flex-direction: column; gap: var(--sp-1); }
+.tabelaDesempenho td:first-child strong { color: var(--text-strong); }
+.tabelaDesempenho td:first-child small { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Estado resume fatos do relatório: gargalo, ausência de fila ou operação em dia. */
+.estadoSupervisor {
+  border-radius: var(--r-full);
+  display: inline-flex;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  padding: var(--sp-1) var(--sp-2);
+  white-space: nowrap;
+}
+.estadoSupervisor--atencao { background: var(--warning-50); color: var(--warning-700); }
+.estadoSupervisor--neutro { background: var(--bg-subtle); color: var(--text-muted); }
+.estadoSupervisor--sucesso { background: var(--success-50); color: var(--success-700); }
+
+/* Atalho secundário mantém a navegação para o detalhe da equipe. */
+.linkDetalhe { color: var(--blue-700); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+
+/* Compensa a navegação fixa ao acessar o atalho #atencao da sidebar. */
+.painelAtencao { scroll-margin-top: var(--sp-6); }
 
 /* Título + descrição de cada painel, no topo do card */
 .secaoTopo {
@@ -175,6 +212,12 @@
   color: var(--warning-700);
 }
 
+/* Oportunidade usa azul: é um chamado real da fila Comercial, ainda sem proposta da Fase 6. */
+.prioridade--oportunidade {
+  background: var(--blue-50);
+  color: var(--blue-700);
+}
+
 .prioridade--neutro {
   background: var(--bg-subtle);
   color: var(--text-muted);
@@ -207,6 +250,14 @@
 
 .atencaoMeta {
   color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-align: right;
+}
+
+/* Atalho explícito reforça que cada alerta abre o chamado rastreável correspondente. */
+.atalhoChamado {
+  color: var(--blue-700);
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   text-align: right;

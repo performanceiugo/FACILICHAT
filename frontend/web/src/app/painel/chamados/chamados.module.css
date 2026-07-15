@@ -40,6 +40,13 @@
   transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
+/* O atalho do painel posiciona e destaca temporariamente o chamado escolhido. */
+.card { scroll-margin-top: var(--sp-6); }
+.card:target {
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-50);
+}
+
 /* Feedback sutil de hover — não é clicável ainda, mas antecipa a interação futura (abrir chat) */
 .card:hover {
   box-shadow: var(--shadow-sm);

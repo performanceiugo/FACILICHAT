@@ -1,15 +1,17 @@
 # Rotas de relatorios executivos do Gestor.
 # Consolida metricas reais dos chamados sem misturar dados entre Empresas.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import and_, case, func, select
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modelos.Chamados import Chamado, ChamadoStatus
+from app.modelos.CoberturaTurno import CoberturaTurno
+from app.modelos.Empresa import EmpresaConfiguracao
 from app.modelos.Mensagens import AutorTipo, Mensagem
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
@@ -36,6 +38,67 @@ class SupervisorRelatorioSaida(BaseModel):
     Abertos: int
     Atrasados: int
     PrimeiraRespostaMediaMinutos: float | None
+
+
+# Configuração efetiva do alerta de gargalo para a Empresa autenticada.
+class ConfiguracaoGargaloSaida(BaseModel):
+    LimiteGargaloHoras: int
+
+
+# Alteração controlada do limite; evita valores inúteis ou abusivamente altos.
+class ConfiguracaoGargaloAtualizar(BaseModel):
+    LimiteGargaloHoras: int = Field(ge=1, le=720)
+
+
+# Chamado parado além do limite, com duração sempre derivada da última atualização.
+class GargaloSaida(BaseModel):
+    ID: UUID
+    Categoria: str
+    Resumo: str | None
+    SupervisorID: UUID | None
+    Atualizacao: datetime
+    TempoParadoHoras: float
+    LimiteGargaloHoras: int
+
+
+# Cobertura atual ou futura que ainda não possui Funcionário confirmado.
+class CoberturaDescobertaSaida(BaseModel):
+    ID: UUID
+    CondominioID: UUID
+    Posto: str
+    Turno: str
+    Inicio: datetime
+    Fim: datetime
+
+
+# Lastro objetivo do desempenho: volume atribuído, fechamento real e gargalos ativos.
+class DesempenhoSupervisorSaida(BaseModel):
+    ID: UUID
+    Nome: str
+    Recebidos: int
+    Resolvidos: int
+    Parados: int
+    TaxaResolucaoPercentual: float | None
+
+
+# Padrão inicial usado somente enquanto a Empresa ainda não salvou sua configuração própria.
+LIMITE_GARGALO_PADRAO_HORAS = 72
+
+
+# Garante que relatórios e edição compartilhem a mesma regra de autorização do Gestor.
+def exigirGestor(usuarioAtual: Usuario, detalhe: str) -> None:
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail=detalhe)
+
+
+# Lê o limite persistido do tenant ou devolve o padrão inicial sem criar dados em um GET.
+async def obterLimiteGargalo(db: AsyncSession, empresaID: UUID) -> int:
+    limite = await db.scalar(
+        select(EmpresaConfiguracao.LimiteGargaloHoras).where(
+            EmpresaConfiguracao.EmpresaID == empresaID
+        )
+    )
+    return limite if limite is not None else LIMITE_GARGALO_PADRAO_HORAS
 
 
 # GET /relatorios/visao-geral — calcula os quatro KPIs previstos para o dashboard.
@@ -121,6 +184,181 @@ async def obterVisaoGeral(
         ResolucaoMediaMinutos=round(float(resolucaoMedia), 2) if resolucaoMedia is not None else None,
         AtualizadoEm=agora,
     )
+
+
+# GET /relatorios/configuracao-gargalo — expõe o limite efetivo da Empresa ao Gestor.
+@roteador.get("/configuracao-gargalo", response_model=ConfiguracaoGargaloSaida)
+async def obterConfiguracaoGargalo(
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+):
+    exigirGestor(usuarioAtual, "Sem permissão para acessar a configuração de gargalo")
+    limite = await obterLimiteGargalo(db, usuarioAtual.EmpresaID)
+    return ConfiguracaoGargaloSaida(LimiteGargaloHoras=limite)
+
+
+# PATCH /relatorios/configuracao-gargalo — persiste o limite somente no tenant autenticado.
+@roteador.patch("/configuracao-gargalo", response_model=ConfiguracaoGargaloSaida)
+async def atualizarConfiguracaoGargalo(
+    payload: ConfiguracaoGargaloAtualizar,
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+):
+    exigirGestor(usuarioAtual, "Sem permissão para alterar a configuração de gargalo")
+    configuracao = await db.scalar(
+        select(EmpresaConfiguracao).where(
+            EmpresaConfiguracao.EmpresaID == usuarioAtual.EmpresaID
+        )
+    )
+    if configuracao is None:
+        configuracao = EmpresaConfiguracao(
+            EmpresaID=usuarioAtual.EmpresaID,
+            LimiteGargaloHoras=payload.LimiteGargaloHoras,
+        )
+        db.add(configuracao)
+    else:
+        configuracao.LimiteGargaloHoras = payload.LimiteGargaloHoras
+    await db.commit()
+    return ConfiguracaoGargaloSaida(LimiteGargaloHoras=configuracao.LimiteGargaloHoras)
+
+
+# GET /relatorios/gargalos — lista chamados ativos parados além do limite configurado.
+@roteador.get("/gargalos", response_model=list[GargaloSaida])
+async def obterGargalos(
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+):
+    exigirGestor(usuarioAtual, "Sem permissão para acessar os gargalos")
+    agora = agoraUtc()
+    limite = await obterLimiteGargalo(db, usuarioAtual.EmpresaID)
+    instanteLimite = agora - timedelta(hours=limite)
+    statusFinais = (ChamadoStatus.Concluido, ChamadoStatus.Cancelado)
+
+    # Atualizacao é a única fonte do tempo parado; registros sem esse fato não são estimados.
+    resultado = await db.execute(
+        select(Chamado)
+        .where(
+            Chamado.EmpresaID == usuarioAtual.EmpresaID,
+            Chamado.Status.not_in(statusFinais),
+            Chamado.Atualizacao.is_not(None),
+            Chamado.Atualizacao <= instanteLimite,
+        )
+        .order_by(Chamado.Atualizacao.asc())
+    )
+    return [
+        GargaloSaida(
+            ID=chamado.ID,
+            Categoria=chamado.Categoria,
+            Resumo=chamado.Resumo,
+            SupervisorID=chamado.SupervisorID,
+            Atualizacao=chamado.Atualizacao,
+            TempoParadoHoras=round((agora - chamado.Atualizacao).total_seconds() / 3600, 2),
+            LimiteGargaloHoras=limite,
+        )
+        for chamado in resultado.scalars().all()
+    ]
+
+
+# GET /relatorios/coberturas-descobertas — alerta o Gestor antes ou durante o turno sem responsável.
+@roteador.get("/coberturas-descobertas", response_model=list[CoberturaDescobertaSaida])
+async def obterCoberturasDescobertas(
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+):
+    exigirGestor(usuarioAtual, "Sem permissão para acessar as coberturas descobertas")
+    agora = agoraUtc()
+
+    # Turnos encerrados deixam de exigir ação; confirmação requer responsável e momento registrado.
+    resultado = await db.execute(
+        select(CoberturaTurno)
+        .where(
+            CoberturaTurno.EmpresaID == usuarioAtual.EmpresaID,
+            CoberturaTurno.Fim >= agora,
+            or_(
+                CoberturaTurno.ResponsavelID.is_(None),
+                CoberturaTurno.ConfirmadaEm.is_(None),
+            ),
+        )
+        .order_by(CoberturaTurno.Inicio)
+    )
+    return [
+        CoberturaDescobertaSaida(
+            ID=cobertura.ID,
+            CondominioID=cobertura.CondominioID,
+            Posto=cobertura.Posto,
+            Turno=cobertura.Turno,
+            Inicio=cobertura.Inicio,
+            Fim=cobertura.Fim,
+        )
+        for cobertura in resultado.scalars().all()
+    ]
+
+
+# GET /relatorios/desempenho-supervisores — compara fatos de atribuição e fechamento, sem nota subjetiva.
+@roteador.get("/desempenho-supervisores", response_model=list[DesempenhoSupervisorSaida])
+async def obterDesempenhoSupervisores(
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+):
+    exigirGestor(usuarioAtual, "Sem permissão para acessar o desempenho dos supervisores")
+    agora = agoraUtc()
+    limite = await obterLimiteGargalo(db, usuarioAtual.EmpresaID)
+    instanteLimite = agora - timedelta(hours=limite)
+    statusFinais = (ChamadoStatus.Concluido, ChamadoStatus.Cancelado)
+
+    # Outer join conserva supervisores sem amostra e todos os casos ficam escopados ao tenant.
+    resultado = await db.execute(
+        select(
+            Usuario.ID,
+            Usuario.Nome,
+            func.count(Chamado.ID).label("Recebidos"),
+            func.count(
+                case((Chamado.Status == ChamadoStatus.Concluido, Chamado.ID))
+            ).label("Resolvidos"),
+            func.count(
+                case(
+                    (
+                        and_(
+                            Chamado.Status.not_in(statusFinais),
+                            Chamado.Atualizacao.is_not(None),
+                            Chamado.Atualizacao <= instanteLimite,
+                        ),
+                        Chamado.ID,
+                    )
+                )
+            ).label("Parados"),
+        )
+        .outerjoin(
+            Chamado,
+            and_(
+                Chamado.SupervisorID == Usuario.ID,
+                Chamado.EmpresaID == usuarioAtual.EmpresaID,
+            ),
+        )
+        .where(
+            Usuario.EmpresaID == usuarioAtual.EmpresaID,
+            Usuario.Funcao == UsuarioFuncao.Supervisor,
+        )
+        .group_by(Usuario.ID, Usuario.Nome)
+        .order_by(Usuario.Nome)
+    )
+
+    # Taxa só existe quando há chamados recebidos; zero amostra permanece explicitamente nulo.
+    return [
+        DesempenhoSupervisorSaida(
+            ID=linha.ID,
+            Nome=linha.Nome,
+            Recebidos=linha.Recebidos,
+            Resolvidos=linha.Resolvidos,
+            Parados=linha.Parados,
+            TaxaResolucaoPercentual=(
+                round((linha.Resolvidos / linha.Recebidos) * 100, 2)
+                if linha.Recebidos > 0
+                else None
+            ),
+        )
+        for linha in resultado
+    ]
 
 
 # GET /relatorios/supervisores — compara carga e primeira resposta com lastro real.

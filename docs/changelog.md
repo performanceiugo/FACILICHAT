@@ -7,6 +7,88 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fase 4 — desempenho por supervisor com lastro (`CU: 868k7vrwh`)
+- **Relatório objetivo:** `GET /relatorios/desempenho-supervisores` retorna recebidos (atribuições),
+  resolvidos (`Concluido`), parados (`Atualizacao` além do limite configurável) e taxa de resolução.
+- **Sem ranking inventado:** supervisores sem chamados permanecem na resposta com contagens zero e
+  taxa `null`; não há nota subjetiva.
+- **Validado:** Roberto Supervisor retornou 7 recebidos, 2 resolvidos e 28,57%; parados mudou de
+  3 para 5 ao reduzir temporariamente o limite 72h→1h, depois restaurado para 72h.
+- Arquivo: `backend/app/rotas/Relatorios.py`.
+
+### Fase 4 — alerta de cobertura descoberta (`CU: 868k7vrw8`)
+- **Fonte estruturada:** nova entidade `CoberturaTurno` registra Empresa, condomínio, posto, turno,
+  início/fim, Funcionário responsável e momento da confirmação; nenhuma regra interpreta texto.
+- **Operação:** Supervisor e Gestor podem registrar/listar coberturas e confirmar um Funcionário do
+  mesmo tenant pelas rotas `/coberturas`.
+- **Alerta:** `GET /relatorios/coberturas-descobertas`, exclusivo do Gestor, lista períodos atuais ou
+  futuros sem responsável confirmado; turnos encerrados deixam de exigir ação.
+- **Isolamento:** tabela com `EmpresaID`, filtros explícitos e RLS forçada.
+- **Validado:** duas descobertas passaram a uma após confirmação; responsável/data foram
+  persistidos e turno passado foi excluído. Banco dev resetado, recriado e deixado limpo ao final.
+- Arquivos: `backend/app/modelos/CoberturaTurno.py`, `modelos/__init__.py`,
+  `backend/app/rotas/Coberturas.py`, `Relatorios.py`, `backend/app/main.py`, `backend/app/rls.sql`.
+
+### Fase 4 — alerta configurável de gargalo (`CU: 868k7vrvm`)
+- **Configuração por Empresa:** nova tabela `EmpresaConfiguracoes` persiste
+  `LimiteGargaloHoras`, com padrão efetivo de 72h e isolamento por `EmpresaID`/RLS.
+- **Gestão:** Gestor consulta e altera o limite por `GET/PATCH /relatorios/configuracao-gargalo`;
+  valores aceitos ficam entre 1 e 720 horas.
+- **Relatório:** `GET /relatorios/gargalos` lista apenas chamados ativos parados além do limite e
+  calcula `TempoParadoHoras` a partir de `Chamado.Atualizacao`, sem duração armazenada ou estimada.
+- **Compatibilidade:** a nova tabela é criada idempotentemente por `create_all`, sem exigir reset ou
+  `ALTER TABLE` nas instalações existentes enquanto Alembic permanece pendente.
+- **Validado:** limite 72→24→72, gargalos 4→8, todas as durações respeitando o limite e payload
+  zero rejeitado com `422`; políticas RLS reaplicadas com sucesso.
+- Arquivos: `backend/app/modelos/Empresa.py`, `modelos/__init__.py`,
+  `backend/app/rotas/Relatorios.py`, `backend/app/rls.sql`, `docs/tecnico-backend.md`.
+
+### Fase 4 — painel “O que precisa da sua atenção” (`CU: 868k7vrx5`)
+- **Três tipos reais:** chamados abertos são apresentados como Crítico, Atenção ou Oportunidade;
+  oportunidade significa fila Comercial já persistida, sem alegar detecção de IA antes da Fase 5.
+- **Rastreabilidade:** cada alerta abre diretamente o card correspondente em Todos os tickets e o
+  destino recebe realce azul por `:target`.
+- **Ordem operacional:** críticos aparecem primeiro, depois atenções e oportunidades; dentro do
+  tipo, prioridade e antiguidade organizam a leitura.
+- **Validado:** `tsc --noEmit`, 2 críticos e 5 atenções reais no banco local, destinos sem erro de
+  runtime e aprovação visual do usuário. Não havia oportunidade aberta e nenhum dado foi inventado.
+- Arquivos: `frontend/web/src/app/painel/visao-geral/page.tsx`, `visao-geral.module.css`,
+  `frontend/web/src/app/painel/chamados/page.tsx`, `chamados.module.css`.
+
+### Fase 4 — navegação completa do painel (`CU: 868k60w2w`)
+- **Sidebar:** adicionados os atalhos Visão geral, Supervisores, Todos os tickets e Alertas, com
+  ícones de linha, estado ativo e `aria-current` nas rotas principais.
+- **Destino honesto:** Alertas aponta para `#atencao` na Visão geral; não foi criada uma rota vazia
+  nem antecipada a página de oportunidades comerciais prevista para a Fase 6.
+- **Validado:** `tsc --noEmit`, destinos com resposta `200` e aprovação visual do usuário.
+- Arquivos: `frontend/web/src/components/painel/AdminShell.tsx`,
+  `frontend/web/src/app/painel/visao-geral/page.tsx`, `visao-geral.module.css`.
+
+### Fase 4 — página de Supervisores com dados reais (`CU: 868k60w2a`)
+- **Métricas da equipe:** `/painel/supervisores` passou a consumir o relatório real de supervisores
+  e derivar dele os totais de equipe, chamados abertos e SLA atrasado.
+- **Fila sob demanda:** abrir um card consulta `GET /chamados/?supervisor_id={UUID}`; cada fila tem
+  carregamento, erro com repetição e cache próprios, sem bloquear os demais cards.
+- **Sem dados simulados:** estados vazio e sem amostra permanecem explícitos; nomes, contagens e
+  chamados vêm sempre da Empresa autenticada.
+- **Atualização:** métricas usam polling de ~20 segundos e mantêm a última leitura boa em falha de
+  fundo; a fila expandida conserva o recorte carregado no clique.
+- **Validado:** `tsc --noEmit`, resposta `200` sem erro de runtime e aprovação visual do usuário.
+- Arquivos: `frontend/web/src/app/painel/supervisores/page.tsx`, `supervisores.module.css`,
+  `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts`, `docs/tecnico-frontend.md`.
+
+### Fase 4 — fila de chamados por supervisor (`CU: 868k60w1g`)
+- **Filtro do Gestor:** `GET /chamados/?supervisor_id={UUID}` retorna somente os chamados
+  atribuídos ao supervisor solicitado, preservando a ordenação decrescente por criação.
+- **Isolamento e autorização:** o filtro é exclusivo do Gestor; o supervisor precisa existir com
+  esse perfil na mesma Empresa. Outros perfis recebem `403` e UUID inexistente, de outro tenant ou
+  de outro perfil recebe `404`, sem permitir enumeração entre Empresas.
+- **Compatibilidade:** chamadas sem `supervisor_id` mantêm a visibilidade anterior — Gestor e
+  Supervisor veem todos os chamados da Empresa; Cliente vê somente os próprios.
+- **Validado na API real:** supervisor válido retornou 7 chamados (`200`) e todos tinham a
+  atribuição solicitada; UUID inexistente retornou `404`; uso pelo Supervisor retornou `403`.
+- Arquivos: `backend/app/rotas/Chamados.py`, `docs/tecnico-backend.md`.
+
 ### Fechada a seção 📄 Documentação do levantamento (`D1`, `D2`, `D4`, `D5`, `D7`, `D8`)
 - **`D1`/`D7` — enums `AutorTipo` divergentes:** as duas ocorrências de `Humano/IA/Sistema` no
   `plano-implementacao.md` (item histórico da Fase 0 e notas rápidas de arquitetura) foram

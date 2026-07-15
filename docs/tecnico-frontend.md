@@ -128,14 +128,35 @@ sem mexer no cliente. Exemplos: `painel/chamados/page.tsx`, `painel/visao-geral/
 
 ### Supervisores (`/painel/supervisores`)
 
-A página de supervisores é o recorte frontend-first do item `868k60w2a`. O componente já contém o
-contrato visual dos cards expansíveis, métricas de carga/atraso/primeira resposta e a fila resumida
-de cada supervisor. Até o endpoint `GET /relatorios/supervisores` (`868k60w1e`) ser implementado, a
-tela exibe um estado de integração com skeletons e travessões — nunca fixtures, nomes ou números
-fictícios que possam ser confundidos com dados da Empresa.
+A página de supervisores conclui o item `868k60w2a` com dados reais dos endpoints
+`GET /relatorios/supervisores` e `GET /chamados/?supervisor_id={UUID}`. Os indicadores de topo são
+derivados das métricas da equipe; cada card apresenta abertos, atrasados e primeira resposta média.
+Ao expandir, a fila daquele supervisor é buscada sob demanda e mantida em cache para reaberturas.
+Carregamento e erro da fila são isolados por card, sem bloquear os demais supervisores, e ausência
+de dados continua explícita — nunca são usados nomes ou números fictícios.
 
-O link na sidebar permanece separado porque pertence ao item `868k60w2w`; durante este recorte a
-rota pode ser acessada diretamente em `/painel/supervisores`.
+A lista de métricas usa a atualização automática existente a cada ~20 segundos, preservando a
+última leitura boa se uma atualização de fundo falhar. A fila aberta não é substituída durante esse
+polling; ela representa o recorte carregado quando o Gestor abriu o card.
+
+O link na sidebar permanece separado porque pertence ao item `868k60w2w`; a rota também pode ser
+acessada diretamente em `/painel/supervisores`.
+
+### Navegação do painel
+
+A sidebar concluída no item `868k60w2w` oferece quatro destinos: Visão geral
+(`/painel/visao-geral`), Supervisores (`/painel/supervisores`), Todos os tickets
+(`/painel/chamados`) e Alertas (`/painel/visao-geral#atencao`). O último é uma âncora para o painel
+operacional já existente; a página de oportunidades comerciais continua reservada para a Fase 6.
+As rotas principais expõem `aria-current="page"` e conservam o destaque visual azul.
+
+### Painel de atenção
+
+O item `868k7vrx5` classifica chamados abertos em três tipos: **Crítico** (prioridade crítica),
+**Oportunidade** (fila Comercial já roteada) e **Atenção** (alta prioridade ou ainda recebido).
+Essa classificação não antecipa a IA: somente a fila persistida permite usar “Oportunidade”. Cada
+linha aponta para `/painel/chamados#chamado-{UUID}`; o card de destino usa `:target` para receber
+foco visual azul e preservar a rastreabilidade do alerta até o ticket.
 
 ### Padrão do cliente HTTP (`lib/api.ts`)
 

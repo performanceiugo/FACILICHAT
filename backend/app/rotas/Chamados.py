@@ -83,11 +83,31 @@ async def criarChamadosIrmaos(
 @roteador.get("/", response_model=list[ChamadoSaida])
 async def listarChamados(
     db: AsyncSession = Depends(obterBancoDadosComTenant),
-    usuarioAtual: Usuario = Depends(obterUsuarioAtual)
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    supervisor_id: uuid.UUID | None = None,
 ):
     # Regra de ouro do multi-tenant: toda consulta é filtrada pela Empresa do usuário logado,
     # antes de qualquer outra regra de visibilidade por papel.
     consulta = select(Chamado).where(Chamado.EmpresaID == usuarioAtual.EmpresaID)
+
+    # O filtro individual existe para a visão operacional do Gestor. Validar o papel e o tenant do
+    # supervisor evita que o UUID seja usado para consultar ou enumerar usuários de outra Empresa.
+    if supervisor_id is not None:
+        if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+            raise HTTPException(status_code=403, detail="Somente o Gestor pode filtrar por supervisor")
+
+        supervisorResultado = await db.execute(
+            select(Usuario.ID).where(
+                Usuario.ID == supervisor_id,
+                Usuario.EmpresaID == usuarioAtual.EmpresaID,
+                Usuario.Funcao == UsuarioFuncao.Supervisor,
+            )
+        )
+        if supervisorResultado.scalar_one_or_none() is None:
+            raise HTTPException(status_code=404, detail="Supervisor não encontrado")
+
+        # Retorna somente a fila atribuída ao supervisor validado, mantendo a ordem mais recente.
+        consulta = consulta.where(Chamado.SupervisorID == supervisor_id)
     if usuarioAtual.Funcao in (UsuarioFuncao.Gestor, UsuarioFuncao.Supervisor):
         # Acesso total dentro da Empresa: retorna todos os chamados em ordem cronológica decrescente
         resultado = await db.execute(consulta.order_by(Chamado.Criacao.desc()))

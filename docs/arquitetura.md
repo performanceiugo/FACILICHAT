@@ -133,7 +133,9 @@ FACILICHAT/
 │       ├── banco_dados.py       ← conexão e sessão do banco
 │       ├── modelos/             ← tabelas do banco de dados
 │       │   ├── Usuarios.py
+│       │   ├── Empresa.py           ← Empresa + configuração operacional 1:1 por tenant
 │       │   ├── Chamados.py
+│       │   ├── CoberturaTurno.py     ← posto/turno e confirmação de responsável por tenant
 │       │   └── Mensagens.py
 │       └── rotas/               ← endpoints da API
 │           ├── Autenticacao.py

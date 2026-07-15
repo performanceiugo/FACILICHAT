@@ -36,3 +36,15 @@ ALTER TABLE "Condominios" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolamento ON "Condominios";
 CREATE POLICY tenant_isolamento ON "Condominios"
     USING ("EmpresaID" = current_setting('app.empresa_id', true)::uuid);
+
+ALTER TABLE "EmpresaConfiguracoes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "EmpresaConfiguracoes" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolamento ON "EmpresaConfiguracoes";
+CREATE POLICY tenant_isolamento ON "EmpresaConfiguracoes"
+    USING ("EmpresaID" = current_setting('app.empresa_id', true)::uuid);
+
+ALTER TABLE "CoberturasTurno" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "CoberturasTurno" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolamento ON "CoberturasTurno";
+CREATE POLICY tenant_isolamento ON "CoberturasTurno"
+    USING ("EmpresaID" = current_setting('app.empresa_id', true)::uuid);

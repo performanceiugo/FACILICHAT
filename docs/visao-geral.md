@@ -62,7 +62,9 @@ O branding define **7 perfis** — **todos já implementados no sistema**:
 - Área de login com a identidade visual da marca
 - **Visão geral executiva** com indicadores reais: chamados abertos, SLA vencido, tempo médio de primeira resposta e de resolução, distribuição por status, volume por fila e por categoria, e lista do que precisa de atenção
 - Lista de chamados com atualização automática (estilo painel de BI, sem precisar recarregar a página)
-- Tela de supervisores (estrutura pronta, aguardando os dados por supervisor)
+- Tela de supervisores com carga, atrasos e primeira resposta reais; cada card abre a fila atribuída daquele supervisor
+- Navegação lateral para Visão geral, Supervisores, Todos os tickets e Alertas operacionais
+- Painel de atenção com críticos, atenções e itens já encaminhados ao Comercial, todos ligados ao chamado de origem
 - Navegação acessível por teclado e leitores de tela; páginas de erro amigáveis em português
 
 ### Aplicativo Mobile

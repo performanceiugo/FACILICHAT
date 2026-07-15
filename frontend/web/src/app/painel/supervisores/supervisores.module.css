@@ -221,6 +221,51 @@
   font-size: var(--fs-xs);
 }
 
+/* Estados da página mantêm feedback assíncrono legível e alinhado aos demais painéis. */
+.estado,
+.estadoErro,
+.estadoVazio {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  padding: var(--sp-5);
+}
+
+/* Erros usam a cor semântica e permanecem anunciáveis pelo role definido no componente. */
+.estadoErro {
+  background: var(--danger-50);
+  border-color: var(--danger-500);
+  color: var(--danger-700);
+}
+
+/* Estado vazio explica o próximo passo sem simular integrantes da equipe. */
+.estadoVazio h2 { color: var(--text-strong); font-size: var(--fs-base); }
+.estadoVazio p { margin-top: var(--sp-1); }
+
+/* Falha isolada de uma fila oferece repetição sem derrubar os outros cards. */
+.filaErro {
+  align-items: center;
+  color: var(--danger-700);
+  display: flex;
+  font-size: var(--fs-xs);
+  gap: var(--sp-3);
+  justify-content: space-between;
+  padding: var(--sp-3) 0;
+}
+
+.filaErro button {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  color: var(--text-default);
+  cursor: pointer;
+  font: inherit;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+}
+
 /* Estado de integração usa um painel real, não uma página vazia ou dados inventados. */
 .integracao {
   background: var(--bg-surface);

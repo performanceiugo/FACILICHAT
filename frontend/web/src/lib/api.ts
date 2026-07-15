@@ -10,7 +10,9 @@ import type {
   EmpresaCriadaResposta,
   EmpresaCriar,
   EmpresaStatus,
+  DesempenhoSupervisorRelatorio,
   Mensagem,
+  SupervisorRelatorio,
   TokenResposta,
   Usuario,
   VisaoGeralRelatorio,
@@ -179,6 +181,9 @@ export const api = {
 
   chamados: {
     listar: () => req<Chamado[]>('/chamados/'),
+    // Carrega sob demanda somente a fila do supervisor aberto pelo Gestor.
+    listarPorSupervisor: (supervisorID: string) =>
+      req<Chamado[]>(`/chamados/?supervisor_id=${encodeURIComponent(supervisorID)}`),
     criar: (payload: ChamadoCriar) =>
       req<Chamado>('/chamados/', { method: 'POST', body: JSON.stringify(payload) }),
     criarIrmaos: (payload: ChamadosIrmaosCriar) =>
@@ -190,6 +195,9 @@ export const api = {
   // Relatorios executivos sao agregados no backend para preservar permissoes e tenant.
   relatorios: {
     visaoGeral: () => req<VisaoGeralRelatorio>('/relatorios/visao-geral'),
+    supervisores: () => req<SupervisorRelatorio[]>('/relatorios/supervisores'),
+    desempenhoSupervisores: () =>
+      req<DesempenhoSupervisorRelatorio[]>('/relatorios/desempenho-supervisores'),
   },
 
   mensagens: {

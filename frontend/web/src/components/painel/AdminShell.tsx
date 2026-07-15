@@ -42,6 +42,24 @@ const IconVisaoGeral = () => (
   </svg>
 )
 
+// Ícone de equipe identifica a visão comparativa dos supervisores.
+const IconSupervisores = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+)
+
+// Ícone de alerta leva ao painel de itens que exigem ação do Gestor.
+const IconAlertas = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+)
+
 // Deriva as iniciais do nome para o avatar circular do rodapé (ex.: "Edson Gestor" → "EG")
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/)
@@ -94,6 +112,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <nav className={styles.nav} aria-label="Navegação principal">
           {(() => {
             const visaoGeralAtiva = pathname === '/painel/visao-geral' || pathname === '/painel'
+            const supervisoresAtivo = pathname?.startsWith('/painel/supervisores') ?? false
             const chamadosAtivo = pathname?.startsWith('/painel/chamados') ?? false
             return (
               <>
@@ -107,12 +126,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 </Link>
 
                 <Link
+                  href="/painel/supervisores"
+                  className={supervisoresAtivo ? styles.linkAtivo : styles.link}
+                  aria-current={supervisoresAtivo ? 'page' : undefined}
+                >
+                  <span className={styles.navIcone} aria-hidden="true"><IconSupervisores /></span>
+                  Supervisores
+                </Link>
+
+                <Link
                   href="/painel/chamados"
                   className={chamadosAtivo ? styles.linkAtivo : styles.link}
                   aria-current={chamadosAtivo ? 'page' : undefined}
                 >
                   <span className={styles.navIcone} aria-hidden="true"><IconChamados /></span>
-                  Chamados
+                  Todos os tickets
+                </Link>
+
+                <Link href="/painel/visao-geral#atencao" className={styles.link}>
+                  <span className={styles.navIcone} aria-hidden="true"><IconAlertas /></span>
+                  Alertas
                 </Link>
               </>
             )

@@ -72,6 +72,18 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Anexo | String(500) | URL do arquivo anexado (opcional) |
 | Criacao | DateTime | Data/hora do envio |
 
+### `CoberturasTurno` — Cobertura operacional estruturada
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| ID | UUID | Identificador da cobertura |
+| EmpresaID | UUID → Empresas | Tenant, com RLS forçada |
+| CondominioID | UUID → Condominios | Contrato/local atendido |
+| Posto / Turno | String | Identificação operacional do período |
+| Inicio / Fim | DateTime | Janela real da cobertura |
+| ResponsavelID | UUID → Usuarios | Funcionário confirmado; nulo enquanto descoberta |
+| ConfirmadaEm | DateTime | Momento da confirmação; nulo enquanto descoberta |
+
 ---
 
 ## Rotas da API
@@ -113,7 +125,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 |---|---|---|---|---|
 | POST | `/chamados/` | Abrir novo chamado | Sim | Qualquer perfil |
 | POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
-| GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gestor vê todos |
+| GET | `/chamados/` | Listar chamados; aceita `supervisor_id={UUID}` para retornar somente a fila atribuída a um supervisor da mesma Empresa | Sim | Sem filtro: Cliente vê só os seus e Supervisor/Gestor vê todos. Com `supervisor_id`: apenas Gestor; 404 para supervisor inexistente, de outro tenant ou com outro perfil |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gestor (403 caso contrário); chamado finalizado não reabre (409) |
 
 ### Relatórios — `/relatorios`
@@ -122,10 +134,29 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 |---|---|---|---|---|
 | GET | `/relatorios/visao-geral` | Total de chamados abertos, SLA vencido, primeira resposta média e resolução média; tempos em minutos e `null` quando não há amostra | Sim | Apenas Gestor; dados filtrados pela Empresa do token e protegidos por RLS |
 | GET | `/relatorios/supervisores` | Lista todos os supervisores da Empresa com chamados abertos, atrasados e primeira resposta média; inclui supervisores sem chamados e usa `null` quando não há resposta | Sim | Apenas Gestor; chamados e mensagens filtrados pela Empresa do token e protegidos por RLS |
+| GET | `/relatorios/configuracao-gargalo` | Retorna o limite efetivo de horas sem atualização (padrão inicial 72h) | Sim | Apenas Gestor; configuração da Empresa do token |
+| PATCH | `/relatorios/configuracao-gargalo` | Persiste `LimiteGargaloHoras` entre 1 e 720 horas | Sim | Apenas Gestor; escrita isolada por Empresa/RLS |
+| GET | `/relatorios/gargalos` | Chamados ativos parados além do limite; `TempoParadoHoras` é derivado de `Atualizacao` | Sim | Apenas Gestor; chamados e configuração da Empresa do token |
+| GET | `/relatorios/coberturas-descobertas` | Coberturas atuais/futuras sem Funcionário e confirmação | Sim | Apenas Gestor; Empresa do token/RLS |
+| GET | `/relatorios/desempenho-supervisores` | Recebidos, resolvidos, parados e taxa de resolução por supervisor; inclui zero amostra | Sim | Apenas Gestor; Empresa do token/RLS |
+
+### Coberturas — `/coberturas`
+
+| Método | Rota | Descrição | Autenticação | Permissão |
+|---|---|---|---|---|
+| POST | `/coberturas/` | Registra condomínio/posto/turno e janela ainda descoberta | Sim | Supervisor ou Gestor |
+| GET | `/coberturas/` | Lista a escala estruturada da Empresa | Sim | Supervisor ou Gestor |
+| PATCH | `/coberturas/{id}/confirmar` | Confirma um usuário com perfil Funcionário do mesmo tenant | Sim | Supervisor ou Gestor |
 
 A primeira resposta por supervisor só considera a primeira mensagem do próprio supervisor
 atribuído ao chamado, posterior à abertura. Respostas de outro usuário ou mensagens de sistema/IA
 não entram na média. Os valores são calculados no PostgreSQL e arredondados apenas na resposta.
+
+`EmpresaConfiguracoes` guarda parâmetros operacionais por tenant em uma tabela 1:1 com Empresa.
+Ela foi separada de `Empresas` para que `create_all` consiga adicioná-la a bancos existentes sem
+reset enquanto Alembic está pendente. A tabela possui `EmpresaID` como chave primária e política
+RLS forçada; ausência de linha significa o padrão inicial de 72h, e o primeiro PATCH persiste a
+escolha do Gestor.
 
 ---
 

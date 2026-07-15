@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
-import type { Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus, VisaoGeralRelatorio } from '@/types'
+import type { Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus, DesempenhoSupervisorRelatorio, SupervisorRelatorio, VisaoGeralRelatorio } from '@/types'
 import styles from './visao-geral.module.css'
 
 // Ordem canonica dos status do MVP, usada para manter os graficos estaveis mesmo com zero itens.
@@ -34,12 +34,14 @@ const PRIORIDADE_PESO: Record<ChamadoPrioridade, number> = {
   Baixa: 1,
 }
 
-// Classe semantica de cada prioridade, ancorada nos tokens de feedback do design system.
-const PRIORIDADE_TOM: Record<ChamadoPrioridade, 'critico' | 'atencao' | 'neutro' | 'sucesso'> = {
-  Critica: 'critico',
-  Alta: 'atencao',
-  Media: 'neutro',
-  Baixa: 'sucesso',
+// Tipos exibidos no painel; oportunidade significa fila Comercial já roteada, não inferência de IA.
+type AlertaTipo = 'critico' | 'atencao' | 'oportunidade'
+
+// Classifica cada chamado aberto sem fabricar SLA ou intenção comercial além da fila persistida.
+function classificarAlerta(chamado: Chamado): { tipo: AlertaTipo; rotulo: string } {
+  if (chamado.Prioridade === 'Critica') return { tipo: 'critico', rotulo: 'Crítico' }
+  if (chamado.Fila === 'Comercial') return { tipo: 'oportunidade', rotulo: 'Oportunidade' }
+  return { tipo: 'atencao', rotulo: 'Atenção' }
 }
 
 // Status finais saem da fila ativa e nao entram nos alertas de atencao.
@@ -74,6 +76,8 @@ function formatarDuracao(minutos: number | null): string {
 export default function VisaoGeralPage() {
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [relatorio, setRelatorio] = useState<VisaoGeralRelatorio | null>(null)
+  const [supervisores, setSupervisores] = useState<SupervisorRelatorio[]>([])
+  const [desempenhos, setDesempenhos] = useState<DesempenhoSupervisorRelatorio[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
@@ -83,11 +87,18 @@ export default function VisaoGeralPage() {
   // troca os dados em silencio e preserva a ultima leitura boa se uma atualizacao falhar.
   const buscarVisaoGeral = useCallback((mostrarCarregando: boolean) => {
     if (mostrarCarregando) setCarregando(true)
-    Promise.all([api.relatorios.visaoGeral(), api.chamados.listar()])
-      .then(([novoRelatorio, novosChamados]) => {
+    Promise.all([
+      api.relatorios.visaoGeral(),
+      api.chamados.listar(),
+      api.relatorios.supervisores(),
+      api.relatorios.desempenhoSupervisores(),
+    ])
+      .then(([novoRelatorio, novosChamados, novosSupervisores, novosDesempenhos]) => {
         if (!ativoRef.current) return
         setRelatorio(novoRelatorio)
         setChamados(novosChamados)
+        setSupervisores(novosSupervisores)
+        setDesempenhos(novosDesempenhos)
         if (mostrarCarregando) setErro('')
       })
       .catch(err => {
@@ -128,8 +139,12 @@ export default function VisaoGeralPage() {
       maxStatus,
       maxFila,
       atencoes: chamadosAbertos
-        .filter(chamado => ['Alta', 'Critica'].includes(chamado.Prioridade) || chamado.Status === 'Recebido')
+        .filter(chamado => chamado.Fila === 'Comercial' || ['Alta', 'Critica'].includes(chamado.Prioridade) || chamado.Status === 'Recebido')
         .sort((a, b) => {
+          // Críticos ficam no topo; depois atenção operacional e, então, sinais comerciais.
+          const tipoPeso: Record<AlertaTipo, number> = { critico: 3, atencao: 2, oportunidade: 1 }
+          const tipo = tipoPeso[classificarAlerta(b).tipo] - tipoPeso[classificarAlerta(a).tipo]
+          if (tipo !== 0) return tipo
           const prioridade = PRIORIDADE_PESO[b.Prioridade] - PRIORIDADE_PESO[a.Prioridade]
           if (prioridade !== 0) return prioridade
           return new Date(a.Criacao).getTime() - new Date(b.Criacao).getTime()
@@ -145,6 +160,18 @@ export default function VisaoGeralPage() {
     { label: '1ª resposta media', valor: formatarDuracao(relatorio?.PrimeiraRespostaMediaMinutos ?? null), detalhe: 'Ate o primeiro retorno', tom: 'warning' },
     { label: 'Resolucao media', valor: formatarDuracao(relatorio?.ResolucaoMediaMinutos ?? null), detalhe: 'Chamados concluidos', tom: 'success' },
   ] as const
+
+  // Junta os dois contratos por ID para exibir carga, resposta e estado com lastro operacional.
+  const desempenhoPorSupervisor = supervisores.map(supervisor => {
+    const desempenho = desempenhos.find(item => item.ID === supervisor.ID)
+    const estado = (desempenho?.Parados ?? 0) > 0
+      ? 'Precisa de atenção'
+      : supervisor.Abertos === 0
+        ? 'Sem fila aberta'
+        : 'Em dia'
+    const tom = (desempenho?.Parados ?? 0) > 0 ? 'atencao' : supervisor.Abertos === 0 ? 'neutro' : 'sucesso'
+    return { ...supervisor, desempenho, estado, tom }
+  })
 
   // Item B5: role="status"/"alert" dão aria-live implícito aos estados de carga e erro
   if (carregando) return <p className={styles.info} role="status">Carregando visao geral...</p>
@@ -179,11 +206,11 @@ export default function VisaoGeralPage() {
 
       {/* Linha principal: primeiro o que exige atencao, depois tendencia operacional. */}
       <section className={styles.gradePrincipal}>
-        <article className={styles.painelAtencao}>
+        <article id="atencao" className={styles.painelAtencao}>
           <div className={styles.secaoTopo}>
             <div>
               <h2 className={styles.secaoTitulo}>O que precisa da sua atencao</h2>
-              <p className={styles.secaoDescricao}>Chamados abertos com prioridade alta, critica ou ainda recebidos.</p>
+              <p className={styles.secaoDescricao}>Críticos, atenções operacionais e oportunidades já encaminhadas ao Comercial.</p>
             </div>
           </div>
 
@@ -191,18 +218,22 @@ export default function VisaoGeralPage() {
             <p className={styles.vazio}>Nada urgente na fila agora.</p>
           ) : (
             <div className={styles.listaAtencao}>
-              {resumo.atencoes.map(chamado => (
-                <div key={chamado.ID} className={styles.itemAtencao}>
-                  <span className={`${styles.prioridade} ${styles[`prioridade--${PRIORIDADE_TOM[chamado.Prioridade]}`]}`}>
-                    {chamado.Prioridade}
+              {resumo.atencoes.map(chamado => {
+                const alerta = classificarAlerta(chamado)
+                return (
+                <Link key={chamado.ID} href={`/painel/chamados#chamado-${chamado.ID}`} className={styles.itemAtencao}>
+                  <span className={`${styles.prioridade} ${styles[`prioridade--${alerta.tipo}`]}`}>
+                    {alerta.rotulo}
                   </span>
                   <div className={styles.atencaoConteudo}>
                     <strong>{chamado.Categoria}</strong>
                     <span>{chamado.Resumo ?? 'Chamado sem resumo informado.'}</span>
                   </div>
                   <span className={styles.atencaoMeta}>{diasDesde(chamado.Criacao)}d</span>
-                </div>
-              ))}
+                  <span className={styles.atalhoChamado}>Abrir chamado →</span>
+                </Link>
+                )
+              })}
             </div>
           )}
         </article>
@@ -271,6 +302,40 @@ export default function VisaoGeralPage() {
             </div>
           )}
         </article>
+      </section>
+
+      {/* Desempenho cruza carga/resposta com fechamentos e gargalos reais por supervisor. */}
+      <section className={styles.painelDesempenho} aria-labelledby="desempenho-supervisores-titulo">
+        <div className={styles.secaoTopo}>
+          <div>
+            <h2 id="desempenho-supervisores-titulo" className={styles.secaoTitulo}>Desempenho por supervisor</h2>
+            <p className={styles.secaoDescricao}>Carga, primeira resposta e estado derivados da operação registrada.</p>
+          </div>
+          <Link href="/painel/supervisores" className={styles.linkDetalhe}>Ver equipe</Link>
+        </div>
+
+        {desempenhoPorSupervisor.length === 0 ? (
+          <p className={styles.vazio}>Nenhum supervisor cadastrado.</p>
+        ) : (
+          <div className={styles.tabelaContainer}>
+            <table className={styles.tabelaDesempenho}>
+              <thead><tr><th>Supervisor</th><th>Abertos</th><th>1ª resposta</th><th>Estado</th></tr></thead>
+              <tbody>
+                {desempenhoPorSupervisor.map(supervisor => (
+                  <tr key={supervisor.ID}>
+                    <td>
+                      <strong>{supervisor.Nome}</strong>
+                      <small>{supervisor.desempenho?.Resolvidos ?? 0} de {supervisor.desempenho?.Recebidos ?? 0} resolvidos</small>
+                    </td>
+                    <td>{supervisor.Abertos}</td>
+                    <td>{formatarDuracao(supervisor.PrimeiraRespostaMediaMinutos)}</td>
+                    <td><span className={`${styles.estadoSupervisor} ${styles[`estadoSupervisor--${supervisor.tom}`]}`}>{supervisor.estado}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   )

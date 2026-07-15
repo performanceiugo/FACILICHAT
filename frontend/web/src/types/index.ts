@@ -54,6 +54,25 @@ export interface VisaoGeralRelatorio {
   AtualizadoEm: string
 }
 
+// Carga operacional de um supervisor calculada pelo backend para o painel do Gestor.
+export interface SupervisorRelatorio {
+  ID: string
+  Nome: string
+  Abertos: number
+  Atrasados: number
+  PrimeiraRespostaMediaMinutos: number | null
+}
+
+// Lastro de fechamento e gargalo do supervisor, sem nota subjetiva.
+export interface DesempenhoSupervisorRelatorio {
+  ID: string
+  Nome: string
+  Recebidos: number
+  Resolvidos: number
+  Parados: number
+  TaxaResolucaoPercentual: number | null
+}
+
 // Mensagem do chat interno de um chamado
 export interface Mensagem {
   ID: string

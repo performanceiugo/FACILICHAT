@@ -3,7 +3,7 @@
 # o FaciliChat para atender os Condomínios dela. Todo dado do sistema pertence a uma Empresa
 # (ver docs/plano-implementacao.md — Fase 0.7, Fundação SaaS Multi-Tenant).
 
-from sqlalchemy import Boolean, String, Enum as SAEnum, DateTime
+from sqlalchemy import Boolean, String, Enum as SAEnum, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.banco_dados import Base
@@ -33,3 +33,17 @@ class Empresa(Base):
     # Empresa (suspendê-la trancaria todos os Superadmins para fora da própria plataforma).
     EhPlataforma: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     Criacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=agoraUtc)
+
+
+# Configurações operacionais por tenant ficam em tabela separada para que instalações existentes
+# recebam o novo schema via create_all, sem ALTER destrutivo enquanto Alembic ainda está pendente.
+class EmpresaConfiguracao(Base):
+    __tablename__ = "EmpresaConfiguracoes"
+
+    EmpresaID: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("Empresas.ID"),
+        primary_key=True,
+    )
+    # 72h é apenas o valor inicial; cada Gestor pode substituí-lo pela API da própria Empresa.
+    LimiteGargaloHoras: Mapped[int] = mapped_column(Integer, default=72, nullable=False)
