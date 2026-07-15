@@ -7,6 +7,28 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fase 0.5 — fecha por completo: V6 e atualização de dependências Python (`CU: 868kb32wc`)
+- **10 dos 11 pacotes** listados na auditoria de 10/07/2026 atualizados no `requirements.txt`:
+  `alembic` 1.18.4→1.18.5, `anthropic` 0.111.0→0.116.0, `anyio` 4.14.0→4.14.2, `cffi` 2.0.0→2.1.0,
+  `click` 8.4.1→8.4.2, `fastapi` 0.138.0→0.139.0, `greenlet` 3.5.2→3.5.3, `jiter` 0.15.0→0.16.0,
+  `typing_extensions` 4.15.0→4.16.0, `uvicorn` 0.49.0→0.51.0.
+- **`pydantic_core` mantido em `2.46.4`:** `pydantic` 2.13.4 (já a versão mais nova disponível) fixa
+  essa dependência exata (`pydantic-core==2.46.4`); tentar subir para `2.47.0` sozinho quebra a
+  resolução (`pip install` confirmou `ResolutionImpossible`) — não há combinação válida hoje que
+  suba os dois juntos.
+- **Validado:** `docker compose build backend` limpo; reset+reseed do banco local; checagem manual
+  pela API (login, `/categorias/`, `/chamados/`, `/usuarios/equipe`, `/relatorios/visao-geral`, 401
+  para acesso anônimo) e `verificar-rls` OK — sem suíte de testes automatizada no backend (já
+  documentado desde os itens V1-V5, mesmo padrão de validação usado aqui).
+- **Fecha a Fase 0.5 por completo:** críticos, segurança (S1–S17), altos, médios (M1–M13), baixos
+  (B1–B7), docs (D1–D8) e agora versões (V1–V6) — todos os itens do levantamento técnico de
+  27/06/2026 estão resolvidos.
+- Arquivo: `backend/requirements.txt`.
+
+### Fase 4 — aprovação visual do usuário para Categorias/Equipe/Ajustes
+- O usuário validou pessoalmente as três telas (`868kcw5xj`, `868kcw5z1`, `868kcw619`), que antes só
+  tinham revisão de screenshots pelo agente. Fase 4 fechada por completo, sem pendência de validação.
+
 ### Ajuste — Categorias e Equipe viram um grupo recolhível "Ajustes" no sidebar
 - **Motivação:** o usuário pediu que os dois links não competissem com a navegação operacional do
   dia a dia — pediu algo no estilo "Ajustes > Categorias + Equipe".
