@@ -10,10 +10,11 @@ import { useFonts } from 'expo-font'
 SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
+  // Cada peso do Figtree fica numa subpasta própria dentro do pacote (ex.: 400Regular/Figtree_400Regular.ttf)
   const [fontsLoaded] = useFonts({
-    Figtree: require('@expo-google-fonts/figtree/Figtree_400Regular.ttf'),
-    'Figtree-SemiBold': require('@expo-google-fonts/figtree/Figtree_600SemiBold.ttf'),
-    'Figtree-Bold': require('@expo-google-fonts/figtree/Figtree_700Bold.ttf'),
+    Figtree: require('@expo-google-fonts/figtree/400Regular/Figtree_400Regular.ttf'),
+    'Figtree-SemiBold': require('@expo-google-fonts/figtree/600SemiBold/Figtree_600SemiBold.ttf'),
+    'Figtree-Bold': require('@expo-google-fonts/figtree/700Bold/Figtree_700Bold.ttf'),
   })
 
   useEffect(() => {

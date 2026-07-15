@@ -167,17 +167,21 @@ então o `npm audit` roda de forma reprodutível (item `S11` do plano):
 
 - **Automática (CI):** o workflow `.github/workflows/auditoria-mobile.yml` roda `npm ci` + `npm audit
   --audit-level=high` em todo push/PR que altere `frontend/mobile/package.json` ou o lockfile **e
-  toda segunda-feira**. O limiar é **alta/crítica** — não moderada — porque hoje existem 13
-  vulnerabilidades moderadas conhecidas, transitivas do Expo SDK 53 (`postcss`, `uuid`/`xcode`), cuja
-  correção exige o bump major de SDK já rastreado como item `V3` do plano (migração sequencial
-  53→54→55→56→57 rodando `expo-doctor` a cada etapa). Barrar o CI nessas moderadas duplicaria o `V3`
-  sem adiantar a correção; o limiar garante que qualquer vulnerabilidade **nova e mais grave** ainda
-  derruba o job.
+  toda segunda-feira**. O limiar ficou em **alta/crítica** — não moderada — enquanto o projeto estava
+  preso ao Expo SDK 53 com 13 vulnerabilidades moderadas conhecidas; a correção exigia o bump major
+  de SDK feito no item `V3` (migração sequencial 53→54→55→56→57, concluída em 15/07/2026).
+- **Estado atual (pós-`V3`, SDK 57):** `npm audit` está **limpo (0 vulnerabilidades)**. A cadeia
+  `uuid@7.0.3 → xcode → @expo/config-plugins` persistia mesmo no SDK 57.0.6 (mais recente
+  disponível), mas foi neutralizada com `overrides.uuid: "^11.1.1"` no `package.json` — mesmo padrão
+  já usado para o `postcss` no web (`S1`). Antes de aplicar o override, confirmamos que o risco real
+  já era nulo: a falha do `uuid` só afeta as funções `v3/v5/v6` quando chamadas com um `buf` próprio,
+  e o `xcode` só usa `uuid.v4()` sem argumentos; além disso o projeto é managed workflow (sem pastas
+  `ios`/`android` nativas), então esse trecho do `xcode` nem chega a executar hoje.
 - **Local (antes de mudar dependência):**
 
 ```bash
 cd frontend/mobile
-npm audit                 # relatório completo, incluindo as moderadas conhecidas (ver V3)
+npm audit                 # relatório completo — hoje deve vir limpo
 npm audit --audit-level=high   # mesmo filtro do CI
 ```
 
@@ -185,8 +189,11 @@ npm audit --audit-level=high   # mesmo filtro do CI
 1. Veja no relatório qual pacote/versão e o aviso (`GHSA-*`/`CVE-*`) — ele indica a versão corrigida.
 2. Se a correção não exigir bump major do Expo SDK, atualize a dependência (`npx expo install --fix`
    quando for pacote do ecossistema Expo) e rode a auditoria de novo.
-3. Se exigir bump major (como as 13 moderadas atuais), trate como parte do `V3`, não como correção
-   avulsa — a migração de SDK precisa ser sequencial e validada com `expo-doctor`.
+3. Se for uma dependência transitiva de uma ferramenta do próprio Expo (como o caso do `uuid`/`xcode`
+   acima) e o `npm audit fix --force` sugerir rebaixar o `expo` para uma versão muito antiga, **não
+   aceite cegamente** — investigue se a função vulnerável é realmente alcançada pelo código que a usa
+   (ver exemplo acima) e considere um `overrides` específico no `package.json` antes de rebaixar
+   qualquer coisa.
 4. Registre a correção no `docs/changelog.md`.
 
 ---

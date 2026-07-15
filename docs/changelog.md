@@ -7,6 +7,30 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fase 0.5 — migração do Expo SDK 53 para 57 (`V3`, `CU: 868kb32gb`)
+- **Migração sequencial:** 53→54→55→56→57, uma versão por vez, validando `expo-doctor`,
+  `tsc --noEmit` e `expo export --platform android|ios` a cada etapa.
+- **Correções no caminho:** `@types/react` alinhado ao React 19.1 (SDK 54, conflito de peer
+  dependency); `app.json` migrou o `splash` legado (propriedade removida do schema) para o
+  plugin `expo-splash-screen`; `@react-navigation/native` removido — era dependência direta
+  não usada em nenhum lugar do código, e o SDK 56 descontinuou o uso conjunto com `expo-router`.
+- **Bug pré-existente encontrado e corrigido (`B9`, `CU: 868kcvg5c`):** `app/_layout.tsx`
+  carregava as fontes Figtree com `require(...)` de um caminho que não existe no pacote —
+  quebrava qualquer bundle real (Android/iOS), só não tinha sido percebido porque `expo-doctor`
+  não bundla o JS e o app nunca fora validado com build real. Corrigido para a subpasta real de
+  cada peso (`400Regular/`, `600SemiBold/`, `700Bold/`), sem mudar as chaves de família usadas
+  em `theme.ts`.
+- **Vulnerabilidades — investigado a fundo, não só aceito:** mesmo no SDK 57.0.6 (mais recente
+  hoje), a cadeia `uuid@7.0.3 → xcode → @expo/config-plugins` seguia acusando 11 vulnerabilidades
+  moderadas no `npm audit` (eram 13 no início). Confirmado que o risco prático é nulo: a falha
+  real do `uuid` só afeta `v3/v5/v6` quando chamados com um `buf` próprio — `xcode` só usa
+  `uuid.v4()` sem argumentos — e o projeto é 100% managed workflow (sem pastas `ios`/`android`
+  nativas), então esse trecho do `xcode` nem chega a executar hoje. Mesmo assim, adicionado
+  `overrides.uuid: "^11.1.1"` no `package.json` (mesmo padrão do `postcss` no web, item `S1`),
+  zerando o `npm audit` (0 vulnerabilidades) sem nenhuma regressão nas validações.
+- Arquivos: `frontend/mobile/package.json`, `frontend/mobile/app.json`,
+  `frontend/mobile/app/_layout.tsx`.
+
 ### Fase 4 — atribuição de supervisor a chamados (`CU: 868kcv8dp`)
 - **Motivação:** ao popular o banco de demonstração com mais de um supervisor, descobrimos que
   não existia nenhuma rota de API para atribuir um supervisor a um chamado — só acontecia por

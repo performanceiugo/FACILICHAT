@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#148AF5"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "br.com.facilichat"
@@ -23,7 +18,20 @@
       },
       "package": "br.com.facilichat"
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#148AF5"
+        }
+      ],
+      "expo-status-bar"
+    ],
     "experiments": {
       "typedRoutes": true
     }

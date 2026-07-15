@@ -10,25 +10,27 @@
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
-    "@expo/vector-icons": "^14.1.0",
-    "@react-navigation/native": "^7.1.6",
-    "expo": "~53.0.27",
-    "expo-constants": "~17.1.8",
-    "expo-font": "~13.3.2",
-    "expo-linking": "~7.1.7",
-    "expo-router": "~5.1.11",
-    "expo-secure-store": "~14.2.4",
-    "expo-splash-screen": "~0.30.10",
-    "expo-status-bar": "~2.2.3",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "react-native": "0.79.6",
-    "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.1"
+    "@expo/vector-icons": "^15.0.3",
+    "expo": "^57.0.6",
+    "expo-constants": "~57.0.5",
+    "expo-font": "~57.0.1",
+    "expo-linking": "~57.0.3",
+    "expo-router": "~57.0.6",
+    "expo-secure-store": "~57.0.1",
+    "expo-splash-screen": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "@types/react": "~19.0.10",
-    "typescript": "~5.8.3"
+    "@types/react": "~19.2.10",
+    "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }
