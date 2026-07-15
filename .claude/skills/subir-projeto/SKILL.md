@@ -63,7 +63,7 @@ primeiro Gestor precisam ser criados fora da API, pelo script — rode-o **dentr
 reusa as dependências já instaladas, sem depender do Python local):
 
 ```
-docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Cefram Demo" 12.345.678/0001-90 "Gestor Demo" admin@facilichat.dev FaciliChat123
+docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Cefram Demo" 12.345.678/0001-90 "Gestor Demo" admin@facilichat.dev FaciliChat2026Demo
 ```
 
 - Se retornar sucesso, guarde as credenciais para o relatório final.
@@ -90,7 +90,7 @@ antes de usar). Faça:
 2. Navegue para **`http://localhost:8000/docs`** (Swagger) — confirme que a API subiu e liste as
    rotas. Screenshot.
 3. Navegue para **`http://localhost:3000`** — a tela de login do painel do gestor. Screenshot.
-4. Faça login com `admin@facilichat.dev` / `FaciliChat123` e confirme que o painel de chamados
+4. Faça login com `admin@facilichat.dev` / `FaciliChat2026Demo` e confirme que o painel de chamados
    carrega. Se der erro de CORS/conexão, verifique `CORS_ORIGINS` no backend e `NEXT_PUBLIC_API_URL`
    no web. Screenshot do painel autenticado.
 

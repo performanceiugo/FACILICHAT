@@ -18,7 +18,8 @@ Confirmar que a API está no ar: `curl -s http://localhost:8000/` deve responder
 `subir-projeto`) antes de continuar.
 
 ## Credenciais de demonstração (seed — `backend/scripts/gerenciar_banco.py`)
-Todas as senhas de demo: **`Senha123`** (domínio `@demo.facilichat.dev`).
+Todas as senhas de demo: **`FaciliChat2026Demo`** (domínio `@demo.facilichat.dev`) — atualizada no
+item M1 para cumprir a política de senha (mínimo 15 caracteres).
 
 | Papel | Email |
 |---|---|
@@ -28,7 +29,7 @@ Todas as senhas de demo: **`Senha123`** (domínio `@demo.facilichat.dev`).
 | Cliente — Carlos Lima (Cond. Vista Alegre) | `carlos@demo.facilichat.dev` |
 | Supervisor — Roberto Supervisor | `supervisor@demo.facilichat.dev` |
 
-Gestor Demo (não é seed do `semear`, é o bootstrap da Empresa): `admin@facilichat.dev` / `FaciliChat123`
+Gestor Demo (não é seed do `semear`, é o bootstrap da Empresa): `admin@facilichat.dev` / `FaciliChat2026Demo`
 (ver `docs/setup.md`/skill `subir-projeto`). Use-o para ações que exigem Supervisor/Gestor (troca de
 status).
 
@@ -42,7 +43,7 @@ status).
 1. Login como um Cliente demo (qualquer um da tabela acima, ou o que o usuário indicar):
    ```bash
    TOKEN=$(curl -s -X POST http://localhost:8000/autenticacao/login \
-     -d "username=maria@demo.facilichat.dev&password=Senha123" \
+     -d "username=maria@demo.facilichat.dev&password=FaciliChat2026Demo" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      | grep -o '"token_acesso":"[^"]*"' | cut -d'"' -f4)
    ```

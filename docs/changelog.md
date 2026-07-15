@@ -5,6 +5,55 @@
 
 ---
 
+## [não versionado] — 15 de julho de 2026
+
+### Fechado `M1` — validação Pydantic de tamanho/força de senha e limites de entrada
+- **Consulta prévia (`verificar-seguranca`):** OWASP Authentication Cheat Sheet atual — mínimo de
+  senha **15 caracteres para aplicação sem MFA** (8 com MFA), máximo ≥ 64 para passphrases, **sem**
+  regras de composição, aceitar todos os caracteres, nunca truncar. **Decisão do usuário: adotar 15**
+  (em vez dos 8 que o `SenhaAlterar` do S14 usava), com teto 128.
+- **Backend:** `UsuarioCriar.Senha` e `SenhaAlterar.SenhaNova` com `min_length=15, max_length=128`
+  (`SenhaAtual` só com teto — senhas legadas mais curtas ainda precisam ser conferidas);
+  `PrimeiroGestorCriar.Senha` (rota da plataforma) na mesma política; `max_length` nos campos de
+  texto livres (`Nome`/`Condominio` 120, `Telefone` 20, `Categoria` 80 com `min_length=1`, `Resumo`
+  2000, `CNPJ` 20).
+- **Coerência do ambiente demo:** senha padrão do seed rotacionada de `Senha123` (8) para
+  `FaciliChat2026Demo` (18) em `gerenciar_banco.py`; Gestor Demo rotacionado **pela própria API**
+  (`PATCH /usuarios/eu/senha`); usuários demo recriados com `limpar-demo` + `semear`; referências
+  atualizadas em `docs/setup.md` e nas skills `chamados-teste`/`subir-projeto`.
+- **Validado com curl na API real:** senha curta/longa no cadastro → 422 em PT ("O campo 'Senha' é
+  muito curto/longo" — traduções do M12 já cobriam `string_too_short/long`); `SenhaNova` curta →
+  422; troca real do Gestor → 200 e login com a nova senha ok; `Categoria` vazia → 422; `Resumo` de
+  2500 chars → 422; login demo com a senha nova ok após o re-seed.
+- Arquivos: `backend/app/rotas/Usuarios.py`, `Chamados.py`, `Plataforma.py`,
+  `backend/scripts/gerenciar_banco.py`, `docs/setup.md`, `docs/tecnico-backend.md`,
+  `.claude/skills/chamados-teste/SKILL.md`, `.claude/skills/subir-projeto/SKILL.md`.
+
+### Fechado `S11` (auditoria reprodutível do mobile) — fecha a seção 🔐 Segurança da Fase 0.5
+- **Problema original:** o app mobile não tinha lockfile versionado, então `npm audit` não rodava de
+  forma reproduzível.
+- **Achado ao investigar:** o lockfile (`frontend/mobile/package-lock.json`, `lockfileVersion: 3`) já
+  existia e estava commitado desde o `A8` (gerado como efeito colateral do `npx expo install --fix`).
+  Faltava automatizar a auditoria e decidir o que fazer com o resultado.
+- **`npm audit` local:** 13 vulnerabilidades moderadas, todas transitivas do Expo SDK 53 (`postcss`,
+  `uuid`/`xcode`), com correção disponível **só** via `expo@57.0.6` (bump major). Essa migração
+  sequencial (53→54→55→56→57) já está registrada como item `V3` do plano — decisão: não duplicar essa
+  migração dentro do `S11`, e sim fechar o `S11` com uma auditoria automatizada que falha para
+  vulnerabilidade **alta/crítica** (limiar `--audit-level=high`), deixando as moderadas conhecidas
+  explicitamente sob o `V3`.
+- **Implementado:** workflow `.github/workflows/auditoria-mobile.yml` (`npm ci` + `npm audit
+  --audit-level=high` em push/PR que altere `package.json`/lockfile do mobile, mais agendamento
+  semanal e disparo manual — mesmo padrão do `auditoria-python.yml` do `S12`); seção "Auditoria de
+  dependências do mobile" no `docs/setup.md` com a rotina local e o critério de quando tratar uma
+  vulnerabilidade como correção avulsa vs. parte do `V3`.
+- **Validado:** `npm audit --audit-level=high` local rodou com exit code `0` (moderadas não derrubam
+  o job); relatório completo (`npm audit`) conferido item a item para confirmar que as 13
+  vulnerabilidades são as mesmas do `V3` e não algo novo.
+- Com o `S11` fechado, todos os itens `S1`–`S17` da seção 🔐 Segurança (levantamento de 08/07/2026)
+  ficam concluídos.
+
+---
+
 ## [não versionado] — 10 de julho de 2026
 
 ### Fase 1.5 criada — Fundação Multicanal (WhatsApp como porta de entrada) — só planejamento

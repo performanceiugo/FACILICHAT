@@ -1,0 +1,62 @@
+# Auditoria automatizada das dependencias do app mobile (item S11 do plano).
+# Roda o "npm audit" contra o lockfile de frontend/mobile e FALHA o workflow
+# apenas para vulnerabilidade alta/critica: hoje ha 13 vulnerabilidades
+# moderadas conhecidas, transitivas do Expo SDK 53, cuja correcao exige o bump
+# major de SDK ja rastreado como item V3 do plano (migracao sequencial
+# 53->54->55->56->57). Barrar o CI nessas moderadas duplicaria o V3 sem
+# adiantar a correcao; o limiar "high" garante que qualquer vulnerabilidade
+# nova e mais grave ainda derruba o job.
+#
+# Gatilhos:
+#   - push / pull_request que altere o package.json/lockfile do mobile
+#   - agendamento semanal: pega CVE publicada depois do ultimo commit,
+#     mesmo sem nenhuma mudanca no codigo
+#   - workflow_dispatch: permite disparar manualmente pela aba Actions
+
+name: Auditoria de dependencias mobile
+
+on:
+  push:
+    paths:
+      - "frontend/mobile/package.json"
+      - "frontend/mobile/package-lock.json"
+      - ".github/workflows/auditoria-mobile.yml"
+  pull_request:
+    paths:
+      - "frontend/mobile/package.json"
+      - "frontend/mobile/package-lock.json"
+      - ".github/workflows/auditoria-mobile.yml"
+  schedule:
+    # Toda segunda-feira as 09:00 UTC (06:00 em Brasilia) - mesmo horario do S12
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+# O job so precisa ler o repositorio - nenhuma permissao de escrita
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/mobile
+    steps:
+      # Baixa o codigo do repositorio
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Mesma major version de Node usada no CI/Docker do projeto
+      - name: Configurar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Instala exatamente o que esta travado no lockfile (nao atualiza nada)
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      # audit-level=high: so derruba o job para vulnerabilidade alta/critica.
+      # As moderadas hoje conhecidas ficam sob o V3 (migracao de SDK major).
+      - name: Auditar frontend/mobile (alta/critica)
+        run: npm audit --audit-level=high

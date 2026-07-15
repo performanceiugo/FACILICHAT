@@ -99,7 +99,7 @@ Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe
 > Em produção, passe o CNPJ real com `--cnpj` — o padrão é um placeholder de dev.
 
 > **`semear` nunca roda em produção (item S10):** os usuários de demonstração nascem com a mesma
-> senha padrão (`Senha123`) em toda instalação — inaceitável fora de dev/staging. O comando recusa
+> senha padrão (`FaciliChat2026Demo`) em toda instalação — inaceitável fora de dev/staging. O comando recusa
 > rodar (sai com erro, sem tocar no banco) quando `AMBIENTE=producao` no `.env` — ver
 > `.env.prod.example`. Em staging, se os dados demo precisarem ser rotacionados/removidos, use
 > `limpar-demo` (apaga os usuários demo e tudo que depende deles — chamados, mensagens, sessões).
@@ -160,6 +160,37 @@ python -m pip_audit -r backend/requirements.txt
 
 ---
 
+## Auditoria de dependências do mobile (`npm audit`)
+
+O app mobile (`frontend/mobile`) tem lockfile versionado (`package-lock.json`, `lockfileVersion: 3`),
+então o `npm audit` roda de forma reprodutível (item `S11` do plano):
+
+- **Automática (CI):** o workflow `.github/workflows/auditoria-mobile.yml` roda `npm ci` + `npm audit
+  --audit-level=high` em todo push/PR que altere `frontend/mobile/package.json` ou o lockfile **e
+  toda segunda-feira**. O limiar é **alta/crítica** — não moderada — porque hoje existem 13
+  vulnerabilidades moderadas conhecidas, transitivas do Expo SDK 53 (`postcss`, `uuid`/`xcode`), cuja
+  correção exige o bump major de SDK já rastreado como item `V3` do plano (migração sequencial
+  53→54→55→56→57 rodando `expo-doctor` a cada etapa). Barrar o CI nessas moderadas duplicaria o `V3`
+  sem adiantar a correção; o limiar garante que qualquer vulnerabilidade **nova e mais grave** ainda
+  derruba o job.
+- **Local (antes de mudar dependência):**
+
+```bash
+cd frontend/mobile
+npm audit                 # relatório completo, incluindo as moderadas conhecidas (ver V3)
+npm audit --audit-level=high   # mesmo filtro do CI
+```
+
+**Quando a auditoria acusar vulnerabilidade alta/crítica:**
+1. Veja no relatório qual pacote/versão e o aviso (`GHSA-*`/`CVE-*`) — ele indica a versão corrigida.
+2. Se a correção não exigir bump major do Expo SDK, atualize a dependência (`npx expo install --fix`
+   quando for pacote do ecossistema Expo) e rode a auditoria de novo.
+3. Se exigir bump major (como as 13 moderadas atuais), trate como parte do `V3`, não como correção
+   avulsa — a migração de SDK precisa ser sequencial e validada com `expo-doctor`.
+4. Registre a correção no `docs/changelog.md`.
+
+---
+
 ## Solução de problemas comuns
 
 | Problema | Causa | Solução |
@@ -168,7 +199,7 @@ python -m pip_audit -r backend/requirements.txt
 | API não sobe, erro de `JWT_SECRET` | Placeholder/chave curta no `backend/.env` | Gerar chave com o comando do Passo 1 |
 | Erro de conexão com banco | Container não está rodando | `docker compose up -d` |
 | Web não fala com a API (CORS/rede) | `.env.local` ausente ou URL errada | Passo 4; conferir `CORS_ORIGINS` no `backend/.env` |
-| Login com contas demo falha | Banco sem seed | `gerenciar_banco.py semear` (senha demo: `Senha123`) |
+| Login com contas demo falha | Banco sem seed | `gerenciar_banco.py semear` (senha demo: `FaciliChat2026Demo`) |
 
 ---
 

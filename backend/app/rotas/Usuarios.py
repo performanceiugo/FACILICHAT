@@ -25,13 +25,18 @@ roteador = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 # EmpresaID permanece no contrato para compatibilidade do frontend atual, mas a rota publica nao
 # confia mais nele: quando o cadastro publico esta habilitado, ele precisa bater com a Empresa
 # explicitamente liberada em configuracao.
+# Limites de tamanho (item M1): politica de senha da OWASP Authentication Cheat Sheet - minimo 15
+# (aplicacao sem MFA; decisao do usuario em 15/07/2026), maximo 128 (>= 64 para passphrases e teto
+# contra DoS de senha longa no argon2), SEM regras de composicao (maiuscula/numero/simbolo) e
+# aceitando qualquer caractere. Campos de texto livres ganham max_length como defesa contra
+# payloads abusivos.
 class UsuarioCriar(BaseModel):
     EmpresaID: uuid.UUID
-    Nome: str
+    Nome: str = Field(min_length=1, max_length=120)
     Email: EmailStr  # Pydantic valida o formato do email automaticamente
-    Senha: str
-    Telefone: str | None = None
-    Condominio: str | None = None
+    Senha: str = Field(min_length=15, max_length=128)
+    Telefone: str | None = Field(default=None, max_length=20)
+    Condominio: str | None = Field(default=None, max_length=120)
 
 
 # Schema de entrada da criacao INTERNA (somente Gestor) - aqui a Funcao pode ser definida,
@@ -42,9 +47,11 @@ class UsuarioCriarEquipe(UsuarioCriar):
 
 # Schema de entrada da troca da propria senha (item S14) - exige a senha atual (Authentication
 # Cheat Sheet da OWASP) para confirmar que quem esta trocando e o dono legitimo da conta.
+# SenhaNova segue a mesma politica do cadastro (item M1: minimo 15, maximo 128); SenhaAtual so tem
+# teto (senhas antigas podem ser mais curtas que a politica atual e ainda precisam ser conferidas).
 class SenhaAlterar(BaseModel):
-    SenhaAtual: str
-    SenhaNova: str = Field(min_length=8)
+    SenhaAtual: str = Field(max_length=128)
+    SenhaNova: str = Field(min_length=15, max_length=128)
 
 
 # Schema de entrada da troca de funcao de um usuario (item S14) - so o Gestor usa esta rota.

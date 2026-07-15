@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
@@ -15,11 +15,13 @@ import uuid
 
 roteador = APIRouter(prefix="/chamados", tags=["Chamados"])
 
-# Schema de entrada — dados obrigatórios e opcionais para abrir um novo chamado
+# Schema de entrada — dados obrigatórios e opcionais para abrir um novo chamado.
+# Limites de tamanho (item M1): Categoria não pode ser vazia e os campos de texto livre têm teto,
+# como defesa contra payloads abusivos (Resumo comporta o relato do cliente, mas não é ilimitado).
 class ChamadoCriar(BaseModel):
     Fila: ChamadoFila
-    Categoria: str
-    Resumo: str | None = None
+    Categoria: str = Field(min_length=1, max_length=80)
+    Resumo: str | None = Field(default=None, max_length=2000)
     Prioridade: ChamadoPrioridade = ChamadoPrioridade.Media
 
 class ChamadosIrmaosCriar(BaseModel):

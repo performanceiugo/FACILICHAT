@@ -59,7 +59,9 @@ CAMINHO_RLS_SQL = os.path.join(
 
 # Todos os usuários de demonstração usam esta senha; e-mails ficam no domínio DOMINIO_DEMO,
 # que também serve de marcador de idempotência do seed.
-SENHA_PADRAO = "Senha123"
+# Atualizada no item M1 para cumprir a política de senha (mínimo 15 caracteres — OWASP sem MFA):
+# a senha antiga "Senha123" (8) ficaria abaixo do mínimo que a própria API passou a exigir.
+SENHA_PADRAO = "FaciliChat2026Demo"
 DOMINIO_DEMO = "@demo.facilichat.dev"
 
 # Clientes de demonstração (moradores que abrem chamados), cada um em um condomínio diferente.

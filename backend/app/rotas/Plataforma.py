@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,16 +18,19 @@ from app.servicos.hasher import pwd
 roteador = APIRouter(prefix="/plataforma", tags=["Plataforma"])
 
 
+# Dados do primeiro Gestor da Empresa recém-criada. A senha segue a mesma política do cadastro
+# (item M1: mínimo 15, máximo 128 — OWASP Authentication Cheat Sheet, sem regras de composição).
 class PrimeiroGestorCriar(BaseModel):
-    Nome: str
+    Nome: str = Field(min_length=1, max_length=120)
     Email: EmailStr
-    Senha: str
-    Telefone: str | None = None
+    Senha: str = Field(min_length=15, max_length=128)
+    Telefone: str | None = Field(default=None, max_length=20)
 
 
+# Dados da nova Empresa (tenant). CNPJ com teto folgado para aceitar máscara (pontos/barra/hífen).
 class EmpresaCriar(BaseModel):
-    Nome: str
-    CNPJ: str
+    Nome: str = Field(min_length=1, max_length=120)
+    CNPJ: str = Field(min_length=1, max_length=20)
     Gestor: PrimeiroGestorCriar
 
 

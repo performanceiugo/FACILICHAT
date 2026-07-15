@@ -126,6 +126,16 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 - Senhas armazenadas com hash **argon2** via `pwdlib` (nunca em texto puro); hasher centralizado
   em `app/servicos/hasher.py` (item B6) — reaproveitado por todas as rotas e scripts que hasheiam
   senha, em vez de instanciado de forma duplicada
+- **Política de senha e limites de entrada (item M1):** senha com **mínimo de 15 caracteres**
+  (OWASP Authentication Cheat Sheet para aplicação **sem MFA** — decisão do usuário em 15/07/2026)
+  e **máximo de 128** (≥ 64 para permitir passphrases e teto contra DoS de senha longa no argon2),
+  **sem regras de composição** (maiúscula/número/símbolo não são exigidos — OWASP) e aceitando
+  qualquer caractere. Vale para `UsuarioCriar`/`UsuarioCriarEquipe`, `SenhaAlterar.SenhaNova` e
+  `PrimeiroGestorCriar` (rota da plataforma); `SenhaAtual` só tem teto (senhas antigas podem ser
+  mais curtas e ainda precisam ser conferidas). Campos de texto livres ganharam `max_length`
+  (`Nome`/`Condominio` 120, `Telefone` 20, `Categoria` 80 com mínimo 1, `Resumo` 2000, `CNPJ` 20)
+  como defesa contra payloads abusivos; os 422 saem em português via o handler do M12. A senha demo
+  do seed passou a ser `FaciliChat2026Demo` (a antiga `Senha123` ficaria abaixo do mínimo da API).
 - JWT assinado com `HS256` e chave secreta configurável. Claims: `sub` (usuário), `funcao`,
   `empresa_id`, `iat`/`exp` (emissão/expiração), `iss`/`aud` (`JWT_ISSUER`/`JWT_AUDIENCE`,
   validados no decode) e `jti` (ID único do token — item B6/S14)
