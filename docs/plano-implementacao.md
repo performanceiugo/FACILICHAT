@@ -534,6 +534,28 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[x]` | `868k7vrwh` | **Desempenho por supervisor com lastro** — relatório exclusivo do Gestor inclui todos os supervisores e deriva recebidos das atribuições, resolvidos de `Concluido`, parados de `Atualizacao` + limite configurável e taxa de resolução (`null` sem amostra). Validado em 15/07/2026: 7 recebidos, 2 resolvidos, taxa 28,57%; parados 3→5 ao alterar 72h→1h e limite restaurado | `backend/app/rotas/Relatorios.py` |
 | `[x]` | `868kcv8dp` | `PATCH /chamados/{id}/supervisor` — atribui ou troca o supervisor responsável por um chamado existente; exclusivo do Gestor, supervisor precisa existir na mesma Empresa, `null` remove a atribuição. **Origem:** descoberto em 15/07/2026 ao popular o banco de demonstração com múltiplos supervisores — não existia nenhuma rota para isso (só inserção direta via script de seed). Validado em 15/07/2026: atribuição/remoção/reatribuição retornaram `200` com `SupervisorNome` correto; Supervisor tentando atribuir recebeu `403`; UUID de supervisor inexistente e chamado inexistente retornaram `404` | `backend/app/rotas/Chamados.py` |
 
+### Backend — manutenção operacional do Gestor (categorias e equipe) 🆕
+
+> **Origem:** discussão de planejamento de 15/07/2026 sobre como uma Empresa nova será implantada
+> (categorias, equipe) e como o cliente fará manutenções depois (incluir/remover categoria,
+> adicionar/remover supervisor). Nenhuma dessas operações existia até então — hoje o Superadmin só
+> cria a Empresa + 1º Gestor (Fase 0.7), o tenant nasce vazio, `Categoria` é texto livre sem catálogo
+> e não existe rota nenhuma para editar/desativar um usuário já criado. **Decisão de produto:** essa
+> manutenção é autoatendimento do **Gestor** de cada Empresa (não tarefa manual do Superadmin por
+> cliente); categoria vira **catálogo obrigatório por Empresa** (FK, não sugestão — inclui migrar as
+> categorias já usadas nos chamados existentes); remover um membro da equipe é sempre **desativação,
+> nunca exclusão** (tese anti-amnésia — preserva o histórico dos chamados já atendidos).
+
+| Status | CU | Item | Arquivo(s) |
+|--------|----|------|-----------|
+| `[ ]` | `868kcw5ft` | Modelo `CategoriaChamado` (`EmpresaID`, `Nome`, `Ativa`) — catálogo de categorias por Empresa | `backend/app/modelos/CategoriaChamado.py` (novo) |
+| `[ ]` | `868kcw5gb` | CRUD de categorias (listar/criar/editar/ativar-desativar), exclusivo do Gestor, escopado por Empresa/RLS; desativar não afeta chamados já criados com aquela categoria | `backend/app/rotas/Categorias.py` (novo) |
+| `[ ]` | `868kcw5h9` | **Migração** `Chamado.Categoria` (texto livre) → `CategoriaID` (FK): cria em `CategoriaChamado`, por Empresa, as categorias distintas já em uso e religa os chamados existentes — sem perda de dado | `backend/scripts/aplicar_fase4_categorias.py` (novo) |
+| `[ ]` | `868kcw5mk` | `ChamadoCriar`/`ChamadoSaida` e rotas de chamado passam a exigir `CategoriaID` de uma categoria ativa da mesma Empresa (substitui o campo texto); resposta inclui o nome da categoria via join | `backend/app/rotas/Chamados.py` |
+| `[ ]` | `868kcw5nh` | `Usuario.Ativo` (novo campo, default `True`) + `PATCH /usuarios/{id}/status` (ativar/desativar), exclusivo do Gestor; usuário inativo não loga e não aparece para novas atribuições | `backend/app/modelos/Usuarios.py`, `backend/app/rotas/Usuarios.py` |
+| `[ ]` | `868kcw5qk` | `GET /usuarios/equipe` (lista a equipe da Empresa, filtro por `Funcao`) e `PATCH /usuarios/{id}` (edita Nome/Telefone/Email) — exclusivos do Gestor | `backend/app/rotas/Usuarios.py` |
+| `[ ]` | `868kcw5v8` | Login (`POST /autenticacao/login`) nega acesso (401) a usuário `Ativo=False`; `PATCH /chamados/{id}/supervisor` só aceita supervisor ativo | `backend/app/rotas/Autenticacao.py`, `backend/app/rotas/Chamados.py` |
+
 ### Frontend Web
 
 | Status | CU | Item | Arquivo(s) |
@@ -548,6 +570,16 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[~]` | `868k60w2j` | Página `tickets` — tabela com filtros: período, supervisor, status, categoria; busca por cliente | `frontend/web/src/app/(painel)/tickets/page.tsx` (novo) |
 | `[x]` | `868k60w2w` | Adicionar links no sidebar: Visão geral / Supervisores / Todos os tickets / Alertas; Alertas aponta para a seção existente `#atencao`, sem antecipar a página comercial da Fase 6. Validado em 15/07/2026: TypeScript sem erros, destinos `200` e aprovação visual do usuário | `frontend/web/src/components/painel/AdminShell.tsx`, `frontend/web/src/app/painel/visao-geral/page.tsx` |
 | `[x]` | `868kb4ga6` | **Atualização automática (polling)** — Visão geral e lista de Chamados refazem o fetch sozinhas a cada ~20s (estilo painel de BI), pausando quando a aba está em segundo plano; hook reutilizável, sem nova dependência (SWR/React Query ficam de fora por ora) | Hook `useAtualizacaoPeriodica` (setInterval de 20s + Page Visibility API); as duas páginas só reexibem "Carregando..."/erro na carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se uma falhar. Validado com Playwright: criei um chamado via API enquanto a página estava aberta e sem dar reload — KPI "Chamados abertos" foi de 10→11 e o total da lista de 14→15, ambos sozinhos | `frontend/web/src/lib/useAtualizacaoPeriodica.ts` (novo), `frontend/web/src/app/painel/visao-geral/page.tsx`, `frontend/web/src/app/painel/chamados/page.tsx` |
+
+### Frontend Web — manutenção operacional do Gestor (categorias e equipe) 🆕
+
+> Ver origem/decisões na seção "Backend — manutenção operacional do Gestor" acima.
+
+| Status | CU | Item | Arquivo(s) |
+|--------|----|------|-----------|
+| `[ ]` | `868kcw5xj` | Página `/painel/categorias` — listar categorias da Empresa, criar, editar nome e ativar/desativar | `frontend/web/src/app/painel/categorias/page.tsx` (novo) |
+| `[ ]` | `868kcw5z1` | Página `/painel/equipe` — lista a equipe da Empresa, cria (reaproveita `POST /usuarios/equipe`), edita dados cadastrais e ativa/desativa (inclui adicionar/remover Supervisor); tela separada do dashboard de métricas em `/painel/supervisores` (que continua só leitura) | `frontend/web/src/app/painel/equipe/page.tsx` (novo) |
+| `[ ]` | `868kcw619` | Adicionar links no sidebar: Categorias e Equipe | `frontend/web/src/components/painel/AdminShell.tsx` |
 
 ---
 
