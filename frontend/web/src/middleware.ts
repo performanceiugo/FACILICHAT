@@ -37,13 +37,13 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(construirUrl(request, '/login'))
     }
     if (!ehSuperadmin) {
-      return NextResponse.redirect(construirUrl(request, '/painel/chamados'))
+      return NextResponse.redirect(construirUrl(request, '/painel/visao-geral'))
     }
   }
 
   if (pathname === '/login' && autenticado) {
     return NextResponse.redirect(
-      construirUrl(request, ehSuperadmin ? '/plataforma/empresas' : '/painel/chamados')
+      construirUrl(request, ehSuperadmin ? '/plataforma/empresas' : '/painel/visao-geral')
     )
   }
 

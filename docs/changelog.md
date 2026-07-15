@@ -7,6 +7,34 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fase 4 — atribuição de supervisor a chamados (`CU: 868kcv8dp`)
+- **Motivação:** ao popular o banco de demonstração com mais de um supervisor, descobrimos que
+  não existia nenhuma rota de API para atribuir um supervisor a um chamado — só acontecia por
+  inserção direta via script de seed. Isso também era uma lacuna real do painel do Gestor.
+- **Nova rota:** `PATCH /chamados/{id}/supervisor` — exclusiva do Gestor; recebe
+  `{"SupervisorID": "<uuid>" | null}`; o supervisor precisa existir com esse perfil na mesma
+  Empresa (404 caso contrário); `null` remove a atribuição atual ("sem supervisor").
+- **Validado:** atribuição, remoção e reatribuição retornaram `200` com `SupervisorNome`
+  correto; tentativa por um Supervisor (não Gestor) retornou `403`; UUID de supervisor
+  inexistente e chamado inexistente retornaram `404`; import do backend confirmado no contêiner.
+- Arquivo: `backend/app/rotas/Chamados.py`.
+
+### Dev — banco de demonstração populado com mais supervisores e chamados variados
+- **Motivação:** ampliar a massa de dados de teste para validar as telas do painel (Visão geral,
+  Supervisores, Todos os tickets) com mais volume e variedade antes de uma rodada de validação
+  visual da aplicação.
+- **Novos supervisores demo:** Fernanda Ribeiro (`fernanda@demo.facilichat.dev`) e Bruno Andrade
+  (`bruno@demo.facilichat.dev`), criados via `POST /usuarios/equipe` como Gestor, mesma senha
+  padrão de demonstração.
+- **13 novos chamados** criados via API (nunca SQL direto) pelos 4 clientes demo, cobrindo as 4
+  filas (Operacional/RH/Financeiro/Comercial), as 4 prioridades e categorias inéditas
+  (Ar-condicionado, Portão, Pintura, Atestado, Proposta, Segurança, Limpeza, Inadimplência,
+  Elevador, Jardinagem, Escala, Renovação, Boleto); parte deles distribuída entre Roberto,
+  Fernanda e Bruno com status variados (`EmAndamento`/`Agendado`/`Concluido`/`Cancelado`) via a
+  nova rota de atribuição, para dar lastro real ao relatório de desempenho por supervisor.
+- **Sem alteração de esquema:** só dado de demonstração; qualquer registro pode ser removido a
+  qualquer momento sem risco (não é dado real de cliente).
+
 ### Fase 4 — página de tickets com filtros e busca por cliente (`CU: 868k60w2j`)
 - **Tabela pesquisável:** `/painel/chamados` (agora "Todos os tickets") lista os chamados da
   Empresa em tabela com colunas Ticket/Cliente/Supervisor/Status/Abertura, em vez dos cards
@@ -30,6 +58,17 @@
   seja a primeira coisa vista ao entrar no painel.
 - Mudança puramente de navegação, sem alteração de regra de negócio.
 - Arquivo: `frontend/web/src/app/(auth)/login/page.tsx`.
+
+### Correção — middleware ainda mandava para `/painel/chamados` após login
+- **Bug:** a mudança acima só ajustou o `router.push` do formulário de login. O `middleware.ts`
+  (que roda no servidor antes do React) ainda tinha `/painel/chamados` hardcoded nos redirects de
+  `/login` (usuário já autenticado) e de `/plataforma` (não-Superadmin). Resultado: abrir
+  `localhost:3000` com uma sessão já ativa (cookie presente) caía direto em `/painel/chamados` —
+  não em `/painel/visao-geral` —, ignorando o comportamento client-side.
+- **Correção:** os dois redirects do `middleware.ts` agora apontam para `/painel/visao-geral`,
+  igual ao `login/page.tsx`. O mesmo ajuste foi replicado no guard client-side de
+  `/plataforma/empresas` (que mandava um não-Superadmin para `/painel/chamados`).
+- Arquivos: `frontend/web/src/middleware.ts`, `frontend/web/src/app/plataforma/empresas/page.tsx`.
 
 ### Fase 0.5 — ESLint com config explícita no web (`V2`, `CU: 868kb32cg`)
 - **Motivação:** `npm run lint` caía no assistente interativo do `next lint` (nenhum

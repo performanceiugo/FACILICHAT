@@ -205,3 +205,51 @@ async def atualizarStatus(
     await db.commit()
     await db.refresh(chamado)
     return chamado
+
+# Schema de entrada da atribuição de supervisor — SupervisorID nulo remove a atribuição atual.
+class SupervisorAtribuir(BaseModel):
+    SupervisorID: uuid.UUID | None = None
+
+# PATCH /chamados/{chamadoID}/supervisor — atribui, troca ou remove o supervisor responsável
+@roteador.patch("/{chamadoID}/supervisor", response_model=ChamadoSaida)
+async def atribuirSupervisor(
+    chamadoID: uuid.UUID,
+    payload: SupervisorAtribuir,
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual)
+):
+    # Autorização: decidir quem cuida de qual chamado é decisão de gestão — só o Gestor atribui.
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail="Somente o Gestor pode atribuir o supervisor responsável")
+
+    # Filtra também por EmpresaID: impede atribuir um chamado de outro tenant só por adivinhar o UUID.
+    resultado = await db.execute(
+        select(Chamado).where(Chamado.ID == chamadoID, Chamado.EmpresaID == usuarioAtual.EmpresaID)
+    )
+    chamado = resultado.scalar_one_or_none()
+    if not chamado:
+        raise HTTPException(status_code=404, detail="Chamado não encontrado")
+
+    supervisorNome: str | None = None
+    if payload.SupervisorID is not None:
+        # O supervisor precisa existir com esse papel na mesma Empresa — evita atribuir um
+        # usuário de outro tenant ou de outro perfil só por adivinhar/enumerar o UUID.
+        supervisorResultado = await db.execute(
+            select(Usuario).where(
+                Usuario.ID == payload.SupervisorID,
+                Usuario.EmpresaID == usuarioAtual.EmpresaID,
+                Usuario.Funcao == UsuarioFuncao.Supervisor,
+            )
+        )
+        supervisor = supervisorResultado.scalar_one_or_none()
+        if supervisor is None:
+            raise HTTPException(status_code=404, detail="Supervisor não encontrado")
+        supervisorNome = supervisor.Nome
+
+    chamado.SupervisorID = payload.SupervisorID
+    await db.commit()
+    await db.refresh(chamado)
+
+    clienteResultado = await db.execute(select(Usuario.Nome).where(Usuario.ID == chamado.ClienteID))
+    clienteNome = clienteResultado.scalar_one_or_none()
+    return montarChamadoSaida(chamado, clienteNome, supervisorNome)

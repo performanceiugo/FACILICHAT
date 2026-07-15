@@ -127,6 +127,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
 | GET | `/chamados/` | Listar chamados; aceita `supervisor_id={UUID}` para retornar somente a fila atribuída a um supervisor da mesma Empresa | Sim | Sem filtro: Cliente vê só os seus e Supervisor/Gestor vê todos. Com `supervisor_id`: apenas Gestor; 404 para supervisor inexistente, de outro tenant ou com outro perfil |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gestor (403 caso contrário); chamado finalizado não reabre (409) |
+| PATCH | `/chamados/{id}/supervisor` | Atribuir, trocar ou remover (`SupervisorID: null`) o supervisor responsável | Sim | Apenas Gestor (403 caso contrário); supervisor precisa existir com esse perfil na mesma Empresa (404 caso contrário) |
 
 ### Relatórios — `/relatorios`
 

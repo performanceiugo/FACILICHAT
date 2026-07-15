@@ -42,7 +42,7 @@ export default function EmpresasPlataformaPage() {
       return
     }
     if (!auth.isSuperadmin()) {
-      router.push('/painel/chamados')
+      router.push('/painel/visao-geral')
       return
     }
     setNome(auth.nome())
