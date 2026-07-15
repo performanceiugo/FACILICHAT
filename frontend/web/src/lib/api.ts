@@ -13,6 +13,7 @@ import type {
   Mensagem,
   TokenResposta,
   Usuario,
+  VisaoGeralRelatorio,
 } from '@/types'
 import { auth } from '@/lib/auth'
 import { COOKIE_CSRF, HEADER_CSRF, lerCookie } from '@/lib/auth-storage'
@@ -184,6 +185,11 @@ export const api = {
       req<Chamado[]>('/chamados/irmaos', { method: 'POST', body: JSON.stringify(payload) }),
     atualizarStatus: (id: string, status: ChamadoStatus) =>
       req<Chamado>(`/chamados/${id}/status?status=${status}`, { method: 'PATCH' }),
+  },
+
+  // Relatorios executivos sao agregados no backend para preservar permissoes e tenant.
+  relatorios: {
+    visaoGeral: () => req<VisaoGeralRelatorio>('/relatorios/visao-geral'),
   },
 
   mensagens: {

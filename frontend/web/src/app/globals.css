@@ -137,3 +137,13 @@ body {
 
 /* Links herdam a cor do contexto por padrão (o design system controla via classe) */
 a { color: inherit; text-decoration: none; }
+
+/* Anel de foco de teclado (item B5) — vale para QUALQUER elemento focável da aplicação
+   (links, botões, inputs). `:focus-visible` só dispara na navegação por teclado, então o
+   clique de mouse não ganha anel. Regras locais mais específicas (ex.: inputs do login com
+   borda+sombra no :focus) continuam valendo por especificidade — o global é a rede de
+   segurança para nunca existir elemento focável sem indicação visual. */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}

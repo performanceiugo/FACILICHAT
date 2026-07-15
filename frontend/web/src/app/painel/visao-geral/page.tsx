@@ -1,15 +1,14 @@
 'use client'
 
 // Visao geral do painel do Gestor.
-// Este recorte visual usa apenas os chamados ja disponiveis para mostrar a direcao do produto
-// sem depender dos endpoints de relatorio da Fase 4 que ainda serao implementados no backend.
+// Combina KPIs calculados pelo backend com distribuicoes derivadas dos chamados do tenant.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
-import type { Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus } from '@/types'
+import type { Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus, VisaoGeralRelatorio } from '@/types'
 import styles from './visao-geral.module.css'
 
 // Ordem canonica dos status do MVP, usada para manter os graficos estaveis mesmo com zero itens.
@@ -63,22 +62,32 @@ function diasDesde(dataIso: string): number {
   return Math.max(0, Math.floor(diferenca / (1000 * 60 * 60 * 24)))
 }
 
+// Formata duracoes executivas sem inventar valor quando o backend nao possui amostra.
+function formatarDuracao(minutos: number | null): string {
+  if (minutos === null) return '—'
+  if (minutos < 60) return `${Math.round(minutos)} min`
+
+  const horas = minutos / 60
+  return `${horas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`
+}
+
 export default function VisaoGeralPage() {
   const [chamados, setChamados] = useState<Chamado[]>([])
+  const [relatorio, setRelatorio] = useState<VisaoGeralRelatorio | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
   const ativoRef = useRef(true)
 
-  // Busca os chamados. `mostrarCarregando` so vale true na carga inicial — a atualizacao
-  // automatica em segundo plano (useAtualizacaoPeriodica) troca os dados sem piscar loading nem
-  // erro, mantendo a ultima leitura boa na tela se uma atualizacao falhar.
-  const buscarChamados = useCallback((mostrarCarregando: boolean) => {
+  // Busca KPIs e chamados juntos. `mostrarCarregando` so vale true na carga inicial; o polling
+  // troca os dados em silencio e preserva a ultima leitura boa se uma atualizacao falhar.
+  const buscarVisaoGeral = useCallback((mostrarCarregando: boolean) => {
     if (mostrarCarregando) setCarregando(true)
-    api.chamados.listar()
-      .then(resultado => {
+    Promise.all([api.relatorios.visaoGeral(), api.chamados.listar()])
+      .then(([novoRelatorio, novosChamados]) => {
         if (!ativoRef.current) return
-        setChamados(resultado)
+        setRelatorio(novoRelatorio)
+        setChamados(novosChamados)
         if (mostrarCarregando) setErro('')
       })
       .catch(err => {
@@ -95,17 +104,15 @@ export default function VisaoGeralPage() {
   useEffect(() => {
     ativoRef.current = true
     setEmpresaNome(auth.empresaNome())
-    buscarChamados(true)
+    buscarVisaoGeral(true)
     return () => { ativoRef.current = false }
-  }, [buscarChamados])
+  }, [buscarVisaoGeral])
 
-  useAtualizacaoPeriodica(() => buscarChamados(false))
+  useAtualizacaoPeriodica(() => buscarVisaoGeral(false))
 
   // Agrega os chamados em estruturas de exibicao para KPIs, graficos e atencoes.
   const resumo = useMemo(() => {
     const chamadosAbertos = chamados.filter(chamado => !STATUS_FINAIS.has(chamado.Status))
-    const chamadosCriticos = chamadosAbertos.filter(chamado => chamado.Prioridade === 'Critica')
-    const chamadosAltaOuCritica = chamadosAbertos.filter(chamado => ['Alta', 'Critica'].includes(chamado.Prioridade))
     const statusContagem = contarPorCampo(chamados, chamado => chamado.Status)
     const filaContagem = contarPorCampo(chamados, chamado => chamado.Fila)
     const categoriaContagem = contarPorCampo(chamados, chamado => chamado.Categoria || 'Sem categoria')
@@ -113,9 +120,6 @@ export default function VisaoGeralPage() {
     const maxFila = Math.max(1, ...FILA_ORDEM.map(fila => filaContagem[fila] ?? 0))
 
     return {
-      chamadosAbertos,
-      chamadosCriticos,
-      chamadosAltaOuCritica,
       statusContagem,
       filaContagem,
       categoriaRanking: Object.entries(categoriaContagem)
@@ -134,16 +138,17 @@ export default function VisaoGeralPage() {
     }
   }, [chamados])
 
-  // KPIs principais: somente metricas derivaveis hoje, sem simular SLA ou tempos medios inexistentes.
+  // KPIs principais usam exclusivamente o relatorio real; nulos aparecem como travessao.
   const kpis = [
-    { label: 'Chamados abertos', valor: resumo.chamadosAbertos.length, detalhe: 'Em operacao agora', tom: 'info' },
-    { label: 'Atencao imediata', valor: resumo.chamadosAltaOuCritica.length, detalhe: 'Alta ou critica abertas', tom: 'danger' },
-    { label: 'Criticos', valor: resumo.chamadosCriticos.length, detalhe: 'Prioridade maxima', tom: 'warning' },
-    { label: 'Concluidos', valor: resumo.statusContagem.Concluido ?? 0, detalhe: 'Base carregada', tom: 'success' },
+    { label: 'Chamados abertos', valor: relatorio?.TotalAbertos ?? '—', detalhe: 'Em operacao agora', tom: 'info' },
+    { label: 'SLA estourado', valor: relatorio?.SlaEstourado ?? '—', detalhe: 'Prazo vencido', tom: 'danger' },
+    { label: '1ª resposta media', valor: formatarDuracao(relatorio?.PrimeiraRespostaMediaMinutos ?? null), detalhe: 'Ate o primeiro retorno', tom: 'warning' },
+    { label: 'Resolucao media', valor: formatarDuracao(relatorio?.ResolucaoMediaMinutos ?? null), detalhe: 'Chamados concluidos', tom: 'success' },
   ] as const
 
-  if (carregando) return <p className={styles.info}>Carregando visao geral...</p>
-  if (erro) return <p className={styles.erro}>{erro}</p>
+  // Item B5: role="status"/"alert" dão aria-live implícito aos estados de carga e erro
+  if (carregando) return <p className={styles.info} role="status">Carregando visao geral...</p>
+  if (erro) return <p className={styles.erro} role="alert">{erro}</p>
 
   return (
     <div className={styles.pagina}>

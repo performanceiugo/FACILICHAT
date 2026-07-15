@@ -188,7 +188,8 @@ export default function EmpresasPlataformaPage() {
               </div>
             </div>
 
-            {erro && <p className={styles.erro}>{erro}</p>}
+            {/* role="alert" anuncia a falha imediatamente em leitores de tela (item B5) */}
+            {erro && <p className={styles.erro} role="alert">{erro}</p>}
             <button type="submit" disabled={carregando} className={styles.botaoPrimario}>
               {carregando ? 'Criando...' : 'Criar empresa'}
             </button>

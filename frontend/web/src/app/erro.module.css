@@ -63,8 +63,4 @@
 
 .botao:hover { background: var(--blue-600); }
 
-/* Anel de foco visível para navegação por teclado (antecipa o padrão do B5) */
-.botao:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--blue-50), 0 0 0 1px var(--border-focus);
-}
+/* Foco de teclado: coberto pelo anel global de :focus-visible do globals.css (item B5) */

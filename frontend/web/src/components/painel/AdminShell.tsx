@@ -89,28 +89,41 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           FaciliChat
         </div>
 
-        <nav className={styles.nav}>
-          <Link
-            href="/painel/visao-geral"
-            className={pathname === '/painel/visao-geral' || pathname === '/painel' ? styles.linkAtivo : styles.link}
-          >
-            <span className={styles.navIcone}><IconVisaoGeral /></span>
-            Visao geral
-          </Link>
+        {/* Item B5: aria-label identifica a navegação para leitores de tela e aria-current
+            marca a rota atual (o equivalente semântico do destaque visual de .linkAtivo) */}
+        <nav className={styles.nav} aria-label="Navegação principal">
+          {(() => {
+            const visaoGeralAtiva = pathname === '/painel/visao-geral' || pathname === '/painel'
+            const chamadosAtivo = pathname?.startsWith('/painel/chamados') ?? false
+            return (
+              <>
+                <Link
+                  href="/painel/visao-geral"
+                  className={visaoGeralAtiva ? styles.linkAtivo : styles.link}
+                  aria-current={visaoGeralAtiva ? 'page' : undefined}
+                >
+                  <span className={styles.navIcone} aria-hidden="true"><IconVisaoGeral /></span>
+                  Visao geral
+                </Link>
 
-          <Link
-            href="/painel/chamados"
-            className={pathname?.startsWith('/painel/chamados') ? styles.linkAtivo : styles.link}
-          >
-            <span className={styles.navIcone}><IconChamados /></span>
-            Chamados
-          </Link>
+                <Link
+                  href="/painel/chamados"
+                  className={chamadosAtivo ? styles.linkAtivo : styles.link}
+                  aria-current={chamadosAtivo ? 'page' : undefined}
+                >
+                  <span className={styles.navIcone} aria-hidden="true"><IconChamados /></span>
+                  Chamados
+                </Link>
+              </>
+            )
+          })()}
         </nav>
 
         {/* Rodapé da sidebar com identificação do usuário e botão de logout */}
         <div className={styles.rodape}>
           <div className={styles.usuario}>
-            <span className={styles.avatar}>{nome ? iniciais(nome) : '?'}</span>
+            {/* Iniciais são decorativas — o nome completo está logo ao lado (item B5) */}
+            <span className={styles.avatar} aria-hidden="true">{nome ? iniciais(nome) : '?'}</span>
             <div className={styles.usuarioInfo}>
               <span className={styles.nomeUsuario}>{nome}</span>
               {empresaNome && <span className={styles.empresaUsuario}>{empresaNome}</span>}

@@ -44,6 +44,16 @@ export interface Chamado {
   Criacao: string  // ISO 8601 — converter com new Date() antes de exibir
 }
 
+// Resumo executivo calculado pelo backend para o painel do Gestor.
+// Medias permanecem nulas quando a Empresa ainda nao possui amostra suficiente.
+export interface VisaoGeralRelatorio {
+  TotalAbertos: number
+  SlaEstourado: number
+  PrimeiraRespostaMediaMinutos: number | null
+  ResolucaoMediaMinutos: number | null
+  AtualizadoEm: string
+}
+
 // Mensagem do chat interno de um chamado
 export interface Mensagem {
   ID: string

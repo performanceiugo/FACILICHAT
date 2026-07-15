@@ -83,12 +83,27 @@ valores hardcoded). O `error.tsx` loga o erro só no `console.error` — o usuá
 trace. Se alguma seção futura precisar de tratamento próprio, basta criar um `error.tsx` local no
 segmento, que o Next usa o mais próximo da falha.
 
+### Acessibilidade (a11y) — item B5
+
+Convenções aplicadas em todo o web e obrigatórias em telas novas:
+- **Foco de teclado:** regra global `:focus-visible` no `globals.css` (anel de 2px em
+  `--border-focus`) cobre qualquer elemento focável. Não escrever `outline: none` sem entregar
+  indicação visual equivalente na mesma regra (como fazem os inputs do login com borda+sombra).
+- **Navegação:** `<nav>` com `aria-label`, link da rota atual com `aria-current="page"`,
+  ícones decorativos (SVGs, avatar de iniciais) com `aria-hidden="true"`.
+- **Estados assíncronos:** mensagem de carregamento com `role="status"` e mensagem de erro com
+  `role="alert"` — ambos têm `aria-live` implícito (polite/assertive), então o leitor de tela
+  anuncia a mudança sem foco no elemento. Padrão já usado em chamados, visão geral, login e
+  empresas; cards expansíveis usam `aria-expanded`/`aria-controls` (ver supervisores).
+
 ### Visão geral do painel (`/painel/visao-geral`)
 
-A visão geral é um recorte visual da Fase 4 que consome apenas `api.chamados.listar()`.
-Ela agrega no frontend os dados já disponíveis: chamados abertos, prioridades alta/crítica, concluídos,
-distribuição por status, volume por fila e categorias vindas dos dados reais. Métricas que ainda não
-existem no backend (SLA, primeira resposta média e resolução média) não são simuladas.
+A visão geral combina duas fontes reais do mesmo tenant. `api.relatorios.visaoGeral()` consome
+`GET /relatorios/visao-geral` para os quatro KPIs executivos — chamados abertos, SLA estourado,
+primeira resposta média e resolução média — enquanto `api.chamados.listar()` alimenta distribuição
+por status, volume por fila, categorias e a lista de atenção. O contrato
+`VisaoGeralRelatorio` fica em `types/index.ts`; médias sem amostra permanecem `null` e são exibidas
+como travessão, nunca substituídas por números fictícios.
 
 **Atualização automática (`useAtualizacaoPeriodica`):** esta página e a de Chamados (abaixo)
 reexecutam o fetch a cada ~20s, estilo painel de BI, em vez de exigir reload manual — hook em
@@ -96,7 +111,8 @@ reexecutam o fetch a cada ~20s, estilo painel de BI, em vez de exigir reload man
 fora por decisão de escopo). O hook pausa o polling quando a aba fica em segundo plano (Page
 Visibility API) e busca na hora ao voltar. Nas duas páginas, `carregando`/`erro` só aparecem na
 carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se
-uma falhar.
+uma falhar. Na visão geral, o mesmo ciclo busca relatório e chamados com `Promise.all`, evitando
+mostrar KPIs de uma leitura e distribuições de outra.
 
 ### Guarda de montagem em `useEffect` com fetch — item B2
 

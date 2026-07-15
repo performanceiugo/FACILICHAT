@@ -216,5 +216,53 @@ EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
 
 ---
 
-*Última atualização: 27 de junho de 2026*
+## Checklist de aceite do branding (item D8)
+
+> Resultado da validação dos HTMLs comerciais de `docs/FaciliChat-Regras/` convertido em critérios
+> de aceite verificáveis, por eixo. Qualquer entrega nova deve continuar passando em todos os
+> itens do(s) eixo(s) que ela toca — em caso de conflito, a fonte da verdade é o material do
+> comercial (e a Trava de Segurança do `CLAUDE.md`).
+
+### Eixo 1 — Design system
+- [ ] Toda cor, raio, espaçamento e fonte da UI vem dos tokens (`globals.css` no web, `lib/theme.ts` no mobile) — nunca valores hardcoded
+- [ ] Azul primário #148AF5, texto nas escalas Ink, Figtree como fonte, ícones de linha (Line Awesome ou equivalente inline)
+- [ ] Interface discreta: hospeda a marca do cliente e nunca compete com ela
+- [ ] Linguagem das telas simples e sem jargão técnico
+
+### Eixo 2 — Anti-amnésia (tese central)
+- [ ] Nada que o cliente pede se perde: toda solicitação vira registro rastreável (chamado)
+- [ ] Uma mensagem pode gerar 2+ chamados (tickets irmãos via `GrupoOrigemID`) sem perder o vínculo de origem
+- [ ] Histórico completo consultável (mensagens, mudanças de status, autoria — incluindo IA/Sistema)
+
+### Eixo 3 — Multi-tenant
+- [ ] Toda tabela tem `EmpresaID`; toda query é escopada por ele; RLS ativo no Postgres
+- [ ] O tenant viaja no JWT; papéis valem por Empresa (não globais)
+- [ ] 7 perfis: Cliente, Funcionário (único, sem subtipos), Supervisor, RH, Financeiro, Gestor, Superadmin
+- [ ] Superadmin (Iugo) opera a plataforma; Empresas são criadas/suspensas só por ele
+
+### Eixo 4 — IA ancorada (inegociável)
+- [ ] A IA nunca inventa preço nem prazo; só narra campos estruturados (status, datas, responsável)
+- [ ] Nunca oferece serviço fora do catálogo da Empresa; nunca responde regra de RH/Financeiro não cadastrada (encaminha)
+- [ ] Nunca responde em nome de um supervisor; mensagens da IA são identificáveis (`AutorTipo.IA`)
+- [ ] Decisões da IA são auditáveis (log de intenção/consulta/ação — `IaAuditoria`, Fase 5.5)
+
+### Eixo 5 — Visita técnica (MVP02)
+- [ ] Visita é entidade irmã do ticket (não um tipo de ticket)
+- [ ] Proativa (supervisor→cliente), com tempo cronometrado; duração **derivada**, nunca armazenada
+- [ ] O cliente não aprova a visita — só recebe/consulta a prova
+
+### Eixo 6 — Jornadas (chat é o palco, ticket é o bastidor)
+- [ ] O cliente interage por conversa; o ticket organiza o trabalho nos bastidores
+- [ ] Estados do ticket no MVP: Recebido, Em andamento, Agendado, Concluído (+ Cancelado)
+- [ ] Filas roteiam ao papel certo: Operacional→Supervisor, RH→RH, Financeiro→Financeiro, Comercial→Gestor
+- [ ] Cliente vê só os próprios chamados; equipe vê conforme o papel
+
+> Status em 15/07/2026: eixos 1, 2 (parcial — chat pendente), 3 e 6 (parcial — chat pendente) já
+> têm implementação conferível no código; eixos 4 e 5 valem como critério de aceite para as fases
+> futuras (IA nas Fases 5/5.5, visitas na Fase 8). As caixas ficam vazias de propósito: o aceite
+> é reavaliado a cada entrega, não marcado uma vez.
+
+---
+
+*Última atualização: 15 de julho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

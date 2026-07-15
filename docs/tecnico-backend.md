@@ -4,19 +4,22 @@
 
 ## Como rodar o backend
 
-```bash
-# 1. Subir o banco de dados
-docker compose up -d
+O caminho padrão é o Docker Compose — ele sobe o Postgres **e** a API juntos (o serviço `backend`
+roda `uvicorn` com `--reload` dentro do container, com o código local montado como volume):
 
-# 2. Instalar dependências Python
+```bash
+# na raiz do repositório (exige .env da raiz e backend/.env — ver docs/setup.md)
+docker compose up -d
+```
+
+Alternativa sem Docker para a API (o banco continua vindo do compose) — funciona desde a criação
+do `backend/app/__init__.py` (item C2), que tornou `app` um pacote importável:
+
+```bash
+docker compose up -d db          # só o Postgres
 cd backend
 pip install -r requirements.txt
-
-# 3. Criar arquivo .env (copiar do exemplo)
-cp .env.example .env
-# (editar os valores no .env)
-
-# 4. Rodar o servidor (a partir de backend/)
+cp .env.example .env             # editar os valores (DATABASE_URL aponta para localhost)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -34,7 +37,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Nome | String(120) | Nome completo |
 | Email | String(120) | Email único (login) |
 | SenhaHash | String(255) | Senha em hash argon2 |
-| Funcao | Enum | Cliente / Supervisor / Funcionario / Gerente |
+| Funcao | Enum | Cliente / Funcionario / Supervisor / RH / Financeiro / Gestor / Superadmin |
 | Telefone | String(20) | Opcional |
 | Condominio | String(120) | Nome do condomínio, opcional |
 | Criacao | DateTime | Data de cadastro |
@@ -110,14 +113,19 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 |---|---|---|---|---|
 | POST | `/chamados/` | Abrir novo chamado | Sim | Qualquer perfil |
 | POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
-| GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gerente vê todos |
-| PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gerente (403 caso contrário); chamado finalizado não reabre (409) |
+| GET | `/chamados/` | Listar chamados | Sim | Cliente vê só os seus; Supervisor/Gestor vê todos |
+| PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gestor (403 caso contrário); chamado finalizado não reabre (409) |
 
 ### Relatórios — `/relatorios`
 
 | Método | Rota | Descrição | Autenticação | Permissão |
 |---|---|---|---|---|
 | GET | `/relatorios/visao-geral` | Total de chamados abertos, SLA vencido, primeira resposta média e resolução média; tempos em minutos e `null` quando não há amostra | Sim | Apenas Gestor; dados filtrados pela Empresa do token e protegidos por RLS |
+| GET | `/relatorios/supervisores` | Lista todos os supervisores da Empresa com chamados abertos, atrasados e primeira resposta média; inclui supervisores sem chamados e usa `null` quando não há resposta | Sim | Apenas Gestor; chamados e mensagens filtrados pela Empresa do token e protegidos por RLS |
+
+A primeira resposta por supervisor só considera a primeira mensagem do próprio supervisor
+atribuído ao chamado, posterior à abertura. Respostas de outro usuário ou mensagens de sistema/IA
+não entram na média. Os valores são calculados no PostgreSQL e arredondados apenas na resposta.
 
 ---
 

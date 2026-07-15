@@ -79,7 +79,7 @@
 | Fase | Tema | Tarefa-pai (CU) | Status |
 |------|------|-----------------|--------|
 | 0 | Infraestrutura e base | `868k60uxe` | ✅ Concluída |
-| 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos e segurança 08/07 (S1–S17) concluídos; altos concluídos; versões/médios/baixos/docs na fila |
+| 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | 🟡 Críticos, segurança (S1–S17), altos, médios (M1–M13), baixos (B1–B7) e docs (D1–D8) concluídos; só versões (V1–V6) na fila |
 | 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo e tickets irmãos concluídos; regras/refinos na fila · **PRIORITÁRIO** |
 | 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | ✅ Concluída |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
@@ -126,7 +126,7 @@
 | `[x]` | `868k60uxr` | Auth JWT (login, token, middleware `obterUsuarioAtual`) |
 | `[x]` | `868k60uxu` | Modelo `Usuario` com enum `UsuarioFuncao` (Cliente/Supervisor/Funcionario/Gerente) |
 | `[x]` | `868k60uy1` | Modelo `Chamado` com enums de Fila, Status e Prioridade |
-| `[x]` | `868k60uy4` | Modelo `Mensagem` com `AutorTipo` (Humano/IA/Sistema) |
+| `[x]` | `868k60uy4` | Modelo `Mensagem` com `AutorTipo` (hoje: Cliente/Supervisor/Funcionario/IA/Sistema) |
 | `[x]` | `868k60uya` | Rotas: POST `/usuarios/`, GET `/usuarios/eu` |
 | `[x]` | `868k60uyf` | Rotas: POST `/chamados/`, GET `/chamados/`, PATCH `/chamados/{id}/status` |
 | `[x]` | `868k60uym` | Conexão assíncrona PostgreSQL via SQLAlchemy + asyncpg |
@@ -256,7 +256,7 @@
 | `[x]` | `868k60vca` | B2 | `useEffect` de fetch sem cleanup/AbortController (web e mobile) | Fechado em 15/07/2026: `painel/chamados/page.tsx` e `painel/visao-geral/page.tsx` já tinham guarda de montagem (`montadoRef`/`ativoRef`); adicionada a mesma guarda em `plataforma/empresas/page.tsx` (web) e em `(tabs)/chamados.tsx`/`(tabs)/perfil.tsx` (mobile) — nenhum `setState` roda mais após a tela desmontar. Convenção documentada no `tecnico-frontend.md` para telas novas. Validado com `tsc --noEmit` nos dois fronts | `frontend/web/src/app/plataforma/empresas/page.tsx`, `frontend/mobile/app/(tabs)/chamados.tsx`, `frontend/mobile/app/(tabs)/perfil.tsx`, `docs/tecnico-frontend.md` |
 | `[x]` | `868k60vck` | B3 | Web: faltam `error.tsx` e `not-found.tsx` | Fechado em 15/07/2026: `app/error.tsx` (boundary global client-side, botão "Tentar novamente" via `reset()`, erro só no `console.error`) e `app/not-found.tsx` (404 com link "Voltar ao início"), em PT e nos tokens do design system (`app/erro.module.css` compartilhado, padrão visual do card de login). Validado com `tsc --noEmit` e Playwright no dev server real: 404 em desktop/mobile e boundary exercitado por rota temporária que lança exceção (removida após a captura) | `frontend/web/src/app/error.tsx`, `not-found.tsx`, `erro.module.css` (novos) |
 | `[x]` | `868k60vct` | B4 | Mobile: tabs sem ícones (Line Awesome) | Adicionar `tabBarIcon` às abas | `frontend/mobile/app/(tabs)/_layout.tsx` |
-| `[ ]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | `:focus-visible` com anel de foco; adicionar atributos ARIA | `frontend/web/src/app/**` |
+| `[x]` | `868k60vcx` | B5 | A11y: foco de teclado removido; navegação sem ARIA; estados sem `aria-live` | Fechado em 15/07/2026: `:focus-visible` global no `globals.css` (anel 2px em `--border-focus`, qualquer elemento focável; removido o local redundante do `erro.module.css`); sidebar com `aria-label`/`aria-current="page"`/ícones `aria-hidden`; carregando com `role="status"` e erros com `role="alert"` (aria-live implícito) em chamados, visão geral, login e empresas (supervisores já conforme). Convenções registradas no `tecnico-frontend.md`. Validado com `tsc --noEmit` e Playwright real: Tab mostra outline `2px solid #148AF5` em botão e links, senha errada dispara o `role="alert"`, nav autenticada expõe o ARIA | `frontend/web/src/app/globals.css`, `erro.module.css`, `components/painel/AdminShell.tsx`, páginas de chamados/visão geral/login/empresas |
 | `[x]` | `868k60vd4` | B6 | Backend: JWT sem `iat/iss/aud/jti`; hasher duplicado (achado um 4º ponto em `Plataforma.py` além dos 3 do levantamento original); `@app.on_event` deprecado | Claims `iat/iss/aud/jti` no token (`criarToken`) e validadas no decode (`_decodificarToken`, com `issuer`/`audience`); hasher centralizado em `app/servicos/hasher.py` e reaproveitado por `Autenticacao.py`, `Usuarios.py`, `Plataforma.py` e `gerenciar_banco.py`; `@app.on_event("startup")` migrado para `lifespan`. Validado com `import app.main`, reset+seed do banco e `verificar-rls` | `backend/app/servicos/hasher.py` (novo), `backend/app/rotas/Autenticacao.py`, `Usuarios.py`, `Plataforma.py`, `backend/app/main.py`, `backend/scripts/gerenciar_banco.py` |
 | `[x]` | `868k7vx0v` | B7 | Painel web (desktop do Gestor) não validado em navegador mobile (breakpoints, tabelas largas) | Validado com Playwright (Chromium) em viewport mobile (390×844) e desktop (1440×900), autenticado como Gestor Demo: `/painel/chamados`, `/painel/supervisores` e `/painel/visao-geral` sem overflow horizontal, sidebar colapsa para o topo em mobile, cards empilham em coluna única, sem erros de console | `frontend/web/src/app/painel/**` |
 
@@ -273,13 +273,13 @@
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
-| `[ ]` | `868k60vdg` | D1 | Divergência de enums: doc cita `AutorTipo: Humano/IA/Sistema` mas código usa `Cliente/Supervisor/Funcionario/IA/Sistema` | Padronizar doc com o código | `plano-implementacao.md`, `tecnico-backend.md` |
-| `[ ]` | `868k60vdm` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Padronizar para o calendário correto | `docs/changelog.md` |
-| `[ ]` | `868k60vdp` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports | Atualizar comando de execução após corrigir imports | `docs/tecnico-backend.md` |
-| `[ ]` | `868kaa3f2` | D5 | `visao-geral.md` está desatualizado: diz que o código ainda tem 4 perfis/"Gerente" e só 3 filas, mas o código já tem 7 perfis e fila `Comercial` | Atualizar visão geral para refletir o estado atual e separar "feito" de "planejado" | `docs/visao-geral.md` |
+| `[x]` | `868k60vdg` | D1 | Divergência de enums: doc cita `AutorTipo: Humano/IA/Sistema` mas código usa `Cliente/Supervisor/Funcionario/IA/Sistema` | Fechado em 15/07/2026: as duas ocorrências no plano (item da Fase 0 e notas rápidas) sincronizadas com o enum real; `tecnico-backend.md` já estava correto no `AutorTipo`, mas a tabela de `Funcao` (4 perfis com "Gerente") e as permissões de chamados foram atualizadas para os 7 perfis com `Gestor` | `plano-implementacao.md`, `tecnico-backend.md` |
+| `[x]` | `868k60vdm` | D2 | Datas inconsistentes no `changelog.md` (mistura 2025/2026) | Fechado em 15/07/2026: versões `0.1.0`/`0.2.0`/`0.3.0`/`0.3.1` corrigidas de 2025 para junho de 2026 (typo entre entradas do mesmo período); mantido o "07/2025" da nota de WhatsApp por ser data externa real da política da Meta | `docs/changelog.md` |
+| `[x]` | `868k60vdp` | D4 | `tecnico-backend.md` documenta `uvicorn app.main:app` que falha pelos imports | Fechado em 15/07/2026: "Como rodar" reescrito — caminho padrão é `docker compose up -d` (Postgres + API, como o compose faz hoje) e o `uvicorn` direto virou alternativa com `docker compose up -d db`; o comando funciona desde o `C2` (`__init__.py`) | `docs/tecnico-backend.md` |
+| `[x]` | `868kaa3f2` | D5 | `visao-geral.md` está desatualizado: diz que o código ainda tem 4 perfis/"Gerente" e só 3 filas, mas o código já tem 7 perfis e fila `Comercial` | Fechado em 15/07/2026: reescrito para o estado real (7 perfis implementados, 4 filas com Comercial, multi-tenant/Superadmin entregues, KPIs reais, tickets irmãos, segurança atual); próximos passos só com o que falta e tabela de estado separando feito de planejado | `docs/visao-geral.md` |
 | `[x]` | `868kaa3fz` | D6 | `arquitetura.md` afirma que `obterTenantAtual` é injetada em todas as rotas, mas a revisão mostrou rotas usando `obterBancoDados` puro | `arquitetura.md` atualizado junto do `S2`, descrevendo a dependência tenant-aware real (`obterBancoDadosComTenant`) | `docs/arquitetura.md`, `backend/app/rotas/*.py` |
-| `[ ]` | `868kaa3ga` | D7 | Notas rápidas do plano mantêm `AutorTipo mensagem: Humano/IA/Sistema`, divergindo do código atual (`Cliente/Supervisor/Funcionario/IA/Sistema`) | Sincronizar notas de arquitetura com enums reais ou ajustar o código se a regra canônica for outra | `docs/plano-implementacao.md`, `docs/tecnico-backend.md` |
-| `[ ]` | `868kaa3h4` | D8 | Resultado da validação dos HTMLs de branding ainda não existe como checklist explícito de aceite | Criar checklist de aceite por eixo: design system, anti-amnésia, multi-tenant, IA ancorada, visita técnica e jornadas | `docs/plano-implementacao.md`, `docs/arquitetura.md` |
+| `[x]` | `868kaa3ga` | D7 | Notas rápidas do plano mantêm `AutorTipo mensagem: Humano/IA/Sistema`, divergindo do código atual (`Cliente/Supervisor/Funcionario/IA/Sistema`) | Fechado em 15/07/2026 junto do D1: a regra canônica confirmada é a do código (o enum diferencia os papéis humanos para rastreabilidade da autoria — tese anti-amnésia); notas rápidas sincronizadas | `docs/plano-implementacao.md`, `docs/tecnico-backend.md` |
+| `[x]` | `868kaa3h4` | D8 | Resultado da validação dos HTMLs de branding ainda não existe como checklist explícito de aceite | Fechado em 15/07/2026: criada a seção "Checklist de aceite do branding (item D8)" no `arquitetura.md`, com critérios verificáveis por eixo (design system, anti-amnésia, multi-tenant, IA ancorada, visita técnica, jornadas) e nota de status por eixo; o aceite é reavaliado a cada entrega que toque o eixo | `docs/arquitetura.md` |
 
 ---
 
@@ -524,7 +524,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[x]` | `868k60w1b` | `GET /relatorios/visao-geral` — total abertos, SLA estourado, 1ª resposta média, resolução média; exclusivo do Gestor, escopado por Empresa/RLS, médias em minutos e `null` sem amostra | `backend/app/rotas/Relatorios.py` (novo) |
-| `[ ]` | `868k60w1e` | `GET /relatorios/supervisores` — supervisores com abertos, atrasados, 1ª resposta média | `backend/app/rotas/Relatorios.py` |
+| `[~]` | `868k60w1e` | `GET /relatorios/supervisores` — supervisores com abertos, atrasados, 1ª resposta média | `backend/app/rotas/Relatorios.py` |
 | `[ ]` | `868k60w1g` | `GET /chamados/?supervisor_id={id}` — fila de um supervisor específico (visão do gestor) | `backend/app/rotas/Chamados.py` |
 | `[ ]` | `868k7vrvm` | **Alerta de gargalo "parado há tempo demais"** — limite **configurável por Empresa** (não hard-coded); "tempo parado" é **derivado** de `Atualizacao` | `backend/app/rotas/Relatorios.py` |
 | `[ ]` | `868k7vrw8` | **Alerta de cobertura descoberta** — posto/turno sem responsável confirmado | `backend/app/rotas/Relatorios.py` |
@@ -535,7 +535,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[x]` | `868k60w1k` | Página `/painel` redirecionada para `/painel/visao-geral` | `frontend/web/src/app/(painel)/page.tsx` |
-| `[~]` | `868k60w1r` | Página `visao-geral` — cards de KPIs (abertos, SLA em risco, 1ª resposta, resolução) | `frontend/web/src/app/(painel)/visao-geral/page.tsx` (novo) |
+| `[x]` | `868k60w1r` | Página `visao-geral` — cards de KPIs (abertos, SLA em risco, 1ª resposta, resolução) | `frontend/web/src/app/(painel)/visao-geral/page.tsx` (novo) |
 | `[ ]` | `868k60w1y` | Seção "Desempenho por supervisor" — tabela com nome, abertos, 1ª resposta, estado | (dentro de visao-geral) |
 | `[x]` | `868k60w26` | Seção "Volume por categoria" — categorias vêm **dos dados** (agregação real), não de lista fixa | (dentro de visao-geral) |
 | `[x]` | `868k7vrwr` | **Hierarquia do painel: urgente → tendência → detalhe** — ação agora primeiro; tendência em 2º nível; detalhe sob demanda | (dentro de visao-geral) |
@@ -802,7 +802,7 @@ Filas de chamado:     Operacional | RH | Financeiro | Comercial
 Status de chamado:    Recebido | EmAndamento | Agendado | Concluido | Cancelado
 Prioridades:          Baixa | Media | Alta | Critica
 Status de visita:     Agendada | EmAndamento | Finalizada | RelatorioEnviado
-AutorTipo mensagem:   Humano | IA | Sistema
+AutorTipo mensagem:   Cliente | Supervisor | Funcionario | IA | Sistema
 Tipo de mensagem:     Texto | Audio | Imagem  (voz/foto valem igual a texto — Fases 1/9)
 
 Entidades novas (discovery, ainda não implementadas):

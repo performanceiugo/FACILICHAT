@@ -81,8 +81,10 @@ export default function ChamadosPage() {
 
   useAtualizacaoPeriodica(() => buscarChamados(false))
 
-  if (carregando) return <p className={styles.info}>Carregando chamados...</p>
-  if (erro) return <p className={styles.erro}>{erro}</p>
+  // Item B5: role="status" (aria-live polite) anuncia o carregamento a leitores de tela;
+  // role="alert" (aria-live assertive) anuncia o erro imediatamente
+  if (carregando) return <p className={styles.info} role="status">Carregando chamados...</p>
+  if (erro) return <p className={styles.erro} role="alert">{erro}</p>
 
   return (
     <div>

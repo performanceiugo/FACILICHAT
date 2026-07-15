@@ -80,8 +80,9 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Mensagem de erro exibida quando login falha */}
-          {erro && <p className={styles.erro}>{erro}</p>}
+          {/* Mensagem de erro exibida quando login falha — role="alert" anuncia a
+              falha imediatamente em leitores de tela (item B5) */}
+          {erro && <p className={styles.erro} role="alert">{erro}</p>}
 
           <button type="submit" disabled={carregando} className={styles.botao}>
             {carregando ? 'Entrando...' : 'Entrar'}

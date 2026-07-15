@@ -7,6 +7,76 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fechada a seção 📄 Documentação do levantamento (`D1`, `D2`, `D4`, `D5`, `D7`, `D8`)
+- **`D1`/`D7` — enums `AutorTipo` divergentes:** as duas ocorrências de `Humano/IA/Sistema` no
+  `plano-implementacao.md` (item histórico da Fase 0 e notas rápidas de arquitetura) foram
+  sincronizadas com o enum real do código (`Cliente/Supervisor/Funcionario/IA/Sistema`);
+  o `tecnico-backend.md` já estava correto nesse ponto, mas ainda citava `Gerente` na tabela de
+  `Funcao` (4 perfis) e nas permissões de chamados — atualizado para os 7 perfis com `Gestor`.
+- **`D2` — datas 2025/2026 no changelog:** as versões antigas `0.1.0`, `0.2.0`, `0.3.0` e `0.3.1`
+  diziam "2025" entre entradas do mesmo período de 2026 (typo de calendário) — padronizadas para
+  junho de 2026. Mantido o "07/2025" da nota de WhatsApp (data externa real da política da Meta).
+- **`D4` — comando de execução do backend:** o "Como rodar" do `tecnico-backend.md` foi reescrito:
+  o caminho padrão é `docker compose up -d` (sobe Postgres **e** API juntos, como o
+  `docker-compose.yml` faz hoje) e o `uvicorn` direto virou alternativa documentada com
+  `docker compose up -d db` — o comando funciona desde o `C2` (`backend/app/__init__.py`).
+- **`D5` — `visao-geral.md` desatualizado:** reescrito para o estado real — 7 perfis implementados
+  (removida a nota "código ainda tem 4 perfis"), 4 filas com `Comercial`, multi-tenant/Superadmin
+  como entregues, painel com KPIs reais e atualização automática, segurança atual (senha 15+,
+  sessão revogável), tickets irmãos; "próximos passos" agora só lista o que de fato falta
+  (chat, WhatsApp, IA, visitas, relatório por supervisor, deploy) e a tabela de estado separa
+  feito de planejado.
+- **`D8` — checklist de aceite do branding:** criada a seção "Checklist de aceite do branding"
+  no `arquitetura.md` com critérios verificáveis por eixo — design system, anti-amnésia,
+  multi-tenant, IA ancorada, visita técnica e jornadas — e nota de status por eixo; o aceite é
+  reavaliado a cada entrega que toque o eixo.
+- Arquivos: `docs/plano-implementacao.md`, `docs/tecnico-backend.md`, `docs/changelog.md`,
+  `docs/visao-geral.md`, `docs/arquitetura.md`.
+
+### Fase 4 — relatório de carga por supervisor (`CU: 868k60w1e`)
+- **Endpoint:** criado `GET /relatorios/supervisores`, exclusivo do Gestor, com supervisores da
+  Empresa autenticada, total de chamados abertos, atrasados e primeira resposta média em minutos.
+- **Lastro da métrica:** a primeira resposta exige mensagem do supervisor atribuído ao chamado,
+  posterior à abertura; mensagens de outro autor, sistema ou IA não contaminam a média.
+- **Estado vazio honesto:** supervisores sem chamados continuam na lista com contagens zero e
+  média `null`, permitindo que o Gestor veja toda a equipe.
+- **Validado:** AST do módulo íntegra e consulta executada contra o PostgreSQL local, retornando
+  `RELATORIO_OK` com os dados sem erro de SQL.
+- Arquivos: `backend/app/rotas/Relatorios.py`, `docs/tecnico-backend.md`.
+
+### Fase 4 — KPIs reais na visão geral do Gestor (`CU: 868k60w1r`)
+- **Integração:** `/painel/visao-geral` passou a consumir `GET /relatorios/visao-geral` junto da
+  lista de chamados, substituindo os indicadores aproximados por chamados abertos, SLA estourado,
+  primeira resposta média e resolução média calculados no backend para a Empresa autenticada.
+- **Sem dados inventados:** médias sem amostra aparecem como travessão; durações são apresentadas
+  em minutos ou horas sem alterar a precisão retornada pela API.
+- **Atualização automática:** o polling existente atualiza KPIs e distribuições em conjunto e
+  preserva a última leitura boa quando uma atualização de fundo falha.
+- **Validado:** `npm.cmd run build` concluído com compilação, lint, checagem de tipos e geração
+  estática da rota `/painel/visao-geral`. A inspeção no navegador integrado não foi executada
+  porque nenhum navegador estava disponível na sessão.
+- Arquivos: `frontend/web/src/types/index.ts`, `frontend/web/src/lib/api.ts`,
+  `frontend/web/src/app/painel/visao-geral/page.tsx`, `docs/tecnico-frontend.md`.
+
+### Fechado `B5` — acessibilidade no web: foco de teclado, ARIA na navegação e estados anunciados
+- **Problema:** nenhum anel de foco global para navegação por teclado (e `outline: none` em pontos
+  do login/erro), `<nav>` da sidebar sem `aria-label`/`aria-current`, e estados de
+  carregando/erro sem live region (leitores de tela não anunciavam falhas nem carregamento).
+- **Correção:** regra global `:focus-visible` no `globals.css` (anel de 2px em `--border-focus`,
+  vale para qualquer elemento focável; regras locais mais específicas continuam valendo);
+  removido o `:focus-visible` local redundante do `erro.module.css`; sidebar com
+  `aria-label="Navegação principal"`, `aria-current="page"` no link ativo e ícones/avatar com
+  `aria-hidden`; estados de carga com `role="status"` e erros com `role="alert"` (aria-live
+  implícito) em chamados, visão geral, login e empresas. Supervisores já estava conforme.
+- **Validado:** `tsc --noEmit` limpo; Playwright no dev server real — Tab pelo teclado mostra
+  outline computado `2px solid rgb(20,138,245)` no botão do login e nos links da sidebar,
+  senha errada dispara o `p[role="alert"]`, e a navegação autenticada expõe `aria-label` +
+  `aria-current="page"` no link da rota atual.
+- Arquivos: `frontend/web/src/app/globals.css`, `erro.module.css`,
+  `frontend/web/src/components/painel/AdminShell.tsx`, `app/painel/chamados/page.tsx`,
+  `app/painel/visao-geral/page.tsx`, `app/(auth)/login/page.tsx`,
+  `app/plataforma/empresas/page.tsx`.
+
 ### Fechado `B3` — páginas de erro globais do web (`error.tsx` e `not-found.tsx`)
 - **Problema:** o painel web não tinha `error.tsx` nem `not-found.tsx` — erro de runtime mostrava a
   tela técnica padrão do Next (em inglês, com stack trace em dev) e rota inexistente caía no 404
@@ -1256,14 +1326,14 @@
 
 ---
 
-## [0.3.1] — 25 de junho de 2025
+## [0.3.1] — 25 de junho de 2026
 
 ### Adicionado
 - **`docs/setup.md`** — guia completo de configuração do ambiente para novos desenvolvedores (WSL 2, Docker, Python venv, Alembic, frontend web e mobile, tabela de solução de problemas)
 
 ---
 
-## [0.3.0] — 25 de junho de 2025
+## [0.3.0] — 25 de junho de 2026
 
 ### Adicionado
 - **Frontend Web (Next.js 15)** — estrutura inicial completa:
@@ -1294,7 +1364,7 @@
 
 ---
 
-## [0.2.0] — Junho de 2025
+## [0.2.0] — Junho de 2026
 
 ### Adicionado
 - **Backend FastAPI** — estrutura inicial completa:
@@ -1314,7 +1384,7 @@
 
 ---
 
-## [0.1.0] — Junho de 2025
+## [0.1.0] — Junho de 2026
 
 ### Adicionado
 - Estrutura inicial do repositório
