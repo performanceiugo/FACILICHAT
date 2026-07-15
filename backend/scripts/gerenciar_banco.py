@@ -35,6 +35,7 @@ from sqlalchemy import delete, func, select, text
 
 from app.banco_dados import AsyncSessionLocal, Base, engine
 from app.configuracoes import configuracoes
+from app.modelos.CategoriaChamado import CategoriaChamado
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus
 from app.modelos.Condominio import Condominio
 from app.modelos.Empresa import Empresa, EmpresaStatus
@@ -61,6 +62,17 @@ CAMINHO_RLS_SQL = os.path.join(
 # que também serve de marcador de idempotência do seed.
 # Atualizada no item M1 para cumprir a política de senha (mínimo 15 caracteres — OWASP sem MFA):
 # a senha antiga "Senha123" (8) ficaria abaixo do mínimo que a própria API passou a exigir.
+#Perfil	Nome	Usuário
+#Superadmin	Superadmin Iugo	superadmin@iugo.com.br
+#Gestor	Gestor Demo	admin@facilichat.dev
+#Supervisor	Roberto Supervisor	supervisor@demo.facilichat.dev
+#Cliente	Ana Costa	ana@demo.facilichat.dev
+#Cliente	Carlos Lima	carlos@demo.facilichat.dev
+#Cliente	João Souza	joao@demo.facilichat.dev
+#Cliente	Maria Silva	maria@demo.facilichat.dev
+
+
+
 SENHA_PADRAO = "FaciliChat2026Demo"
 DOMINIO_DEMO = "@demo.facilichat.dev"
 
@@ -267,6 +279,24 @@ async def _obter_ou_criar_condominio(db, empresa_id, nome):
     return condominio
 
 
+# Busca uma Categoria do catálogo do tenant pelo nome (case-insensitive) ou a cria.
+async def _obter_ou_criar_categoria(db, empresa_id, nome):
+    resultado = await db.execute(
+        select(CategoriaChamado).where(
+            CategoriaChamado.EmpresaID == empresa_id,
+            func.lower(CategoriaChamado.Nome) == nome.lower(),
+        )
+    )
+    categoria = resultado.scalar_one_or_none()
+    if categoria:
+        return categoria
+
+    categoria = CategoriaChamado(EmpresaID=empresa_id, Nome=nome)
+    db.add(categoria)
+    await db.flush()
+    return categoria
+
+
 # Busca um usuário pelo e-mail (único) ou o cria com a função e o condomínio indicados.
 async def _obter_ou_criar_usuario(db, empresa_id, nome, email, funcao, condominio=None):
     resultado = await db.execute(select(Usuario).where(Usuario.Email == email))
@@ -327,11 +357,15 @@ async def _criar_dados_tenant(empresa_id: uuid.UUID, rotulo: str):
         session.add(usuario)
         await session.flush()
 
+        categoria = CategoriaChamado(EmpresaID=empresa_id, Nome=f"Teste RLS {rotulo}")
+        session.add(categoria)
+        await session.flush()
+
         chamado = Chamado(
             EmpresaID=empresa_id,
             ClienteID=usuario.ID,
             Fila=ChamadoFila.Operacional,
-            Categoria="Teste RLS",
+            CategoriaID=categoria.ID,
             Resumo=f"Chamado {rotulo}",
             Prioridade=ChamadoPrioridade.Media,
         )
@@ -386,6 +420,7 @@ async def _validar_visibilidade_tenant(empresa_id, esperado_cond, esperado_user,
 async def _limpar_dados_tenant(empresa_id: uuid.UUID) -> None:
     async with _sessao_tenant(empresa_id) as session:
         await session.execute(delete(Chamado).where(Chamado.EmpresaID == empresa_id))
+        await session.execute(delete(CategoriaChamado).where(CategoriaChamado.EmpresaID == empresa_id))
         await session.execute(delete(Usuario).where(Usuario.EmpresaID == empresa_id))
         await session.execute(delete(Condominio).where(Condominio.EmpresaID == empresa_id))
         await session.commit()
@@ -561,13 +596,14 @@ async def _semear() -> None:
 
         # Cria cada chamado com data de abertura escalonada e o histórico de chat correspondente.
         for item in CHAMADOS:
+            categoria = await _obter_ou_criar_categoria(db, empresa.ID, item["categoria"])
             aberto_em = agora - timedelta(days=item["dias"], hours=2)
             chamado = Chamado(
                 EmpresaID=empresa.ID,
                 ClienteID=clientes[item["cliente"]].ID,
                 SupervisorID=supervisor.ID if item["supervisor"] else None,
                 Fila=item["fila"],
-                Categoria=item["categoria"],
+                CategoriaID=categoria.ID,
                 Status=item["status"],
                 Prioridade=item["prioridade"],
                 Resumo=item["resumo"],

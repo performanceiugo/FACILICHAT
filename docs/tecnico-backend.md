@@ -38,6 +38,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Email | String(120) | Email único (login) |
 | SenhaHash | String(255) | Senha em hash argon2 |
 | Funcao | Enum | Cliente / Funcionario / Supervisor / RH / Financeiro / Gestor / Superadmin |
+| Ativo | Boolean | Default `True`. `False` = "removido" da equipe (nunca exclusão — anti-amnésia); não loga e não aparece para novas atribuições |
 | Telefone | String(20) | Opcional |
 | Condominio | String(120) | Nome do condomínio, opcional |
 | Criacao | DateTime | Data de cadastro |
@@ -52,7 +53,7 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | GrupoOrigemID | UUID | Opcional; agrupa tickets irmãos nascidos do mesmo aviso/mensagem |
 | SupervisorID | UUID → Usuarios | Supervisor atribuído (opcional) |
 | Fila | Enum | Operacional / RH / Financeiro / Comercial |
-| Categoria | String(80) | Ex: "Vazamento", "Folha de Pagamento" |
+| CategoriaID | UUID → CategoriasChamado | Categoria do catálogo da Empresa (Fase 4 — substituiu o texto livre); a API continua expondo `Categoria` (nome, via join) na resposta |
 | Status | Enum | Recebido / EmAndamento / Agendado / Concluido / Cancelado |
 | Prioridade | Enum | Baixa / Media / Alta / Critica |
 | Resumo | Text | Descrição do problema (opcional) |
@@ -71,6 +72,16 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | Conteudo | Text | Texto da mensagem |
 | Anexo | String(500) | URL do arquivo anexado (opcional) |
 | Criacao | DateTime | Data/hora do envio |
+
+### `CategoriasChamado` — Catálogo de categorias por Empresa (Fase 4)
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| ID | UUID | Identificador único |
+| EmpresaID | UUID → Empresas | Tenant, com RLS forçada |
+| Nome | String(80) | Nome da categoria (único por Empresa, case-insensitive) |
+| Ativa | Boolean | Default `True`. `False` = "removida" do catálogo (nunca exclusão) — chamados já criados com ela continuam intactos |
+| Criacao | DateTime | Data de criação |
 
 ### `CoberturasTurno` — Cobertura operacional estruturada
 
@@ -115,7 +126,10 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 | POST | `/usuarios/equipe` | Criar usuário com função definida (Supervisor/Funcionario/RH/Financeiro/Gestor) | Sim | Apenas Gestor (403 caso contrário) |
 | GET | `/usuarios/eu` | Retorna dados do usuário logado | Sim | Qualquer perfil |
 | PATCH | `/usuarios/eu/senha` | Troca a própria senha (exige `SenhaAtual`); revoga **todas** as sessões do usuário — denylist do `jti` atual + todas as famílias de refresh (item S14) | Sim | Qualquer perfil |
+| GET | `/usuarios/equipe` | Lista a equipe da Empresa; filtro opcional `?funcao={UsuarioFuncao}` (Fase 4) | Sim | Apenas Gestor (403 caso contrário) |
+| PATCH | `/usuarios/{usuarioID}` | Edita dados cadastrais (Nome/Telefone/Email) de um usuário da mesma Empresa — não altera Função (Fase 4) | Sim | Apenas Gestor (403 caso contrário); 404 se o alvo não existir ou for de outra Empresa |
 | PATCH | `/usuarios/{usuarioID}/funcao` | Muda a função de outro usuário da mesma Empresa; revoga todas as famílias de refresh do usuário-alvo (item S14) | Sim | Apenas Gestor (403 caso contrário); 404 se o alvo não existir ou for de outra Empresa |
+| PATCH | `/usuarios/{usuarioID}/status` | Ativa/desativa (`Ativo`) um usuário da mesma Empresa — "remover" da equipe é sempre desativação, nunca exclusão (Fase 4); desativar revoga todas as famílias de refresh | Sim | Apenas Gestor (403 caso contrário); Gestor não pode autodesativar (400); 404 se o alvo não existir ou for de outra Empresa |
 
 > **Primeiro Gestor:** como o cadastro público fica fechado por padrão e `/usuarios/equipe` exige um Gestor, a primeira Empresa + primeiro Gestor são criados por `python scripts/gerenciar_banco.py criar-empresa ...` (ver a seção "Scripts do banco" abaixo e `docs/setup.md`).
 
@@ -123,11 +137,19 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
 
 | Método | Rota | Descrição | Autenticação | Permissão |
 |---|---|---|---|---|
-| POST | `/chamados/` | Abrir novo chamado | Sim | Qualquer perfil |
-| POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID` | Sim | Qualquer perfil |
+| POST | `/chamados/` | Abrir novo chamado — exige `CategoriaID` de uma categoria **ativa** da mesma Empresa (Fase 4; substituiu o texto livre) | Sim | Qualquer perfil |
+| POST | `/chamados/irmaos` | Abrir 2+ chamados simultâneos ligados pelo mesmo `GrupoOrigemID`; cada ticket valida sua própria `CategoriaID` | Sim | Qualquer perfil |
 | GET | `/chamados/` | Listar chamados; aceita `supervisor_id={UUID}` para retornar somente a fila atribuída a um supervisor da mesma Empresa | Sim | Sem filtro: Cliente vê só os seus e Supervisor/Gestor vê todos. Com `supervisor_id`: apenas Gestor; 404 para supervisor inexistente, de outro tenant ou com outro perfil |
 | PATCH | `/chamados/{id}/status` | Atualizar status | Sim | Apenas Supervisor/Gestor (403 caso contrário); chamado finalizado não reabre (409) |
-| PATCH | `/chamados/{id}/supervisor` | Atribuir, trocar ou remover (`SupervisorID: null`) o supervisor responsável | Sim | Apenas Gestor (403 caso contrário); supervisor precisa existir com esse perfil na mesma Empresa (404 caso contrário) |
+| PATCH | `/chamados/{id}/supervisor` | Atribuir, trocar ou remover (`SupervisorID: null`) o supervisor responsável | Sim | Apenas Gestor (403 caso contrário); supervisor precisa existir com esse perfil, **ativo**, na mesma Empresa (404 caso contrário) |
+
+### Categorias — `/categorias` (Fase 4)
+
+| Método | Rota | Descrição | Autenticação | Permissão |
+|---|---|---|---|---|
+| GET | `/categorias/` | Lista o catálogo completo da Empresa (inclui inativas) | Sim | Apenas Gestor |
+| POST | `/categorias/` | Cria uma categoria nova; nome duplicado (case-insensitive) é rejeitado (400) | Sim | Apenas Gestor |
+| PATCH | `/categorias/{id}` | Edita `Nome` e/ou `Ativa`, independentemente; nunca exclui — desativar não afeta os chamados que já a referenciam | Sim | Apenas Gestor; 404 se a categoria não existir ou for de outra Empresa |
 
 ### Relatórios — `/relatorios`
 
@@ -173,8 +195,8 @@ escolha do Gestor.
   qualquer caractere. Vale para `UsuarioCriar`/`UsuarioCriarEquipe`, `SenhaAlterar.SenhaNova` e
   `PrimeiroGestorCriar` (rota da plataforma); `SenhaAtual` só tem teto (senhas antigas podem ser
   mais curtas e ainda precisam ser conferidas). Campos de texto livres ganharam `max_length`
-  (`Nome`/`Condominio` 120, `Telefone` 20, `Categoria` 80 com mínimo 1, `Resumo` 2000, `CNPJ` 20)
-  como defesa contra payloads abusivos; os 422 saem em português via o handler do M12. A senha demo
+  (`Nome`/`Condominio` 120, `Telefone` 20, `CategoriaChamado.Nome` 80 com mínimo 1, `Resumo` 2000,
+  `CNPJ` 20) como defesa contra payloads abusivos; os 422 saem em português via o handler do M12. A senha demo
   do seed passou a ser `FaciliChat2026Demo` (a antiga `Senha123` ficaria abaixo do mínimo da API).
 - JWT assinado com `HS256` e chave secreta configurável. Claims: `sub` (usuário), `funcao`,
   `empresa_id`, `iat`/`exp` (emissão/expiração), `iss`/`aud` (`JWT_ISSUER`/`JWT_AUDIENCE`,

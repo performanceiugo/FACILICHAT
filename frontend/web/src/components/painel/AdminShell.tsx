@@ -60,6 +60,44 @@ const IconAlertas = () => (
   </svg>
 )
 
+// Ícone de categorias representa o catálogo (Fase 4) como uma lista de itens.
+const IconCategorias = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+)
+
+// Ícone de equipe (Fase 4) — distinto do de Supervisores: uma pessoa com um "+", já que esta
+// tela é sobre contratar/manter cadastro, não comparar métricas.
+const IconEquipe = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="19" y1="8" x2="19" y2="14" />
+    <line x1="22" y1="11" x2="16" y2="11" />
+  </svg>
+)
+
+// Ícone de engrenagem identifica o grupo "Ajustes" — manutenção pouco frequente, fica recolhido.
+const IconAjustes = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+)
+
+// Seta indicadora de expandir/recolher o grupo "Ajustes" — gira via CSS conforme o estado.
+const IconChevron = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+)
+
 // Deriva as iniciais do nome para o avatar circular do rodapé (ex.: "Edson Gestor" → "EG")
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/)
@@ -76,6 +114,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [carregado, setCarregado] = useState(false)
   const [nome, setNome] = useState<string | null>(null)
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
+
+  // Ajustes agrupa telas de manutenção pouco usadas (Categorias/Equipe) num submenu recolhível,
+  // para não competir visualmente com a navegação operacional do dia a dia. O valor inicial já
+  // nasce aberto quando a sessão começa direto numa dessas rotas (ex.: URL colada); depois disso
+  // o toggle manual do usuário manda — sem efeito sincronizando o estado (react-hooks/set-state-in-effect).
+  const dentroDeAjustes = (pathname?.startsWith('/painel/categorias') || pathname?.startsWith('/painel/equipe')) ?? false
+  const [ajustesAberto, setAjustesAberto] = useState(dentroDeAjustes)
+
   useEffect(() => {
     // Sem sessão ativa → manda para o login e não revela o painel
     if (!auth.autenticado()) {
@@ -118,6 +164,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             const visaoGeralAtiva = pathname === '/painel/visao-geral' || pathname === '/painel'
             const supervisoresAtivo = pathname?.startsWith('/painel/supervisores') ?? false
             const chamadosAtivo = pathname?.startsWith('/painel/chamados') ?? false
+            const categoriasAtivo = pathname?.startsWith('/painel/categorias') ?? false
+            const equipeAtivo = pathname?.startsWith('/painel/equipe') ?? false
             return (
               <>
                 <Link
@@ -151,6 +199,46 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   <span className={styles.navIcone} aria-hidden="true"><IconAlertas /></span>
                   Alertas
                 </Link>
+
+                {/* Grupo recolhível: manutenção pouco frequente (Categorias/Equipe), separada
+                    da navegação operacional do dia a dia. */}
+                <div className={styles.subGrupo}>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    onClick={() => setAjustesAberto(atual => !atual)}
+                    aria-expanded={ajustesAberto}
+                    aria-controls="submenu-ajustes"
+                  >
+                    <span className={styles.navIcone} aria-hidden="true"><IconAjustes /></span>
+                    Ajustes
+                    <span className={`${styles.chevron} ${ajustesAberto ? styles.chevronAberto : ''}`} aria-hidden="true">
+                      <IconChevron />
+                    </span>
+                  </button>
+
+                  {ajustesAberto && (
+                    <div id="submenu-ajustes" className={styles.subNav}>
+                      <Link
+                        href="/painel/categorias"
+                        className={categoriasAtivo ? styles.subLinkAtivo : styles.subLink}
+                        aria-current={categoriasAtivo ? 'page' : undefined}
+                      >
+                        <span className={styles.navIcone} aria-hidden="true"><IconCategorias /></span>
+                        Categorias
+                      </Link>
+
+                      <Link
+                        href="/painel/equipe"
+                        className={equipeAtivo ? styles.subLinkAtivo : styles.subLink}
+                        aria-current={equipeAtivo ? 'page' : undefined}
+                      >
+                        <span className={styles.navIcone} aria-hidden="true"><IconEquipe /></span>
+                        Equipe
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </>
             )
           })()}

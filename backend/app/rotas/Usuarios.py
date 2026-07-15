@@ -60,6 +60,21 @@ class FuncaoAlterar(BaseModel):
     Funcao: UsuarioFuncao
 
 
+# Schema de entrada da ativacao/desativacao de um usuario (Fase 4) - so o Gestor usa esta rota.
+# "Remover" um membro da equipe e sempre desativacao, nunca exclusao (tese anti-amnesia): preserva
+# o historico dos chamados ja atendidos por essa pessoa.
+class StatusAlterar(BaseModel):
+    Ativo: bool
+
+
+# Schema de entrada da edicao de dados cadastrais da equipe (Fase 4) - so o Gestor usa esta rota.
+# Funcao nao entra aqui de proposito: troca de funcao continua exclusiva de PATCH /{id}/funcao.
+class UsuarioEditar(BaseModel):
+    Nome: str | None = Field(default=None, min_length=1, max_length=120)
+    Telefone: str | None = Field(default=None, max_length=20)
+    Email: EmailStr | None = None
+
+
 # Schema de saida - retorna dados publicos do usuario (sem senha ou hash)
 class UsuarioSaida(BaseModel):
     ID: uuid.UUID
@@ -67,6 +82,7 @@ class UsuarioSaida(BaseModel):
     Nome: str
     Email: str
     Funcao: UsuarioFuncao
+    Ativo: bool
     Telefone: str | None
     CondominioID: uuid.UUID | None
     Condominio: str | None
@@ -183,6 +199,7 @@ def _serializarUsuario(usuario: Usuario, condominioNome: str | None) -> UsuarioS
         Nome=usuario.Nome,
         Email=usuario.Email,
         Funcao=usuario.Funcao,
+        Ativo=usuario.Ativo,
         Telefone=usuario.Telefone,
         CondominioID=usuario.CondominioID,
         Condominio=condominioNome or usuario.Condominio,
@@ -338,4 +355,113 @@ async def alterarFuncao(
     if usuarioAlvo.CondominioID:
         resultado = await db.execute(select(Condominio.Nome).where(Condominio.ID == usuarioAlvo.CondominioID))
         condominioNome = resultado.scalar_one_or_none() or condominioNome
+    return _serializarUsuario(usuarioAlvo, condominioNome)
+
+
+# GET /usuarios/equipe - lista a equipe da Empresa (Fase 4), com filtro opcional por Funcao.
+# Autoatendimento do Gestor: alimenta a tela de manutencao /painel/equipe. Nao inclui Cliente por
+# padrao no filtro (o chamador decide), mas nao ha restricao tecnica - so o Gestor pode consultar.
+@roteador.get("/equipe", response_model=list[UsuarioSaida])
+async def listarEquipe(
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+    funcao: UsuarioFuncao | None = None,
+):
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail="Apenas o Gestor pode listar a equipe")
+
+    consulta = select(Usuario).where(Usuario.EmpresaID == usuarioAtual.EmpresaID)
+    if funcao is not None:
+        consulta = consulta.where(Usuario.Funcao == funcao)
+
+    resultado = await db.execute(consulta.order_by(Usuario.Nome))
+    usuarios = resultado.scalars().all()
+
+    condominioIDs = {u.CondominioID for u in usuarios if u.CondominioID}
+    nomesPorCondominioID: dict[uuid.UUID, str] = {}
+    if condominioIDs:
+        resultadoCondominios = await db.execute(
+            select(Condominio.ID, Condominio.Nome).where(Condominio.ID.in_(condominioIDs))
+        )
+        nomesPorCondominioID = dict(resultadoCondominios.all())
+
+    return [
+        _serializarUsuario(u, nomesPorCondominioID.get(u.CondominioID) if u.CondominioID else u.Condominio)
+        for u in usuarios
+    ]
+
+
+# PATCH /usuarios/{usuarioID} - edita dados cadastrais (Nome/Telefone/Email) de um membro da equipe
+# (Fase 4). Funcao continua exclusiva de PATCH /{id}/funcao - este endpoint nao promove ninguem.
+@roteador.patch("/{usuarioID}", response_model=UsuarioSaida)
+async def editarUsuario(
+    usuarioID: uuid.UUID,
+    payload: UsuarioEditar,
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+):
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail="Apenas o Gestor pode editar um usuario")
+
+    resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioID))
+    usuarioAlvo = resultado.scalar_one_or_none()
+    if not usuarioAlvo or usuarioAlvo.EmpresaID != usuarioAtual.EmpresaID:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    if payload.Email is not None and payload.Email != usuarioAlvo.Email:
+        duplicado = await db.execute(select(Usuario.ID).where(Usuario.Email == payload.Email))
+        if duplicado.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Nao foi possivel salvar com os dados informados")
+        usuarioAlvo.Email = payload.Email
+
+    if payload.Nome is not None:
+        usuarioAlvo.Nome = payload.Nome
+    if payload.Telefone is not None:
+        usuarioAlvo.Telefone = payload.Telefone
+
+    await db.commit()
+    await db.refresh(usuarioAlvo)
+
+    condominioNome = usuarioAlvo.Condominio
+    if usuarioAlvo.CondominioID:
+        resultadoCondominio = await db.execute(select(Condominio.Nome).where(Condominio.ID == usuarioAlvo.CondominioID))
+        condominioNome = resultadoCondominio.scalar_one_or_none() or condominioNome
+    return _serializarUsuario(usuarioAlvo, condominioNome)
+
+
+# PATCH /usuarios/{usuarioID}/status - ativa ou desativa um usuario (Fase 4). "Remover" um membro da
+# equipe e sempre desativacao, nunca exclusao (anti-amnesia): preserva o historico de chamados ja
+# atendidos. Usuario inativo nao loga (ver Autenticacao.login) e nao aparece para novas atribuicoes.
+@roteador.patch("/{usuarioID}/status", response_model=UsuarioSaida)
+async def alterarStatusUsuario(
+    usuarioID: uuid.UUID,
+    payload: StatusAlterar,
+    usuarioAtual: Usuario = Depends(obterUsuarioAtual),
+    db: AsyncSession = Depends(obterBancoDadosComTenant),
+):
+    if usuarioAtual.Funcao != UsuarioFuncao.Gestor:
+        raise HTTPException(status_code=403, detail="Apenas o Gestor pode ativar ou desativar um usuario")
+
+    # Um Gestor nao pode se autodesativar - travaria o proprio acesso sem ninguem para reverter.
+    if usuarioID == usuarioAtual.ID and not payload.Ativo:
+        raise HTTPException(status_code=400, detail="Voce nao pode desativar a propria conta")
+
+    resultado = await db.execute(select(Usuario).where(Usuario.ID == usuarioID))
+    usuarioAlvo = resultado.scalar_one_or_none()
+    if not usuarioAlvo or usuarioAlvo.EmpresaID != usuarioAtual.EmpresaID:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado")
+
+    usuarioAlvo.Ativo = payload.Ativo
+    await db.commit()
+    await db.refresh(usuarioAlvo)
+
+    # Desativar encerra a sessao de verdade (mesma logica de mudanca de privilegio do item S14):
+    # sem isso, um access token ja emitido continuaria valendo ate expirar (no maximo 15min).
+    if not payload.Ativo:
+        await revogarTodasFamiliasDoUsuario(db, usuarioAlvo.ID)
+
+    condominioNome = usuarioAlvo.Condominio
+    if usuarioAlvo.CondominioID:
+        resultadoCondominio = await db.execute(select(Condominio.Nome).where(Condominio.ID == usuarioAlvo.CondominioID))
+        condominioNome = resultadoCondominio.scalar_one_or_none() or condominioNome
     return _serializarUsuario(usuarioAlvo, condominioNome)

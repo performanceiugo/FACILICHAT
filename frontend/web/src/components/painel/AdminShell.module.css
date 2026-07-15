@@ -80,6 +80,62 @@
 
 .navIcone svg { width: 100%; height: 100%; }
 
+/* Grupo "Ajustes": o botão reaproveita o visual de .link, mas é <button> (não <a>) e some
+   sozinho no fim da linha para não competir com o rótulo. */
+.subGrupo { display: flex; flex-direction: column; }
+.subGrupo > .link {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.chevron {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-subtle);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.chevron svg { width: 100%; height: 100%; }
+.chevronAberto { transform: rotate(180deg); }
+
+/* Sub-itens recuados e discretos — sinalizam "manutenção", não navegação do dia a dia. */
+.subNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding-left: var(--sp-5);
+  margin-top: var(--sp-1);
+}
+
+.subLink,
+.subLinkAtivo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-subtle);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.subLink .navIcone,
+.subLinkAtivo .navIcone { width: 16px; height: 16px; }
+
+.subLink:hover { background: var(--blue-50); color: var(--blue-700); }
+
+.subLinkAtivo {
+  background: var(--blue-50);
+  color: var(--blue-700);
+  font-weight: var(--fw-semibold);
+}
+
 /* Rodapé com identificação do usuário e logout */
 .rodape {
   display: flex;

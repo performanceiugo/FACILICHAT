@@ -39,6 +39,15 @@ status).
   nasce `Recebido` — não é campo de entrada em `POST /chamados/`)
 - `Prioridade`: `Baixa` | `Media` | `Alta` | `Critica`
 
+## Categoria (Fase 4: virou catálogo, não é mais texto livre)
+`POST /chamados/` exige `CategoriaID` (UUID) de uma categoria **ativa** da mesma Empresa — não
+aceita mais o nome em texto. Descubra o catálogo antes de montar o payload:
+```bash
+curl -s http://localhost:8000/categorias/ -H "Authorization: Bearer $TOKEN_GESTOR"
+```
+Se a categoria que o cenário pede ainda não existir no catálogo, crie com `POST /categorias/`
+(exclusivo do Gestor) antes de abrir o chamado.
+
 ## Criar um chamado novo
 1. Login como um Cliente demo (qualquer um da tabela acima, ou o que o usuário indicar):
    ```bash
@@ -47,7 +56,7 @@ status).
      -H "Content-Type: application/x-www-form-urlencoded" \
      | grep -o '"token_acesso":"[^"]*"' | cut -d'"' -f4)
    ```
-2. Criar o chamado — **se `Categoria`/`Resumo` tiverem acento (ã, ç, é...), não use `-d '{...}'`
+2. Criar o chamado — **se `Resumo` tiver acento (ã, ç, é...), não use `-d '{...}'`
    direto**: o Bash deste ambiente corrompe a codificação e a API responde
    `"There was an error parsing the body"`. Escreva o JSON num arquivo (Write, UTF-8) e envie com
    `--data-binary @arquivo`:
@@ -60,9 +69,10 @@ status).
 3. Se o usuário não especificar algum campo, preencha com bom senso (não pergunte de volta por
    detalhe menor — é o motivo desta skill existir): `Fila: Operacional` e `Prioridade: Media` como
    padrão neutro; só suba para `Alta`/`Critica` se o pedido sugerir urgência ("crítico", "urgente",
-   "parado"); `Categoria`/`Resumo` livres, coerentes com o cenário de condomínio (ex.: "Elevador",
-   "Vazamento", "Portaria", "Jardinagem" — ver `CHAMADOS` em `gerenciar_banco.py` para o tom certo).
-   Só pare para perguntar se o pedido for genuinamente ambíguo (ex.: qual cliente/condomínio usar).
+   "parado"); resolva `CategoriaID` no catálogo (`GET /categorias/`) escolhendo o nome mais coerente
+   com o cenário de condomínio (ex.: "Elevador", "Hidráulica", "Portaria", "Jardinagem" — já existem
+   no seed); `Resumo` livre. Só pare para perguntar se o pedido for genuinamente ambíguo (ex.: qual
+   cliente/condomínio usar, ou categoria nova que exigiria criar no catálogo primeiro).
 
 ## Atualizar o status de um chamado
 A única mutação disponível hoje via API é `PATCH /chamados/{id}/status` (mudar `Prioridade` ou

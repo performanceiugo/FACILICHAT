@@ -7,6 +7,126 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Ajuste — Categorias e Equipe viram um grupo recolhível "Ajustes" no sidebar
+- **Motivação:** o usuário pediu que os dois links não competissem com a navegação operacional do
+  dia a dia — pediu algo no estilo "Ajustes > Categorias + Equipe".
+- **Feito:** os links soltos deram lugar a um botão "Ajustes" (ícone de engrenagem + chevron que
+  gira) que expande/recolhe um submenu indentado e discreto com Categorias e Equipe. O grupo nasce
+  aberto se a sessão começar direto numa dessas rotas; depois disso só o clique do usuário
+  controla — sem `useEffect` sincronizando estado (evitou o erro de lint
+  `react-hooks/set-state-in-effect`, o mesmo já contornado com `queueMicrotask` em outras telas).
+- **Validado:** `tsc --noEmit` e lint sem erro; Playwright cobriu abrir o grupo, navegar para
+  Categorias pelo submenu, confirmar que o grupo continua aberto ao visitar Visão geral (o
+  `AdminShell` não remonta entre navegações do painel) e recolher manualmente — sem erro de
+  console. Screenshots descartados após a checagem.
+- Arquivos: `frontend/web/src/components/painel/AdminShell.tsx`, `AdminShell.module.css`.
+
+### Fase 4 — links de Categorias e Equipe no sidebar (`CU: 868kcw619`)
+- **Sidebar:** dois destinos novos, Categorias e Equipe, com ícones próprios (lista para o catálogo;
+  pessoa com "+" para a equipe, distinto do ícone de Supervisores) e o mesmo padrão de destaque
+  (`aria-current="page"`) das rotas existentes.
+- **Fecha a Fase 4 de manutenção operacional** (categorias e equipe): os 10 itens do bloco —
+  7 de backend + 3 de frontend — estão concluídos.
+- **Validado em 15/07/2026:** `tsc --noEmit` sem erros; Playwright clicou nos dois links a partir do
+  login como Gestor Demo e confirmou a navegação e o destaque visual, sem erro de console.
+  Screenshots descartados após a checagem.
+- Arquivo: `frontend/web/src/components/painel/AdminShell.tsx`.
+
+### Fase 4 — página `/painel/equipe` do Gestor (`CU: 868kcw5z1`)
+- **Tela nova:** contratação (reaproveita `POST /usuarios/equipe`), lista da equipe interna (Cliente
+  fica de fora — não é "equipe"), edição inline de Nome/Email/Telefone e ativar/desativar por linha.
+  Papéis oferecidos na criação: Supervisor, Funcionário, RH, Financeiro, Gestor.
+- **Validado em 15/07/2026:** `tsc --noEmit` e lint sem novidade; Playwright cobriu login como
+  Gestor Demo, contratação de um Funcionário de teste, edição do nome, desativação/reativação e a
+  tentativa do próprio Gestor se autodesativar — que a API recusa (`400`) e a tela exibe inline
+  ("Você não pode desativar a própria conta"), sem nenhum erro de console além desse 400 esperado.
+  Screenshots descartados após a checagem.
+- **Nota operacional:** a validação bateu duas vezes no rate limit de login (`429`, 5
+  tentativas/300s — item de segurança já existente) por causa do volume de logins repetidos entre
+  os testes desta e da tela de categorias; resolvido reiniciando o container do backend (limpa o
+  contador em memória), sem nenhuma mudança de código.
+- **Escopo:** só esta tela — falta apenas o link no sidebar (`868kcw619`, junto com o de
+  Categorias), que fecha a Fase 4 de manutenção operacional.
+- Arquivos: `frontend/web/src/app/painel/equipe/page.tsx` (novo), `equipe.module.css` (novo),
+  `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts`.
+
+### Fase 4 — página `/painel/categorias` do Gestor (`CU: 868kcw5xj`)
+- **Tela nova:** lista o catálogo de categorias da Empresa, com formulário de criação no topo e,
+  por linha, edição de nome (inline) e ativar/desativar — nunca excluir (anti-amnésia).
+- **Validado em 15/07/2026:** `tsc --noEmit` sem erros; Playwright cobriu login como Gestor Demo,
+  criação de categoria, desativação (pílula muda para "Inativa"), edição de nome com o valor
+  persistindo após reload da lista — sem erro de console em nenhum passo. Screenshots descartados
+  após a checagem.
+- **Nota operacional:** durante a validação o servidor Next.js local ficou respondendo `500` em
+  todas as rotas (não só a nova) — investigação apontou para o processo `next dev` ter ficado num
+  estado travado após a migração para Next.js 16 (`middleware.ts`→`proxy.ts`, feita em outra sessão
+  em paralelo neste mesmo repositório). Reiniciado o container do Postgres/backend e o processo
+  `next dev` (cache `.next` limpo); após o restart todas as rotas voltaram a responder normalmente.
+  Nenhum código da migração precisou ser alterado — o `proxy.ts` já seguia corretamente o guia
+  oficial de upgrade do Next.js 16.
+- **Escopo:** só esta tela — `/painel/equipe` e os links do sidebar (itens `868kcw5z1`,
+  `868kcw619`) ficam para os próximos passos, um de cada vez.
+- Arquivos: `frontend/web/src/app/painel/categorias/page.tsx` (novo), `categorias.module.css`
+  (novo), `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts`.
+
+### Fase 4 — backend de manutenção operacional: Categorias e Ativação de usuário (`CU: 868kcw5ft, 868kcw5gb, 868kcw5h9, 868kcw5mk, 868kcw5nh, 868kcw5qk, 868kcw5v8`)
+- **Motivação:** ao planejar como uma Empresa nova é implantada e mantida, ficou claro que faltava
+  autoatendimento do Gestor para duas coisas básicas: gerenciar o catálogo de categorias de chamado
+  (hoje texto livre, sem controle) e desativar um membro da equipe que sai (hoje não existia — só
+  dava para criar). Decisão de produto: essa manutenção é do Gestor de cada Empresa, categoria vira
+  catálogo por Empresa (FK, migrando as já usadas) e "remover" alguém da equipe é sempre desativação,
+  nunca exclusão (tese anti-amnésia — preserva o histórico dos chamados que essa pessoa atendeu).
+- **Catálogo de categorias:** modelo novo `CategoriaChamado` (`EmpresaID`, `Nome`, `Ativa`), com RLS
+  aplicada. CRUD completo em `/categorias/` (listar/criar/editar/ativar-desativar), exclusivo do
+  Gestor; nome duplicado (case-insensitive) é rejeitado; desativar não apaga nem afeta os chamados
+  que já usam aquela categoria.
+- **`Chamado.Categoria` (texto) → `CategoriaID` (FK):** `POST /chamados/`, `POST /chamados/irmaos`,
+  `GET /chamados/` e `GET /relatorios/gargalos` agora validam que a categoria existe, está **ativa**
+  e pertence à mesma Empresa antes de aceitar/exibir o chamado; a resposta da API continua trazendo
+  o campo `Categoria` (nome, via join) para não quebrar o contrato já consumido pelo frontend web —
+  só o campo de entrada mudou de texto para `CategoriaID`.
+- **Decisão de migração (15/07/2026):** sem script incremental novo (`aplicar_fase_*`). O banco de
+  dev só tem dado de demonstração, então o caminho foi ajustar os modelos e o seed de
+  `gerenciar_banco.py` (nova função `_obter_ou_criar_categoria`, mesmo padrão já usado para
+  Condomínio) e rodar `reset` + `criar-empresa` + `semear` — consistente com a prática já adotada de
+  não espalhar scripts de migração incrementais em dev.
+- **`Usuario.Ativo`:** novo campo (default `True`). `PATCH /usuarios/{id}/status` liga/desliga,
+  exclusivo do Gestor; um Gestor não pode autodesativar (travaria o próprio acesso); desativar revoga
+  todas as sessões da pessoa (mesma lógica já usada na troca de função). Usuário inativo não loga
+  (`POST /autenticacao/login` passa a responder `401`, mensagem uniforme) e não pode mais ser
+  atribuído como supervisor responsável de um chamado (`404`).
+- **Equipe:** `GET /usuarios/equipe` (filtro opcional por `Funcao`) e `PATCH /usuarios/{id}` (edita
+  Nome/Telefone/Email — sem tocar Função, que continua exclusiva de `PATCH /{id}/funcao`), ambos
+  exclusivos do Gestor.
+- **Validado em 15/07/2026 via curl** (reset+reseed do banco local, sem dado real): catálogo semeado
+  com as categorias já usadas no seed; categoria duplicada `400`; chamado com categoria
+  inativa/inexistente `404`, com categoria ativa `200`; `GET /usuarios/equipe?funcao=Supervisor`
+  filtra corretamente; edição de telefone reflete na resposta; supervisor desativado recebe `401` no
+  login e `404` ao ser atribuído a um chamado; Gestor tentando autodesativar recebe `400`; Cliente
+  tentando listar a equipe recebe `403`; `verificar-rls` seguiu OK após a nova tabela.
+- **Escopo desta entrega:** só backend, por decisão do usuário — as telas `/painel/categorias` e
+  `/painel/equipe` (itens `868kcw5xj`, `868kcw5z1`, `868kcw619`) ficam para uma próxima sessão. Como
+  nenhum formulário do frontend web/mobile chama `POST /chamados/` hoje (só leitura do campo
+  `Categoria`), não há regressão visível em produção enquanto a UI não for construída.
+- Arquivos: `backend/app/modelos/CategoriaChamado.py` (novo), `backend/app/modelos/Chamados.py`,
+  `backend/app/modelos/Usuarios.py`, `backend/app/modelos/__init__.py`, `backend/app/rls.sql`,
+  `backend/app/rotas/Categorias.py` (novo), `backend/app/rotas/Chamados.py`,
+  `backend/app/rotas/Usuarios.py`, `backend/app/rotas/Autenticacao.py`,
+  `backend/app/rotas/Relatorios.py`, `backend/app/servicos/chamados.py`, `backend/app/main.py`,
+  `backend/scripts/gerenciar_banco.py`, `.claude/skills/chamados-teste/SKILL.md`.
+
+### Fase 4 — validação visual e fechamento da página de tickets (`CU: 868k60w2j`)
+- **Motivação:** o item já estava implementado (filtros de período, supervisor, status,
+  categoria e busca por cliente) e validado por `tsc`/`lint`, mas nunca tinha recebido a
+  aprovação visual em navegador real que fecha os demais itens da Fase 4 — por isso seguia
+  `[~]` no plano e "🚧 em andamento" no ClickUp.
+- **Validado:** login como Gestor Demo via Playwright em `http://localhost:3000/painel/chamados`
+  — 25 tickets renderizados sem erro de console; aplicado o filtro de Status ("Recebido"), a
+  lista reduziu corretamente de 25 para 10 registros, todos com o status esperado. Screenshots
+  descartados após a checagem.
+- **Sem alteração de código** — apenas fechamento de status no `docs/plano-implementacao.md` e
+  no ClickUp (`868k60w2j`).
+
 ### Fase 0.5 — migração do Expo SDK 53 para 57 (`V3`, `CU: 868kb32gb`)
 - **Migração sequencial:** 53→54→55→56→57, uma versão por vez, validando `expo-doctor`,
   `tsc --noEmit` e `expo export --platform android|ios` a cada etapa.

@@ -1,7 +1,7 @@
 # Modelo ORM da tabela Usuarios
 # Representa todos os perfis de usuário do sistema: moradores, funcionários, supervisores, back-office e gestores
 
-from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey
+from sqlalchemy import Boolean, String, Enum as SAEnum, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
@@ -34,6 +34,9 @@ class Usuario(Base):
     Email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     SenhaHash: Mapped[str] = mapped_column(String(255), nullable=False)  # Senha armazenada como hash argon2 (nunca texto puro)
     Funcao: Mapped[UsuarioFuncao] = mapped_column(SAEnum(UsuarioFuncao), nullable=False)
+    # Fase 4: "remover" um membro da equipe é sempre desativação, nunca exclusão (anti-amnésia) —
+    # usuário inativo não loga (Autenticacao.login) e não aparece para novas atribuições.
+    Ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     Telefone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # Campo legado mantido temporariamente para compatibilidade com clientes antigos.
     Condominio: Mapped[str | None] = mapped_column(String(120), nullable=True)  # Condomínio ao qual o usuário pertence

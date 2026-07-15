@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modelos.CategoriaChamado import CategoriaChamado
 from app.modelos.Chamados import Chamado, ChamadoStatus
 from app.modelos.CoberturaTurno import CoberturaTurno
 from app.modelos.Empresa import EmpresaConfiguracao
@@ -236,7 +237,8 @@ async def obterGargalos(
 
     # Atualizacao é a única fonte do tempo parado; registros sem esse fato não são estimados.
     resultado = await db.execute(
-        select(Chamado)
+        select(Chamado, CategoriaChamado.Nome.label("CategoriaNome"))
+        .join(CategoriaChamado, CategoriaChamado.ID == Chamado.CategoriaID)
         .where(
             Chamado.EmpresaID == usuarioAtual.EmpresaID,
             Chamado.Status.not_in(statusFinais),
@@ -247,15 +249,15 @@ async def obterGargalos(
     )
     return [
         GargaloSaida(
-            ID=chamado.ID,
-            Categoria=chamado.Categoria,
-            Resumo=chamado.Resumo,
-            SupervisorID=chamado.SupervisorID,
-            Atualizacao=chamado.Atualizacao,
-            TempoParadoHoras=round((agora - chamado.Atualizacao).total_seconds() / 3600, 2),
+            ID=linha.Chamado.ID,
+            Categoria=linha.CategoriaNome,
+            Resumo=linha.Chamado.Resumo,
+            SupervisorID=linha.Chamado.SupervisorID,
+            Atualizacao=linha.Chamado.Atualizacao,
+            TempoParadoHoras=round((agora - linha.Chamado.Atualizacao).total_seconds() / 3600, 2),
             LimiteGargaloHoras=limite,
         )
-        for chamado in resultado.scalars().all()
+        for linha in resultado
     ]
 
 

@@ -3,6 +3,7 @@
 from app.modelos.Empresa import Empresa, EmpresaConfiguracao
 from app.modelos.Condominio import Condominio
 from app.modelos.Usuarios import Usuario
+from app.modelos.CategoriaChamado import CategoriaChamado
 from app.modelos.Chamados import Chamado
 from app.modelos.Mensagens import Mensagem
 from app.modelos.SessaoRevogada import SessaoRevogada

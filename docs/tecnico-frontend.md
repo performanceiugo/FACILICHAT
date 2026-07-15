@@ -142,6 +142,29 @@ polling; ela representa o recorte carregado quando o Gestor abriu o card.
 O link na sidebar permanece separado porque pertence ao item `868k60w2w`; a rota também pode ser
 acessada diretamente em `/painel/supervisores`.
 
+### Equipe (`/painel/equipe`) — Fase 4
+
+Página de manutenção cadastral da equipe (item `868kcw5z1`). Contratação reaproveita
+`POST /usuarios/equipe` (mesma rota já usada no seed); a lista vem de `GET /usuarios/equipe` mas
+filtra `Cliente` no cliente (Condomínio/contrato não é "equipe"). Cada linha permite editar
+Nome/Email/Telefone inline (`PATCH /usuarios/{id}`) e ativar/desativar (`PATCH /usuarios/{id}/status`)
+— nunca exclusão (anti-amnésia). O Gestor não consegue se autodesativar: o backend responde `400`
+e a tela mostra o erro embaixo do próprio status da linha, sem travar o restante da tabela. Papéis
+oferecidos na criação: Supervisor, Funcionário, RH, Financeiro, Gestor (Superadmin fica fora —
+nasce só pelo bootstrap da plataforma). Tela separada do dashboard de métricas em
+`/painel/supervisores`, que continua só leitura. Link no sidebar adicionado no item `868kcw619`.
+
+### Categorias (`/painel/categorias`) — Fase 4
+
+Página de manutenção do catálogo de categorias (item `868kcw5xj`), consumindo `/categorias/`
+(`GET`/`POST`/`PATCH`) — todos exclusivos do Gestor. Formulário de criação fica sempre visível no
+topo; a tabela abaixo lista todas as categorias (inclusive inativas) com edição de nome inline
+(um `<input>` substitui o `<strong>` só na linha em edição) e um botão que alterna Ativa/Inativa.
+Nome e status são independentes — renomear não mexe no status e vice-versa. Não existe exclusão:
+"remover" uma categoria é sempre desativação (anti-amnésia), e chamados antigos continuam
+mostrando o nome normalmente via join no backend. Link no sidebar adicionado no item `868kcw619`,
+junto com o link de Equipe.
+
 ### Navegação do painel
 
 A sidebar concluída no item `868k60w2w` oferece quatro destinos: Visão geral
@@ -149,6 +172,16 @@ A sidebar concluída no item `868k60w2w` oferece quatro destinos: Visão geral
 (`/painel/chamados`) e Alertas (`/painel/visao-geral#atencao`). O último é uma âncora para o painel
 operacional já existente; a página de oportunidades comerciais continua reservada para a Fase 6.
 As rotas principais expõem `aria-current="page"` e conservam o destaque visual azul.
+
+O item `868kcw619` (Fase 4) acrescentou Categorias (`/painel/categorias`) e Equipe
+(`/painel/equipe`), mas não como links soltos: por pedido do usuário, ficam dentro de um grupo
+recolhível **"Ajustes"** (ícone de engrenagem + chevron) ao final da navegação, sinalizando que são
+telas de manutenção pouco usadas — não concorrem visualmente com a navegação operacional do dia a
+dia. O grupo nasce aberto quando a sessão começa direto numa dessas rotas (ex.: URL colada) e, a
+partir daí, só o toggle manual do usuário controla o estado — sem `useEffect` sincronizando (evita
+o lint `react-hooks/set-state-in-effect`, já usado como referência em outras telas do painel). Como
+o `AdminShell` vive no layout persistente de `/painel` (não remonta entre navegações internas), o
+grupo continua aberto ao visitar outra tela e só fecha se o Gestor clicar em "Ajustes" de novo.
 
 ### Painel de atenção
 

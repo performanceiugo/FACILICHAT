@@ -193,6 +193,11 @@ async def login(
     if not usuario or not senhaValida:
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
+    # Fase 4: usuario desativado (Usuario.Ativo=False) nao loga - "remover" da equipe e sempre
+    # desativacao, nunca exclusao, mas o acesso precisa parar de valer a partir dai.
+    if not usuario.Ativo:
+        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+
     # Nome da Empresa vai junto na resposta do login (não no JWT) só para exibição na UI
     # (ex.: "Admin · Cefram" no cabeçalho do painel) — o backend nunca confia nesse campo depois.
     resultadoEmpresa = await db.execute(select(Empresa).where(Empresa.ID == usuario.EmpresaID))

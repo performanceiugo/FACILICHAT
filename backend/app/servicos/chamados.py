@@ -12,13 +12,14 @@ from app.modelos.Usuarios import Usuario
 # O Protocol evita acoplar esta regra a um schema Pydantic específico da camada de rotas.
 class ChamadoPayload(Protocol):
     Fila: ChamadoFila
-    Categoria: str
+    CategoriaID: uuid.UUID
     Resumo: str | None
     Prioridade: ChamadoPrioridade
 
 
 # Constrói dois ou mais chamados nascidos do mesmo aviso, sem gravá-los no banco.
-# A rota chamadora continua responsável pela validação da quantidade, persistência e resposta HTTP.
+# A rota chamadora continua responsável por validar cada CategoriaID (ativa/mesma Empresa) antes de
+# chamar esta função, e também pela persistência e resposta HTTP.
 def montarChamadosIrmaos(payloads: Sequence[ChamadoPayload], usuarioAtual: Usuario) -> list[Chamado]:
     # Um único identificador liga todos os tickets criados nesta operação para preservar a rastreabilidade.
     grupoOrigemID = uuid.uuid4()
@@ -30,7 +31,7 @@ def montarChamadosIrmaos(payloads: Sequence[ChamadoPayload], usuarioAtual: Usuar
             ClienteID=usuarioAtual.ID,
             GrupoOrigemID=grupoOrigemID,
             Fila=payload.Fila,
-            Categoria=payload.Categoria,
+            CategoriaID=payload.CategoriaID,
             Resumo=payload.Resumo,
             Prioridade=payload.Prioridade,
         )

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.banco_dados import engine, Base
 from app.configuracoes import configuracoes
 from app import modelos  # importação necessária para que o SQLAlchemy reconheça os modelos antes do create_all
-from app.rotas import Autenticacao, Usuarios, Chamados, Plataforma, Relatorios, Coberturas
+from app.rotas import Autenticacao, Usuarios, Chamados, Plataforma, Relatorios, Coberturas, Categorias
 from app.servicos.csrf import CsrfMiddleware
 
 
@@ -123,6 +123,7 @@ app.include_router(Chamados.roteador)       # /chamados/...
 app.include_router(Plataforma.roteador)     # /plataforma/...
 app.include_router(Relatorios.roteador)     # /relatorios/...
 app.include_router(Coberturas.roteador)     # /coberturas/...
+app.include_router(Categorias.roteador)     # /categorias/...
 
 # Rota de verificação de saúde da API
 @app.get("/")

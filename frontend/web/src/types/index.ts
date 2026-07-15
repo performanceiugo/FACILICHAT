@@ -25,9 +25,28 @@ export interface Usuario {
   Nome: string
   Email: string
   Funcao: UsuarioFuncao
+  Ativo: boolean  // Fase 4: "removido" da equipe é sempre desativação, nunca exclusão
   Telefone: string | null
   CondominioID: string | null
   Condominio: string | null
+}
+
+// Categoria do catálogo de chamados de uma Empresa (Fase 4) — substituiu o texto livre.
+export interface CategoriaChamado {
+  ID: string
+  EmpresaID: string
+  Nome: string
+  Ativa: boolean
+}
+
+export interface CategoriaCriar {
+  Nome: string
+}
+
+// Nome e Ativa são independentes — o Gestor pode renomear sem mexer no status e vice-versa.
+export interface CategoriaAtualizar {
+  Nome?: string
+  Ativa?: boolean
 }
 
 // Dados de um chamado retornados pela API
@@ -40,6 +59,7 @@ export interface Chamado {
   SupervisorID: string | null
   SupervisorNome: string | null
   Fila: ChamadoFila
+  CategoriaID: string  // Fase 4: FK do catálogo — Categoria (abaixo) é o nome resolvido via join
   Categoria: string
   Status: ChamadoStatus
   Prioridade: ChamadoPrioridade
@@ -130,11 +150,30 @@ export interface EmpresaCriadaResposta {
 // Payload enviado ao criar um novo chamado
 export interface ChamadoCriar {
   Fila: ChamadoFila
-  Categoria: string
+  CategoriaID: string  // Fase 4: substituiu o texto livre — precisa ser uma categoria ativa da Empresa
   Resumo?: string
   Prioridade?: ChamadoPrioridade
 }
 
 export interface ChamadosIrmaosCriar {
   Chamados: ChamadoCriar[]
+}
+
+// Payload de criação de um membro da equipe (Fase 4) — reaproveita POST /usuarios/equipe.
+// EmpresaID é exigido pelo schema do backend mas ignorado na prática: a rota sempre usa a
+// Empresa do Gestor autenticado (nunca a informada no corpo).
+export interface UsuarioCriarEquipe {
+  EmpresaID: string
+  Nome: string
+  Email: string
+  Senha: string
+  Funcao: UsuarioFuncao
+  Telefone?: string
+}
+
+// Edição de dados cadastrais (Fase 4) — Função não entra aqui, continua exclusiva de outra rota.
+export interface UsuarioEditar {
+  Nome?: string
+  Telefone?: string
+  Email?: string
 }

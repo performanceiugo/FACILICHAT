@@ -1,7 +1,7 @@
 # Modelo ORM da tabela Chamados (solicitações de serviço)
 # Um chamado é criado pelo Cliente e percorre um fluxo de status até ser concluído ou cancelado
 
-from sqlalchemy import String, Enum as SAEnum, DateTime, ForeignKey, Text
+from sqlalchemy import Enum as SAEnum, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.banco_dados import Base
@@ -44,7 +44,9 @@ class Chamado(Base):
     GrupoOrigemID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)       # Tickets irmãos do mesmo aviso
     SupervisorID: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("Usuarios.ID"), nullable=True) # Responsável atribuído (opcional)
     Fila: Mapped[ChamadoFila] = mapped_column(SAEnum(ChamadoFila), nullable=False)
-    Categoria: Mapped[str] = mapped_column(String(80), nullable=False)           # Ex: "Elétrica", "Hidráulica", "Segurança"
+    # Fase 4: substitui o antigo campo texto livre — categoria agora é uma linha do catálogo
+    # CategoriaChamado, por Empresa (regra de modelagem: nada de nome fixo em enum/constante).
+    CategoriaID: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("CategoriasChamado.ID"), nullable=False)
     Status: Mapped[ChamadoStatus | None] = mapped_column(SAEnum(ChamadoStatus), default=ChamadoStatus.Recebido)
     Prioridade: Mapped[ChamadoPrioridade | None] = mapped_column(SAEnum(ChamadoPrioridade), default=ChamadoPrioridade.Media)
     Resumo: Mapped[str | None] = mapped_column(Text, nullable=True)                     # Descrição livre do problema

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select
 from sqlalchemy.orm import aliased
 from pydantic import BaseModel, ConfigDict, Field
+from app.modelos.CategoriaChamado import CategoriaChamado
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
 from app.rotas.Autenticacao import obterBancoDadosComTenant, obterUsuarioAtual
@@ -17,11 +18,13 @@ import uuid
 roteador = APIRouter(prefix="/chamados", tags=["Chamados"])
 
 # Schema de entrada — dados obrigatórios e opcionais para abrir um novo chamado.
-# Limites de tamanho (item M1): Categoria não pode ser vazia e os campos de texto livre têm teto,
-# como defesa contra payloads abusivos (Resumo comporta o relato do cliente, mas não é ilimitado).
+# Fase 4: Categoria passou de texto livre para CategoriaID (FK) — a rota valida que a categoria
+# existe, está ativa e pertence à mesma Empresa antes de criar o chamado.
+# Limites de tamanho (item M1): os campos de texto livre têm teto, como defesa contra payloads
+# abusivos (Resumo comporta o relato do cliente, mas não é ilimitado).
 class ChamadoCriar(BaseModel):
     Fila: ChamadoFila
-    Categoria: str = Field(min_length=1, max_length=80)
+    CategoriaID: uuid.UUID
     Resumo: str | None = Field(default=None, max_length=2000)
     Prioridade: ChamadoPrioridade = ChamadoPrioridade.Media
 
@@ -38,6 +41,7 @@ class ChamadoSaida(BaseModel):
     SupervisorID: uuid.UUID | None
     SupervisorNome: str | None = None
     Fila: ChamadoFila
+    CategoriaID: uuid.UUID
     Categoria: str
     Status: ChamadoStatus
     Prioridade: ChamadoPrioridade
@@ -52,6 +56,7 @@ def montarChamadoSaida(
     chamado: Chamado,
     clienteNome: str | None = None,
     supervisorNome: str | None = None,
+    categoriaNome: str = "",
 ) -> ChamadoSaida:
     return ChamadoSaida(
         ID=chamado.ID,
@@ -62,12 +67,29 @@ def montarChamadoSaida(
         SupervisorID=chamado.SupervisorID,
         SupervisorNome=supervisorNome,
         Fila=chamado.Fila,
-        Categoria=chamado.Categoria,
+        CategoriaID=chamado.CategoriaID,
+        Categoria=categoriaNome,
         Status=chamado.Status,
         Prioridade=chamado.Prioridade,
         Resumo=chamado.Resumo,
         Criacao=chamado.Criacao,
     )
+
+
+# Busca uma categoria ATIVA da mesma Empresa — rejeita categoria de outro tenant (IDOR) e categoria
+# desativada (o catálogo de manutenção não deve aceitar novos chamados nela).
+async def _obterCategoriaAtiva(categoriaID: uuid.UUID, empresaID: uuid.UUID, db: AsyncSession) -> CategoriaChamado:
+    resultado = await db.execute(
+        select(CategoriaChamado).where(
+            CategoriaChamado.ID == categoriaID,
+            CategoriaChamado.EmpresaID == empresaID,
+            CategoriaChamado.Ativa.is_(True),
+        )
+    )
+    categoria = resultado.scalar_one_or_none()
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada ou inativa")
+    return categoria
 
 # POST /chamados/ — cria um novo chamado vinculado ao usuário autenticado
 @roteador.post("/", response_model=ChamadoSaida)
@@ -76,18 +98,20 @@ async def criarChamado(
     db: AsyncSession = Depends(obterBancoDadosComTenant),
     usuarioAtual: Usuario = Depends(obterUsuarioAtual)
 ):
+    categoria = await _obterCategoriaAtiva(payload.CategoriaID, usuarioAtual.EmpresaID, db)
+
     chamado = Chamado(
         EmpresaID=usuarioAtual.EmpresaID,  # regra de ouro do multi-tenant: nasce escopado ao tenant do criador
         ClienteID=usuarioAtual.ID,
         Fila=payload.Fila,
-        Categoria=payload.Categoria,
+        CategoriaID=categoria.ID,
         Resumo=payload.Resumo,
         Prioridade=payload.Prioridade,
     )
     db.add(chamado)
     await db.commit()
     await db.refresh(chamado)
-    return chamado
+    return montarChamadoSaida(chamado, categoriaNome=categoria.Nome)
 
 # POST /chamados/irmaos — cria 2+ chamados ligados pelo mesmo GrupoOrigemID
 @roteador.post("/irmaos", response_model=list[ChamadoSaida])
@@ -99,12 +123,25 @@ async def criarChamadosIrmaos(
     if len(payload.Chamados) < 2:
         raise HTTPException(status_code=400, detail="Tickets irmãos exigem pelo menos 2 chamados")
 
+    # Cada ticket irmão pode ir para uma categoria diferente (ex.: atestado → RH + Supervisão) —
+    # valida uma a uma antes de montar, na mesma regra da criação individual.
+    categoriasPorID = {
+        categoria.ID: categoria.Nome
+        for categoria in [
+            await _obterCategoriaAtiva(item.CategoriaID, usuarioAtual.EmpresaID, db)
+            for item in payload.Chamados
+        ]
+    }
+
     chamados = montarChamadosIrmaos(payload.Chamados, usuarioAtual)
     db.add_all(chamados)
     await db.commit()
     for chamado in chamados:
         await db.refresh(chamado)
-    return chamados
+    return [
+        montarChamadoSaida(chamado, categoriaNome=categoriasPorID[chamado.CategoriaID])
+        for chamado in chamados
+    ]
 
 # GET /chamados/ — lista chamados; gestores e supervisores veem todos, clientes veem apenas os seus
 @roteador.get("/", response_model=list[ChamadoSaida])
@@ -122,6 +159,7 @@ async def listarChamados(
             Chamado,
             cliente.Nome.label("ClienteNome"),
             supervisor.Nome.label("SupervisorNome"),
+            CategoriaChamado.Nome.label("CategoriaNome"),
         )
         .join(
             cliente,
@@ -137,6 +175,7 @@ async def listarChamados(
                 supervisor.EmpresaID == usuarioAtual.EmpresaID,
             ),
         )
+        .join(CategoriaChamado, CategoriaChamado.ID == Chamado.CategoriaID)
         .where(Chamado.EmpresaID == usuarioAtual.EmpresaID)
     )
 
@@ -170,7 +209,7 @@ async def listarChamados(
         )
     # Os nomes tornam a tabela pesquisável sem expor qualquer usuário fora da Empresa autenticada.
     return [
-        montarChamadoSaida(linha.Chamado, linha.ClienteNome, linha.SupervisorNome)
+        montarChamadoSaida(linha.Chamado, linha.ClienteNome, linha.SupervisorNome, linha.CategoriaNome)
         for linha in resultado
     ]
 
@@ -204,7 +243,9 @@ async def atualizarStatus(
     chamado.Atualizacao = agoraUtc()  # timezone-aware, compatível com a coluna DateTime(timezone=True)
     await db.commit()
     await db.refresh(chamado)
-    return chamado
+
+    categoriaNome = await db.scalar(select(CategoriaChamado.Nome).where(CategoriaChamado.ID == chamado.CategoriaID))
+    return montarChamadoSaida(chamado, categoriaNome=categoriaNome or "")
 
 # Schema de entrada da atribuição de supervisor — SupervisorID nulo remove a atribuição atual.
 class SupervisorAtribuir(BaseModel):
@@ -232,13 +273,15 @@ async def atribuirSupervisor(
 
     supervisorNome: str | None = None
     if payload.SupervisorID is not None:
-        # O supervisor precisa existir com esse papel na mesma Empresa — evita atribuir um
-        # usuário de outro tenant ou de outro perfil só por adivinhar/enumerar o UUID.
+        # O supervisor precisa existir com esse papel, ATIVO, na mesma Empresa — evita atribuir um
+        # usuário de outro tenant, de outro perfil ou já desativado (Fase 4) só por
+        # adivinhar/enumerar o UUID.
         supervisorResultado = await db.execute(
             select(Usuario).where(
                 Usuario.ID == payload.SupervisorID,
                 Usuario.EmpresaID == usuarioAtual.EmpresaID,
                 Usuario.Funcao == UsuarioFuncao.Supervisor,
+                Usuario.Ativo.is_(True),
             )
         )
         supervisor = supervisorResultado.scalar_one_or_none()
@@ -252,4 +295,5 @@ async def atribuirSupervisor(
 
     clienteResultado = await db.execute(select(Usuario.Nome).where(Usuario.ID == chamado.ClienteID))
     clienteNome = clienteResultado.scalar_one_or_none()
-    return montarChamadoSaida(chamado, clienteNome, supervisorNome)
+    categoriaNome = await db.scalar(select(CategoriaChamado.Nome).where(CategoriaChamado.ID == chamado.CategoriaID))
+    return montarChamadoSaida(chamado, clienteNome, supervisorNome, categoriaNome or "")

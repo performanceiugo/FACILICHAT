@@ -1,0 +1,104 @@
+/* Página de categorias do Gestor: formulário de criação + tabela de manutenção. */
+
+.pagina { display: flex; flex-direction: column; gap: var(--sp-6); }
+
+.cabecalho { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); }
+.sobretitulo { color: var(--blue-700); font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: .04em; }
+.titulo { color: var(--text-strong); font-size: var(--fs-h2); font-weight: var(--fw-bold); margin-top: var(--sp-1); }
+.subtitulo { color: var(--text-muted); font-size: var(--fs-sm); margin-top: var(--sp-2); max-width: 640px; }
+
+/* Formulário de criação: campo + botão numa linha, erro logo ao lado em telas largas. */
+.formCriar {
+  align-items: end;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+}
+.campo { display: flex; flex-direction: column; flex: 1 1 260px; gap: var(--sp-2); min-width: 0; }
+.campo span { color: var(--text-default); font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
+.campo input {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  color: var(--text-default);
+  font: inherit;
+  font-size: var(--fs-sm);
+  height: 42px;
+  padding: 0 var(--sp-3);
+  width: 100%;
+}
+.campo input:focus { border-color: var(--blue-500); box-shadow: 0 0 0 3px var(--blue-50); outline: none; }
+
+.botaoPrimario {
+  background: var(--blue-500);
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--text-onbrand);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  height: 42px;
+  padding: 0 var(--sp-5);
+  white-space: nowrap;
+}
+.botaoPrimario:hover:not(:disabled) { background: var(--blue-700); }
+.botaoPrimario:disabled { cursor: default; opacity: .6; }
+
+.erroInline { color: var(--danger-700); font-size: var(--fs-sm); }
+
+/* Tabela segue o mesmo padrão visual da tela de tickets. */
+.tabelaPainel { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--r-sm); box-shadow: var(--shadow-xs); overflow: hidden; }
+.tabelaContainer { overflow-x: auto; }
+.tabela { border-collapse: collapse; min-width: 480px; width: 100%; }
+.tabela th { background: var(--bg-subtle); color: var(--text-muted); font-size: var(--fs-xs); font-weight: var(--fw-semibold); padding: var(--sp-3) var(--sp-5); text-align: left; }
+.tabela td { border-top: 1px solid var(--border-subtle); color: var(--text-default); font-size: var(--fs-sm); padding: var(--sp-4) var(--sp-5); vertical-align: middle; }
+.tabela tbody tr:hover { background: var(--bg-subtle); }
+.tabela td strong { color: var(--text-strong); }
+
+.inputLinha {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  color: var(--text-default);
+  font: inherit;
+  font-size: var(--fs-sm);
+  height: 36px;
+  padding: 0 var(--sp-3);
+  width: 100%;
+}
+.inputLinha:focus { border-color: var(--blue-500); box-shadow: 0 0 0 3px var(--blue-50); outline: none; }
+.erroLinha { color: var(--danger-700); display: block; margin-top: var(--sp-1); }
+
+.status { border-radius: var(--r-full); display: inline-flex; font-size: var(--fs-xs); font-weight: var(--fw-semibold); padding: 3px var(--sp-3); white-space: nowrap; }
+.status--sucesso { background: var(--success-50); color: var(--success-700); }
+.status--apagado { background: var(--bg-muted); color: var(--text-subtle); }
+
+.acoes { display: flex; gap: var(--sp-4); white-space: nowrap; }
+.link {
+  background: none;
+  border: none;
+  color: var(--blue-700);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  padding: 0;
+}
+.link:hover:not(:disabled) { text-decoration: underline; }
+.link:disabled { color: var(--text-subtle); cursor: default; }
+
+.vazio { align-items: center; color: var(--text-muted); display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-8); text-align: center; }
+.vazio strong { color: var(--text-strong); }
+.info { color: var(--text-muted); margin-top: var(--sp-8); }
+.erro { color: var(--danger-700); margin-top: var(--sp-8); }
+
+@media (max-width: 640px) {
+  .cabecalho { flex-direction: column; }
+  .formCriar { flex-direction: column; align-items: stretch; }
+}

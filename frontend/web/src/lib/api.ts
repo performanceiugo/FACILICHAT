@@ -2,6 +2,9 @@
 // Todas as chamadas de API passam por aqui — adiciona token de autenticação automaticamente
 
 import type {
+  CategoriaAtualizar,
+  CategoriaChamado,
+  CategoriaCriar,
   Chamado,
   ChamadoCriar,
   ChamadosIrmaosCriar,
@@ -15,6 +18,9 @@ import type {
   SupervisorRelatorio,
   TokenResposta,
   Usuario,
+  UsuarioCriarEquipe,
+  UsuarioEditar,
+  UsuarioFuncao,
   VisaoGeralRelatorio,
 } from '@/types'
 import { auth } from '@/lib/auth'
@@ -190,6 +196,27 @@ export const api = {
       req<Chamado[]>('/chamados/irmaos', { method: 'POST', body: JSON.stringify(payload) }),
     atualizarStatus: (id: string, status: ChamadoStatus) =>
       req<Chamado>(`/chamados/${id}/status?status=${status}`, { method: 'PATCH' }),
+  },
+
+  // Manutenção da equipe da Empresa (Fase 4) — exclusivo do Gestor.
+  usuarios: {
+    equipe: (funcao?: UsuarioFuncao) =>
+      req<Usuario[]>(`/usuarios/equipe${funcao ? `?funcao=${encodeURIComponent(funcao)}` : ''}`),
+    criarEquipe: (payload: UsuarioCriarEquipe) =>
+      req<Usuario>('/usuarios/equipe', { method: 'POST', body: JSON.stringify(payload) }),
+    editar: (id: string, payload: UsuarioEditar) =>
+      req<Usuario>(`/usuarios/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    alterarStatus: (id: string, ativo: boolean) =>
+      req<Usuario>(`/usuarios/${id}/status`, { method: 'PATCH', body: JSON.stringify({ Ativo: ativo }) }),
+  },
+
+  // Catálogo de categorias por Empresa (Fase 4) — exclusivo do Gestor.
+  categorias: {
+    listar: () => req<CategoriaChamado[]>('/categorias/'),
+    criar: (payload: CategoriaCriar) =>
+      req<CategoriaChamado>('/categorias/', { method: 'POST', body: JSON.stringify(payload) }),
+    atualizar: (id: string, payload: CategoriaAtualizar) =>
+      req<CategoriaChamado>(`/categorias/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   },
 
   // Relatorios executivos sao agregados no backend para preservar permissoes e tenant.
