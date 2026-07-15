@@ -43,6 +43,70 @@
   inexistente e chamado inexistente retornaram `404`; import do backend confirmado no contêiner.
 - Arquivo: `backend/app/rotas/Chamados.py`.
 
+### Fase 0.5 — pinagem de Node/Python para desenvolvimento (`V4`, `CU: 868kb32ph`)
+- **Problema:** o repositório não declarava oficialmente a versão de Node/Python esperada para
+  desenvolver (sem `.nvmrc`/`.python-version`/`engines`), então uma máquina local podia divergir
+  do que Docker/CI já usavam (Node 22, Python 3.12).
+- **Decisão do usuário:** ao confirmar o item, subir a versão oficial de Node para **24** (em vez
+  de manter 22), ampliando o escopo para também atualizar o Dockerfile do web e o workflow de CI
+  do mobile — evita que o pin fique inconsistente com o que os containers/CI realmente rodam.
+- **Feito:** `.nvmrc` (`24`) e `.python-version` (`3.12`) novos na raiz; `engines.node` (`>=24.0.0
+  <25.0.0`) adicionado em `frontend/web/package.json` e `frontend/mobile/package.json`;
+  `frontend/web/Dockerfile` (build e runtime) e `.github/workflows/auditoria-mobile.yml`
+  atualizados de `node:22` para `node:24`; `docs/setup.md` atualizado (pré-requisito Node 24 +
+  nota sobre os arquivos de pinagem).
+- Arquivos: `.nvmrc` (novo), `.python-version` (novo), `frontend/web/package.json`,
+  `frontend/mobile/package.json`, `frontend/web/Dockerfile`,
+  `.github/workflows/auditoria-mobile.yml`, `docs/setup.md`.
+
+### Fase 0.5 — migração do Next.js 15.5.20 para 16.2.10 (`V5`, `CU: 868kb32v1`)
+- **Pesquisa prévia:** documentação oficial consultada via Context7 (`/vercel/next.js`) antes de
+  mexer no código, já que a versão-alvo é bem mais recente que o conhecimento de treino: guia de
+  upgrade 15→16, migração `middleware`→`proxy`, requisitos de Node/TypeScript e o novo flat config
+  nativo do ESLint.
+- **`next`/`eslint-config-next`** atualizados de `15.5.20` para `16.2.10` (pin exato, mesmo padrão
+  do resto do projeto); `react`/`react-dom` já satisfaziam `^19.0.0` (resolveram para `19.2.7`).
+  Node 20.9+/TypeScript 5.1+ exigidos pelo Next 16 — já atendidos (`V4` fixou Node 24).
+- **`middleware.ts` → `proxy.ts`:** convenção renomeada pelo Next 16 (o nome de arquivo/export
+  antigo fica deprecado). Renomeado manualmente (o codemod oficial recusou rodar por haver
+  alterações de git não commitadas de outra frente de trabalho em andamento no repo); função
+  `middleware` virou `proxy`, comportamento de guarda de sessão/redirecionamento idêntico —
+  revalidado com `curl` real (sem cookie: `/painel/*` e `/plataforma/*` → 307 para `/login`; headers
+  de segurança do S16 confirmados na resposta).
+- **ESLint nativo:** `eslint.config.mjs` migrado do shim `FlatCompat` (`@eslint/eslintrc`, usado até
+  a v15 para traduzir `next/core-web-vitals`/`next/typescript`) para os presets flat nativos que o
+  `eslint-config-next` 16 já exporta (`eslint-config-next/core-web-vitals` e `/typescript` com
+  `defineConfig`/`globalIgnores` de `eslint/config`); `@eslint/eslintrc` removido do
+  `package.json` por não ser mais necessário.
+- **Turbopack:** já é o padrão do `next dev`/`next build` na v16, sem mudança de script necessária;
+  build de produção confirmado com `next build` (`▲ Next.js 16.2.10 (Turbopack)`) gerando o
+  `.next/standalone` normalmente (item S9 intacto).
+- **Regressão encontrada e corrigida:** o `eslint-config-next` 16 trouxe por padrão as regras novas
+  e mais rígidas do `eslint-plugin-react-hooks` v6 ("React Compiler rules"), que passaram a acusar
+  5 erros em 4 arquivos que antes passavam limpos — padrões antigos e intencionais, não bugs novos
+  introduzidos agora. **Decisão do usuário:** corrigir os arquivos em vez de rebaixar as regras ou
+  adiar. Corrigido: `useAtualizacaoPeriodica.ts` (escrita da ref movida de dentro do corpo da render
+  para um `useEffect`, satisfazendo `react-hooks/refs`); `AdminShell.tsx`,
+  `painel/chamados/page.tsx`, `painel/visao-geral/page.tsx` e `plataforma/empresas/page.tsx`
+  (setters do efeito de guarda de sessão/carregamento inicial envolvidos em `queueMicrotask`,
+  satisfazendo `react-hooks/set-state-in-effect` sem mudar o comportamento — comportamento
+  confirmado por padrão comprovado com um probe isolado do próprio ESLint antes de aplicar nos
+  arquivos reais). `npm run lint` voltou a rodar com 0 erros (só os mesmos 4 warnings
+  pré-existentes do `api.ts` do item V2).
+- **Validado:** `npm run lint` (0 erros), `tsc --noEmit` (limpo), `npm run build` (build de produção
+  completo, 9 rotas), smoke test real com `next start` numa porta alternativa (307 para `/login` nas
+  rotas protegidas sem cookie, CSP/`X-Frame-Options`/`Referrer-Policy`/`Permissions-Policy`
+  presentes).
+- Arquivos: `frontend/web/package.json`, `frontend/web/package-lock.json`,
+  `frontend/web/eslint.config.mjs`, `frontend/web/src/proxy.ts` (novo, substitui
+  `src/middleware.ts`), `frontend/web/src/lib/useAtualizacaoPeriodica.ts`,
+  `frontend/web/src/components/painel/AdminShell.tsx`,
+  `frontend/web/src/app/painel/chamados/page.tsx`,
+  `frontend/web/src/app/painel/visao-geral/page.tsx`,
+  `frontend/web/src/app/plataforma/empresas/page.tsx`, `frontend/web/tsconfig.json` (ajustado
+  automaticamente pelo próprio `next build`), `docs/tecnico-frontend.md`,
+  `.claude/skills/verificar-seguranca/SKILL.md`.
+
 ### Dev — banco de demonstração populado com mais supervisores e chamados variados
 - **Motivação:** ampliar a massa de dados de teste para validar as telas do painel (Visão geral,
   Supervisores, Todos os tickets) com mais volume e variedade antes de uma rodada de validação

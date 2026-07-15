@@ -1,4 +1,4 @@
-// Middleware de autenticacao do app web.
+// Proxy de autenticacao do app web (renomeado de middleware.ts na migracao para o Next.js 16 — item V4/V5).
 // Executa antes do render para evitar flash de conteudo protegido nas rotas do painel/plataforma.
 
 import { NextResponse } from 'next/server'
@@ -9,14 +9,14 @@ function construirUrl(request: NextRequest, pathname: string) {
   return new URL(pathname, request.url)
 }
 
-// O middleware existe para evitar o FLASH de conteudo protegido — nao para autorizar.
+// O proxy existe para evitar o FLASH de conteudo protegido — nao para autorizar.
 // Por decisao explicita (item S6), ele apenas CHECA A PRESENCA do cookie de sessao; nao verifica
 // a assinatura do JWT, o que exigiria espalhar o `JWT_SECRET` para o servidor do Next.
 // Toda autorizacao real acontece no backend, que revalida o token assinado a cada requisicao.
 //
 // O cookie `funcao` e legivel (logo, forjavel) e serve so para escolher a tela inicial. Forja-lo
 // leva o usuario a uma tela que a API vai recusar a preencher — nao concede acesso a dado nenhum.
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const sessao = request.cookies.get(COOKIE_SESSAO)?.value
   const funcao = request.cookies.get(COOKIE_FUNCAO)?.value

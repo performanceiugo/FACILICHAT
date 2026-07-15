@@ -45,7 +45,9 @@ export default function EmpresasPlataformaPage() {
       router.push('/painel/visao-geral')
       return
     }
-    setNome(auth.nome())
+    // `queueMicrotask` evita chamar o setter direto no corpo síncrono do efeito — o Next.js 16/
+    // React Compiler ESLint (`react-hooks/set-state-in-effect`) não permite.
+    queueMicrotask(() => setNome(auth.nome()))
     carregarEmpresas()
       .catch(err => {
         if (montadoRef.current) setErro(err instanceof Error ? err.message : 'Erro ao carregar empresas')

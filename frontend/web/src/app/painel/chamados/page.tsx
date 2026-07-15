@@ -83,8 +83,13 @@ export default function ChamadosPage() {
 
   useEffect(() => {
     montadoRef.current = true
-    setEmpresaNome(auth.empresaNome())
-    buscarChamados(true)
+    // `queueMicrotask` evita chamar setters (direto ou via `buscarChamados`, que também seta
+    // estado) no corpo síncrono do efeito — o Next.js 16/React Compiler ESLint
+    // (`react-hooks/set-state-in-effect`) não permite.
+    queueMicrotask(() => {
+      setEmpresaNome(auth.empresaNome())
+      buscarChamados(true)
+    })
     return () => { montadoRef.current = false }
   }, [buscarChamados])
 

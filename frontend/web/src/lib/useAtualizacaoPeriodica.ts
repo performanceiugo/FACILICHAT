@@ -14,8 +14,12 @@ import { useEffect, useRef } from 'react'
 export function useAtualizacaoPeriodica(buscar: () => void, intervaloMs = 20000) {
   // Guarda a funcao mais recente numa ref para o efeito abaixo nao precisar recriar o
   // setInterval a cada render (evita reiniciar o timer quando `buscar` muda de referencia).
+  // A escrita roda num efeito (nao direto no corpo da render) porque o Next.js 16/React Compiler
+  // ESLint (`react-hooks/refs`) proibe mutar `ref.current` durante a render.
   const buscarRef = useRef(buscar)
-  buscarRef.current = buscar
+  useEffect(() => {
+    buscarRef.current = buscar
+  })
 
   useEffect(() => {
     // Tick do polling: so busca se a aba estiver visivel — evita gastar requisicao com o

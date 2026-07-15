@@ -6,7 +6,7 @@
 # imagem final pequena e sem código-fonte/toolchain.
 
 # ---------- Estágio 1: build ----------
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 
 # Dependências primeiro — camada cacheável enquanto os manifests não mudam.
@@ -30,7 +30,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ---------- Estágio 2: runtime ----------
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 # O server.js standalone lê PORT/HOSTNAME do ambiente; 0.0.0.0 expõe para a rede do compose

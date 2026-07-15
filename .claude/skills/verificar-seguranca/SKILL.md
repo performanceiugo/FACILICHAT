@@ -23,7 +23,7 @@ Não use para alterações que não tocam nesses temas — isso evita gastar tok
 1. Identifique o(s) tema(s) específico(s) da mudança (ex.: só CORS, ou JWT + cookies) — não faça uma
    varredura geral se a mudança só toca um tema.
 2. Leia o código atual relevante para descrever o estado atual (ex.: `backend/app/main.py` para
-   CORS, o módulo de segurança do backend para JWT, o `middleware.ts`/cookies do `frontend/web`).
+   CORS, o módulo de segurança do backend para JWT, o `proxy.ts`/cookies do `frontend/web`).
 3. Busque a recomendação atual só para o(s) tema(s) identificado(s):
    - Biblioteca específica (FastAPI, Next.js) → use a skill `find-docs` (Context7).
    - Prática geral de segurança web (ex.: "recomendação atual de SameSite", "OWASP CORS") →

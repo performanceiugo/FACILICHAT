@@ -82,10 +82,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       router.push('/login')
       return
     }
-    // Com sessão: carrega os dados do usuário para o estado
-    setNome(auth.nome())
-    setEmpresaNome(auth.empresaNome())
-    setCarregado(true)
+    // Com sessão: carrega os dados do usuário para o estado. `queueMicrotask` evita chamar
+    // os setters direto no corpo síncrono do efeito — o Next.js 16/React Compiler ESLint
+    // (`react-hooks/set-state-in-effect`) não permite, mesmo sendo um efeito de montagem único.
+    queueMicrotask(() => {
+      setNome(auth.nome())
+      setEmpresaNome(auth.empresaNome())
+      setCarregado(true)
+    })
   }, [router])
 
   // Encerra a sessão e volta ao login. O logout é uma chamada ao backend porque só ele consegue

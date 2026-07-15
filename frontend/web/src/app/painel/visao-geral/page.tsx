@@ -114,8 +114,13 @@ export default function VisaoGeralPage() {
   // Carrega a Empresa de exibicao e a lista de chamados ao montar a tela.
   useEffect(() => {
     ativoRef.current = true
-    setEmpresaNome(auth.empresaNome())
-    buscarVisaoGeral(true)
+    // `queueMicrotask` evita chamar setters (direto ou via `buscarVisaoGeral`, que também seta
+    // estado) no corpo síncrono do efeito — o Next.js 16/React Compiler ESLint
+    // (`react-hooks/set-state-in-effect`) não permite.
+    queueMicrotask(() => {
+      setEmpresaNome(auth.empresaNome())
+      buscarVisaoGeral(true)
+    })
     return () => { ativoRef.current = false }
   }, [buscarVisaoGeral])
 

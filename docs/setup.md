@@ -10,8 +10,12 @@
 ## Pré-requisitos
 
 - **Docker Desktop** instalado e rodando (Windows/Mac/Linux)
-- **Node.js 20+** (para o frontend web)
+- **Node.js 24** (para o frontend web) — versão travada no `.nvmrc` da raiz; se usar `nvm`, rode `nvm use` no repositório
 - **Git**
+
+> O repositório fixa as versões oficiais de desenvolvimento em arquivos de pinagem na raiz:
+> `.nvmrc` (Node 24, mesma major do Docker/CI) e `.python-version` (Python 3.12, mesma versão do
+> `backend/Dockerfile`). Ferramentas como `nvm`/`pyenv` os detectam automaticamente.
 
 ---
 

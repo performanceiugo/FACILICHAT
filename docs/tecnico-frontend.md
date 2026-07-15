@@ -239,7 +239,7 @@ enviado pelo Next — fica no proxy HTTPS de produção (ver `docs/deploy-produc
 
 > **Atenção ao rodar `next build` localmente:** pare o `next dev` antes. Os dois compartilham a
 > pasta `.next/` e um build feito com o dev server ativo sai contaminado com artefatos de dev
-> (sintoma: `EvalError: Code generation from strings disallowed` no middleware ao usar `next start`).
+> (sintoma: `EvalError: Code generation from strings disallowed` no proxy ao usar `next start`).
 
 ### Imagem de produção (item S9)
 
