@@ -1,11 +1,12 @@
 # Pendencias Locais de Sincronizacao ClickUp
 
-Este arquivo existe porque a sessao atual do Codex nao expoe MCP/ferramenta nativa de ClickUp.
-Use-o como checklist manual na sessao que tiver acesso ao board.
+Este arquivo funciona como checklist de contingencia quando o conector ClickUp nao estiver
+disponivel. No app desktop, usar explicitamente o Workspace ID para evitar ambiguidade entre contas.
 
 Board: Operacoes Internas > FaciliChat - Desenvolvimento > Roadmap de Implementacao
 List ID: `901114027434`
-Atualizado em: 2026-07-10
+Workspace ID: `9011725879`
+Atualizado em: 2026-07-15
 
 ## Alteracoes pendentes
 

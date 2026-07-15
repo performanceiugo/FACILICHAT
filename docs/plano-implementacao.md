@@ -87,6 +87,7 @@
 | 2 | Criar chamado e detalhe (cliente) | `868k60vvt` | ⬜ Na fila |
 | 3 | Fila e operação do supervisor (mobile) | `868k60vx4` | ⬜ Na fila |
 | 4 | Dashboard do gestor (web) | `868k60w16` | ⬜ Na fila |
+| 4.1 | Desempenho e escala para produção | `868kcuvv8` | ⬜ Na fila · executar após a conclusão visual da Fase 4 e antes da produção |
 | 4.5 | Catálogo de Serviços e Parceiros | `868k7vr0g` | ⬜ Na fila · **NOVA (discovery)** |
 | 5 | IA (classificação, roteamento e narração) | `868k60w34` | ⬜ Na fila |
 | 5.5 | Governança e guardrails da IA | `868k7vr1c` | ⬜ Na fila · **NOVA (discovery)** |
@@ -98,7 +99,7 @@
 | 11 | Experiência do Funcionário (canal único, voz/foto, sensor de campo) | `868k7vr1k` | ⬜ Na fila · **NOVA (discovery)** |
 | — | Adiados (pós-MVP): privacidade por tópico, integração ERP | `868k7vr1q` | ⬜ Registrado |
 
-> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1 → 1.5 (inbound) → 2–4 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
+> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1 → 1.5 (inbound) → 2–4 → 4.1 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
 > encaixando as correções pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são
 > fundação e vêm antes das features. As Fases 4.5, 5.5 e 11 saíram do material de discovery (jornadas +
 > How Might We + Governança de IA em `docs/FaciliChat-Regras/`) revisado em 02/07/2026. A Fase 1.5
@@ -223,8 +224,8 @@
 
 | Status | CU | ID | Problema | Correção | Arquivo(s) |
 |--------|----|----|----------|----------|-----------|
-| `[ ]` | `868kb32ap` | V1 | Docker Engine 29.5.3 desatualizado; 29.6.1 traz correções de segurança do Engine | Atualizar Docker Desktop/Engine para 29.6.1 | máquina local (fora do repositório) |
-| `[ ]` | `868kb32cg` | V2 | Web: `npm run lint` não roda automatizado (config interativa); `next lint` será removido no Next 16 | Criar config ESLint explícita e trocar o script por `eslint .` — pode ser feito ainda no Next 15 | `frontend/web/package.json`, `eslint.config.*` (novo) |
+| `[x]` | `868kb32ap` | V1 | Docker Engine 29.5.3 desatualizado; 29.6.1 traz correções de segurança do Engine | Fechado em 15/07/2026: Docker Desktop atualizado via `winget upgrade` (4.79.0→4.82.0), trazendo Engine 29.5.3→29.6.1 e Compose v5.1.4→v5.3.0. Containers do projeto (`facilichat_db`/`facilichat_backend`) caíram no reinício do daemon e foram religados com `docker compose up -d`, confirmados saudáveis | máquina local (fora do repositório) |
+| `[x]` | `868kb32cg` | V2 | Web: `npm run lint` não roda automatizado (config interativa); `next lint` será removido no Next 16 | Fechado em 15/07/2026: `eslint.config.mjs` (flat config, `FlatCompat` traduzindo `next/core-web-vitals`/`next/typescript`) com `.next/out/build` ignorados; script `lint` trocado para `eslint .`; nova dependência `@eslint/eslintrc`. Validado: `npm run lint` roda sem interação (exit 0, só 4 warnings pré-existentes em `api.ts`), `tsc --noEmit` e `npm run build` limpos | `frontend/web/package.json`, `eslint.config.mjs` (novo) |
 | `[ ]` | `868kb32gb` | V3 | Mobile: Expo SDK 53 (4 SDKs atrás); `npm audit` acusa 13 vulnerabilidades moderadas transitivas cuja correção exige SDK 57 | Migração sequencial 53→54→55→56→57 rodando `expo-doctor` a cada etapa; React/React Native acompanham o SDK | `frontend/mobile/package.json` |
 | `[ ]` | `868kb32ph` | V4 | Sem `.nvmrc`/`.python-version`/`engines`; Docker/CI usam Node 22/Python 3.12 e as máquinas locais podem divergir | Declarar oficialmente Node 22 (ou 24) e Python 3.12 para desenvolvimento via arquivos de pinagem | raiz do repositório (novos arquivos) |
 | `[ ]` | `868kb32v1` | V5 | Next.js 15.5.20 desatualizado (atual 16.2.10) — não urgente, ainda em Maintenance LTS e sem vulnerabilidades | Planejar migração separadamente após V2: `middleware.ts`→`proxy.ts`, remoção do `next lint`, Turbopack padrão, revisão do `next.config.ts` | `frontend/web/**` |
@@ -536,14 +537,31 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 |--------|----|------|-----------|
 | `[x]` | `868k60w1k` | Página `/painel` redirecionada para `/painel/visao-geral` | `frontend/web/src/app/(painel)/page.tsx` |
 | `[x]` | `868k60w1r` | Página `visao-geral` — cards de KPIs (abertos, SLA em risco, 1ª resposta, resolução) | `frontend/web/src/app/(painel)/visao-geral/page.tsx` (novo) |
-| `[~]` | `868k60w1y` | Seção "Desempenho por supervisor" — tabela com nome, abertos, 1ª resposta, estado | (dentro de visao-geral) |
+| `[x]` | `868k60w1y` | Seção "Desempenho por supervisor" — tabela cruza carga, primeira resposta e desempenho com lastro por supervisor; exibe nome, abertos, resolvidos/recebidos e estado operacional, com acesso à equipe. Validado visualmente pelo usuário em 15/07/2026: Roberto Supervisor com 5 abertos, 2 de 7 resolvidos, primeira resposta de 34 min e estado "Precisa de atenção" | `frontend/web/src/app/painel/visao-geral/page.tsx`, `visao-geral.module.css`, `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts` |
 | `[x]` | `868k60w26` | Seção "Volume por categoria" — categorias vêm **dos dados** (agregação real), não de lista fixa | (dentro de visao-geral) |
 | `[x]` | `868k7vrwr` | **Hierarquia do painel: urgente → tendência → detalhe** — ação agora primeiro; tendência em 2º nível; detalhe sob demanda | (dentro de visao-geral) |
 | `[x]` | `868k7vrx5` | **Painel "O que precisa da sua atenção"** — alertas críticos, atenções operacionais e oportunidades já roteadas à fila Comercial, sem atribuir detecção à IA; cada item abre e realça diretamente o chamado correspondente. Validado em 15/07/2026: TypeScript sem erros, 2 críticos e 5 atenções reais no banco local, destinos sem erro de runtime e aprovação visual do usuário | `frontend/web/src/app/painel/visao-geral/page.tsx`, `visao-geral.module.css`, `frontend/web/src/app/painel/chamados/page.tsx`, `chamados.module.css` |
 | `[x]` | `868k60w2a` | Página `supervisores` — cards clicáveis com métricas reais; clique busca e expande a fila atribuída daquele supervisor, com estados isolados de carregamento/erro e cache por card. Validado em 15/07/2026: TypeScript sem erros, rota `200` sem erro de runtime e aprovação visual do usuário | `frontend/web/src/app/painel/supervisores/page.tsx`, `supervisores.module.css`, `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts` |
-| `[ ]` | `868k60w2j` | Página `tickets` — tabela com filtros: período, supervisor, status, categoria; busca por cliente | `frontend/web/src/app/(painel)/tickets/page.tsx` (novo) |
+| `[~]` | `868k60w2j` | Página `tickets` — tabela com filtros: período, supervisor, status, categoria; busca por cliente | `frontend/web/src/app/(painel)/tickets/page.tsx` (novo) |
 | `[x]` | `868k60w2w` | Adicionar links no sidebar: Visão geral / Supervisores / Todos os tickets / Alertas; Alertas aponta para a seção existente `#atencao`, sem antecipar a página comercial da Fase 6. Validado em 15/07/2026: TypeScript sem erros, destinos `200` e aprovação visual do usuário | `frontend/web/src/components/painel/AdminShell.tsx`, `frontend/web/src/app/painel/visao-geral/page.tsx` |
 | `[x]` | `868kb4ga6` | **Atualização automática (polling)** — Visão geral e lista de Chamados refazem o fetch sozinhas a cada ~20s (estilo painel de BI), pausando quando a aba está em segundo plano; hook reutilizável, sem nova dependência (SWR/React Query ficam de fora por ora) | Hook `useAtualizacaoPeriodica` (setInterval de 20s + Page Visibility API); as duas páginas só reexibem "Carregando..."/erro na carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se uma falhar. Validado com Playwright: criei um chamado via API enquanto a página estava aberta e sem dar reload — KPI "Chamados abertos" foi de 10→11 e o total da lista de 14→15, ambos sozinhos | `frontend/web/src/lib/useAtualizacaoPeriodica.ts` (novo), `frontend/web/src/app/painel/visao-geral/page.tsx`, `frontend/web/src/app/painel/chamados/page.tsx` |
+
+---
+
+## Fase 4.1 — Desempenho e escala para produção · CU: `868kcuvv8`
+
+> **Momento de execução:** concluir primeiro a validação visual da Fase 4. Este pacote não bloqueia o
+> MVP com o volume atual (12 chamados, 34 mensagens e 7 usuários), mas deve ser concluído e validado
+> antes de escalar o ambiente de produção. Preservar em todas as otimizações o isolamento por
+> `EmpresaID` e a proteção RLS já estabelecida.
+
+| Status | CU | Item | Critério de aceite / Arquivo(s) provável(is) |
+|--------|----|------|----------------------------------------------|
+| `[ ]` | `868kcuw15` | **Índices para consultas multi-tenant e relacionamentos** — levantar os planos reais com `EXPLAIN (ANALYZE, BUFFERS)` e criar índices compostos iniciando por `EmpresaID`, combinados conforme os filtros/ordenações de chamados (`SupervisorID`, `Status`, `Atualizacao`, `PrazoSLA`) e mensagens (`ChamadoID`, `Criacao`/ordenação). Não criar índices isolados por suposição; validar custo de escrita e evitar redundâncias | Migração versionada, RLS preservada e planos comparativos registrados para consultas representativas do painel, listagem e thread de mensagens · `backend/alembic/**` ou mecanismo de migração adotado, modelos e documentação técnica |
+| `[ ]` | `868kcuw1q` | **Paginação da listagem de chamados** — substituir o retorno integral por paginação estável, com limite máximo e ordenação determinística; manter filtros por tenant, supervisor, status, período, categoria e busca | Contrato retorna itens + metadados/cursor, não repete nem omite registros entre páginas em ordem estável, limita volume por requisição e mantém compatibilidade coordenada entre backend e web/mobile · `backend/app/rotas/Chamados.py`, schemas, clientes e tipos frontend |
+| `[ ]` | `868kcuw24` | **Endpoint agregado do dashboard** — consolidar numa única leitura do frontend os dados necessários à visão geral e reutilizar agregações/CTEs quando relatórios percorrem as mesmas tabelas, sem mover cálculo registro a registro para Python | A atualização principal do dashboard usa 1 chamada, preserva os valores atuais e o escopo por Empresa/RLS; comparar SQL e tempo de resposta antes/depois · `backend/app/rotas/Relatorios.py`, `frontend/web/src/lib/api.ts`, `frontend/web/src/app/painel/visao-geral/page.tsx` |
+| `[ ]` | `868kcuw2p` | **Polling eficiente e proteção contra atualizações simultâneas** — impedir uma nova atualização enquanto a anterior estiver em andamento, cancelar requisições obsoletas ao desmontar/trocar de contexto e evitar baixar toda a listagem apenas para atualizar indicadores | Nunca há duas atualizações equivalentes simultâneas por tela; polling segue suspenso em aba oculta, preserva a última leitura boa em falhas e não refaz a listagem completa quando só os KPIs precisam mudar · `frontend/web/src/lib/useAtualizacaoPeriodica.ts`, páginas do painel e cliente de API |
+| `[ ]` | `868kcuw3b` | **Validação de escala antes da produção** — criar massa sintética multi-tenant e medir as rotas críticas com volume representativo, incluindo concorrência controlada | Cenário reproduzível com milhares de chamados/mensagens, sem dados reais; registrar p50/p95, taxa de erros, consultas lentas e evidência de isolamento entre tenants; definir orçamento de desempenho e impedir regressão relevante antes do go-live · scripts/testes de carga, `docs/deploy-producao.md`, documentação técnica |
 
 ---
 

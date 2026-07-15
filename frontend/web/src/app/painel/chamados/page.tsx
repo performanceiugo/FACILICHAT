@@ -1,30 +1,25 @@
 'use client'
 
-// Página de listagem de chamados do painel web
-// Gestores e supervisores veem todos os chamados; clientes veem apenas os seus (filtro no backend)
+// Página de tickets do Gestor.
+// Exibe os chamados do tenant em tabela pesquisável, com filtros operacionais combináveis.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
 import type { Chamado, ChamadoPrioridade, ChamadoStatus } from '@/types'
 import styles from './chamados.module.css'
 
-// Labels amigáveis para exibição dos status no card.
-// Tipar com os enums (item M7) faz o compilador cobrar esta tabela quando um status novo
-// entrar em `ChamadoStatus` — com `Record<string, string>` um valor faltante só aparecia
-// em runtime, como badge sem texto.
+// Labels simples preservam a linguagem do produto sem expor os valores técnicos dos enums.
 const STATUS_LABEL: Record<ChamadoStatus, string> = {
   Recebido: 'Recebido',
-  EmAndamento: 'Em Andamento',
+  EmAndamento: 'Em andamento',
   Agendado: 'Agendado',
   Concluido: 'Concluído',
   Cancelado: 'Cancelado',
 }
 
-// Classe de cor do badge de status — semântica do design system (pílula bg+texto).
-// Recebido fica neutro (só chegou); Em andamento usa âmbar (atenção); Agendado usa azul
-// (compromisso confirmado); Concluído usa verde; Cancelado fica neutro-esmaecido.
+// Cada status usa apenas as cores semânticas previstas no design system.
 const STATUS_COR: Record<ChamadoStatus, string> = {
   Recebido: 'neutro',
   EmAndamento: 'atencao',
@@ -33,26 +28,41 @@ const STATUS_COR: Record<ChamadoStatus, string> = {
   Cancelado: 'apagado',
 }
 
-// Cores de destaque para cada nível de prioridade — tokens do design system.
-// "Crítica" não tem roxo no DS: usa o vermelho mais intenso (danger-700) para se
-// distinguir de "Alta" (danger-500) mantendo-se dentro da paleta da marca.
+// A prioridade recebe um indicador compacto, sem competir visualmente com o status.
 const PRIORIDADE_COR: Record<ChamadoPrioridade, string> = {
-  Baixa: 'var(--success-500)',  // verde
-  Media: 'var(--warning-500)',  // âmbar
-  Alta: 'var(--danger-500)',    // vermelho
-  Critica: 'var(--danger-700)', // vermelho intenso
+  Baixa: 'var(--success-500)',
+  Media: 'var(--warning-500)',
+  Alta: 'var(--danger-500)',
+  Critica: 'var(--danger-700)',
+}
+
+// Remove diferenças de caixa e acentuação para a busca por cliente ser tolerante à digitação.
+function normalizarTexto(valor: string): string {
+  return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
+}
+
+// Converte o instante da API em data curta no fuso local do navegador.
+function formatarData(valor: string): string {
+  return new Date(valor).toLocaleDateString('pt-BR')
 }
 
 export default function ChamadosPage() {
+  // Dados remotos continuam atualizados pelo polling já adotado no painel.
   const [chamados, setChamados] = useState<Chamado[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
   const montadoRef = useRef(true)
 
-  // Busca os chamados. `mostrarCarregando` so vale true na carga inicial — a atualizacao
-  // automatica em segundo plano (useAtualizacaoPeriodica) troca a lista sem piscar loading nem
-  // erro, mantendo a ultima lista boa na tela se uma atualizacao falhar.
+  // Filtros permanecem locais para responder imediatamente e podem ser combinados livremente.
+  const [buscaCliente, setBuscaCliente] = useState('')
+  const [supervisorID, setSupervisorID] = useState('')
+  const [status, setStatus] = useState<ChamadoStatus | ''>('')
+  const [categoria, setCategoria] = useState('')
+  const [dataInicial, setDataInicial] = useState('')
+  const [dataFinal, setDataFinal] = useState('')
+
+  // Busca a última lista sem piscar o carregamento durante atualizações automáticas silenciosas.
   const buscarChamados = useCallback((mostrarCarregando: boolean) => {
     if (mostrarCarregando) setCarregando(true)
     api.chamados.listar()
@@ -62,9 +72,8 @@ export default function ChamadosPage() {
         if (mostrarCarregando) setErro('')
       })
       .catch((err: unknown) => {
-        // Narrowing explícito (item M7): sem o instanceof, um throw não-Error viraria undefined na tela
         if (montadoRef.current && mostrarCarregando) {
-          setErro(err instanceof Error ? err.message : 'Não foi possível carregar os chamados.')
+          setErro(err instanceof Error ? err.message : 'Não foi possível carregar os tickets.')
         }
       })
       .finally(() => {
@@ -81,57 +90,164 @@ export default function ChamadosPage() {
 
   useAtualizacaoPeriodica(() => buscarChamados(false))
 
-  // Item B5: role="status" (aria-live polite) anuncia o carregamento a leitores de tela;
-  // role="alert" (aria-live assertive) anuncia o erro imediatamente
-  if (carregando) return <p className={styles.info} role="status">Carregando chamados...</p>
+  // As opções refletem somente os dados reais disponíveis na Empresa autenticada.
+  const categorias = useMemo(
+    () => [...new Set(chamados.map(chamado => chamado.Categoria))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [chamados],
+  )
+  const supervisores = useMemo(() => {
+    const porID = new Map<string, string>()
+    chamados.forEach(chamado => {
+      if (chamado.SupervisorID && chamado.SupervisorNome) {
+        porID.set(chamado.SupervisorID, chamado.SupervisorNome)
+      }
+    })
+    return [...porID.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'))
+  }, [chamados])
+
+  // Aplica todos os critérios numa única passagem lógica sem alterar a ordem recebida da API.
+  const chamadosFiltrados = useMemo(() => {
+    const busca = normalizarTexto(buscaCliente)
+    const inicio = dataInicial ? new Date(`${dataInicial}T00:00:00`) : null
+    const fim = dataFinal ? new Date(`${dataFinal}T23:59:59.999`) : null
+
+    return chamados.filter(chamado => {
+      const criacao = new Date(chamado.Criacao)
+      if (busca && !normalizarTexto(chamado.ClienteNome ?? '').includes(busca)) return false
+      if (supervisorID === 'sem-supervisor' && chamado.SupervisorID !== null) return false
+      if (supervisorID && supervisorID !== 'sem-supervisor' && chamado.SupervisorID !== supervisorID) return false
+      if (status && chamado.Status !== status) return false
+      if (categoria && chamado.Categoria !== categoria) return false
+      if (inicio && criacao < inicio) return false
+      if (fim && criacao > fim) return false
+      return true
+    })
+  }, [buscaCliente, categoria, chamados, dataFinal, dataInicial, status, supervisorID])
+
+  // Restaura a visão completa sem aguardar uma nova requisição.
+  function limparFiltros() {
+    setBuscaCliente('')
+    setSupervisorID('')
+    setStatus('')
+    setCategoria('')
+    setDataInicial('')
+    setDataFinal('')
+  }
+
+  const possuiFiltro = Boolean(buscaCliente || supervisorID || status || categoria || dataInicial || dataFinal)
+
+  // Estados globais são anunciados de forma acessível antes da renderização da tabela.
+  if (carregando) return <p className={styles.info} role="status">Carregando tickets...</p>
   if (erro) return <p className={styles.erro} role="alert">{erro}</p>
 
   return (
-    <div>
-      {/* Cabeçalho com título, contexto da Empresa (tenant) e contador total */}
-      <div className={styles.cabecalho}>
+    <div className={styles.pagina}>
+      {/* Cabeçalho posiciona a tela no contexto do Gestor e informa o resultado atual. */}
+      <header className={styles.cabecalho}>
         <div>
-          <h1 className={styles.titulo}>Chamados</h1>
-          {empresaNome && <p className={styles.subtitulo}>{empresaNome}</p>}
+          <span className={styles.sobretitulo}>PAINEL DO GESTOR</span>
+          <h1 className={styles.titulo}>Todos os tickets</h1>
+          <p className={styles.subtitulo}>Consulte e refine as solicitações registradas{empresaNome ? ` em ${empresaNome}` : ''}.</p>
         </div>
-        <span className={styles.total}>{chamados.length} total</span>
-      </div>
+        <span className={styles.total}>{chamadosFiltrados.length} de {chamados.length}</span>
+      </header>
 
-      {chamados.length === 0 ? (
-        <p className={styles.info}>Nenhum chamado encontrado.</p>
-      ) : (
-        <div className={styles.lista}>
-          {chamados.map(c => (
-            <div key={c.ID} id={`chamado-${c.ID}`} className={styles.card}>
-              {/* Topo do card: categoria e fila */}
-              <div className={styles.cardTopo}>
-                <span className={styles.categoria}>{c.Categoria}</span>
-                <span className={styles.fila}>{c.Fila}</span>
-              </div>
+      {/* Controles combináveis cobrem exatamente período, supervisor, status, categoria e cliente. */}
+      <section className={styles.filtrosPainel} aria-label="Filtros dos tickets">
+        <label className={`${styles.campo} ${styles.campoBusca}`}>
+          <span>Buscar cliente</span>
+          <input
+            type="search"
+            value={buscaCliente}
+            onChange={evento => setBuscaCliente(evento.target.value)}
+            placeholder="Digite o nome do cliente"
+          />
+        </label>
 
-              {/* Resumo/descrição do chamado */}
-              <p className={styles.resumo}>{c.Resumo ?? '—'}</p>
+        <label className={styles.campo}>
+          <span>Supervisor</span>
+          <select value={supervisorID} onChange={evento => setSupervisorID(evento.target.value)}>
+            <option value="">Todos</option>
+            <option value="sem-supervisor">Sem supervisor</option>
+            {supervisores.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+          </select>
+        </label>
 
-              {/* Rodapé do card: status (pílula colorida), prioridade (indicador + label) e data */}
-              <div className={styles.cardRodape}>
-                <span className={`${styles.status} ${styles[`status--${STATUS_COR[c.Status]}`]}`}>
-                  {STATUS_LABEL[c.Status]}
-                </span>
-                <span className={styles.prioridade}>
-                  <span
-                    className={styles.prioridadePonto}
-                    style={{ background: PRIORIDADE_COR[c.Prioridade] }}
-                  />
-                  {c.Prioridade}
-                </span>
-                <span className={styles.data}>
-                  {new Date(c.Criacao).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-            </div>
-          ))}
+        <label className={styles.campo}>
+          <span>Status</span>
+          <select value={status} onChange={evento => setStatus(evento.target.value as ChamadoStatus | '')}>
+            <option value="">Todos</option>
+            {(Object.keys(STATUS_LABEL) as ChamadoStatus[]).map(valor => (
+              <option key={valor} value={valor}>{STATUS_LABEL[valor]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className={styles.campo}>
+          <span>Categoria</span>
+          <select value={categoria} onChange={evento => setCategoria(evento.target.value)}>
+            <option value="">Todas</option>
+            {categorias.map(valor => <option key={valor} value={valor}>{valor}</option>)}
+          </select>
+        </label>
+
+        <label className={styles.campo}>
+          <span>De</span>
+          <input type="date" value={dataInicial} max={dataFinal || undefined} onChange={evento => setDataInicial(evento.target.value)} />
+        </label>
+
+        <label className={styles.campo}>
+          <span>Até</span>
+          <input type="date" value={dataFinal} min={dataInicial || undefined} onChange={evento => setDataFinal(evento.target.value)} />
+        </label>
+
+        <button type="button" className={styles.limpar} onClick={limparFiltros} disabled={!possuiFiltro}>
+          Limpar filtros
+        </button>
+      </section>
+
+      {/* A tabela mantém os fatos centrais legíveis e preserva os IDs usados pelos atalhos do painel. */}
+      <section className={styles.tabelaPainel} aria-labelledby="lista-tickets-titulo">
+        <div className={styles.tabelaTopo}>
+          <div>
+            <h2 id="lista-tickets-titulo">Tickets encontrados</h2>
+            <p>Resultados em ordem do registro mais recente.</p>
+          </div>
+          <strong>{chamadosFiltrados.length}</strong>
         </div>
-      )}
+
+        {chamadosFiltrados.length === 0 ? (
+          <div className={styles.vazio}>
+            <strong>Nenhum ticket encontrado</strong>
+            <span>Ajuste ou limpe os filtros para ampliar a busca.</span>
+          </div>
+        ) : (
+          <div className={styles.tabelaContainer}>
+            <table className={styles.tabela}>
+              <thead>
+                <tr><th>Ticket</th><th>Cliente</th><th>Supervisor</th><th>Status</th><th>Abertura</th></tr>
+              </thead>
+              <tbody>
+                {chamadosFiltrados.map(chamado => (
+                  <tr key={chamado.ID} id={`chamado-${chamado.ID}`}>
+                    <td>
+                      <div className={styles.ticketTitulo}>
+                        <span className={styles.prioridadePonto} style={{ background: PRIORIDADE_COR[chamado.Prioridade] }} aria-hidden="true" />
+                        <strong>{chamado.Categoria}</strong>
+                      </div>
+                      <small>{chamado.Fila} · {chamado.Resumo ?? 'Sem resumo informado'}</small>
+                    </td>
+                    <td>{chamado.ClienteNome ?? 'Cliente não identificado'}</td>
+                    <td>{chamado.SupervisorNome ?? 'Não atribuído'}</td>
+                    <td><span className={`${styles.status} ${styles[`status--${STATUS_COR[chamado.Status]}`]}`}>{STATUS_LABEL[chamado.Status]}</span></td>
+                    <td>{formatarData(chamado.Criacao)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

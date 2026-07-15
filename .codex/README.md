@@ -32,8 +32,10 @@ quebrar um invariante de produto, ela para e pede confirmação explícita.
 - Escrita liberada apenas dentro do workspace `D:\ProjetoDEV\FACILICHAT`.
 - Instalação global de skills/plugins fora do workspace depende de permissão extra.
 - Rede restrita: consultas externas e instalações podem exigir liberação.
-- Nenhum MCP de ClickUp apareceu nas ferramentas disponíveis desta sessão; por isso,
-  a sincronização do board fica documentada, mas não é automatizada daqui.
+- O conector ClickUp está disponível pelo app desktop. Como há mais de um workspace autenticado,
+  informar explicitamente `workspace_id: 9011725879` em todas as operações do FaciliChat.
+- Board canônico: `Roadmap de Implementacao`, `list_id: 901114027434`, no Space
+  `Operações Internas` (`space_id: 90114155244`). Sincronizar plano e board na mesma interação.
 
 ## Uso prático
 

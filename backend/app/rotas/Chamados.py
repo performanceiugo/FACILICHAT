@@ -3,7 +3,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import and_, select
+from sqlalchemy.orm import aliased
 from pydantic import BaseModel, ConfigDict, Field
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoStatus, ChamadoPrioridade
 from app.modelos.Usuarios import Usuario, UsuarioFuncao
@@ -32,7 +33,10 @@ class ChamadoSaida(BaseModel):
     ID: uuid.UUID
     EmpresaID: uuid.UUID
     ClienteID: uuid.UUID
+    ClienteNome: str | None = None
     GrupoOrigemID: uuid.UUID | None
+    SupervisorID: uuid.UUID | None
+    SupervisorNome: str | None = None
     Fila: ChamadoFila
     Categoria: str
     Status: ChamadoStatus
@@ -41,6 +45,29 @@ class ChamadoSaida(BaseModel):
     Criacao: datetime
 
     model_config = ConfigDict(from_attributes=True)  # Permite serializar objetos ORM diretamente
+
+
+# Combina o chamado com os nomes carregados por join, sem depender de lazy loading assíncrono.
+def montarChamadoSaida(
+    chamado: Chamado,
+    clienteNome: str | None = None,
+    supervisorNome: str | None = None,
+) -> ChamadoSaida:
+    return ChamadoSaida(
+        ID=chamado.ID,
+        EmpresaID=chamado.EmpresaID,
+        ClienteID=chamado.ClienteID,
+        ClienteNome=clienteNome,
+        GrupoOrigemID=chamado.GrupoOrigemID,
+        SupervisorID=chamado.SupervisorID,
+        SupervisorNome=supervisorNome,
+        Fila=chamado.Fila,
+        Categoria=chamado.Categoria,
+        Status=chamado.Status,
+        Prioridade=chamado.Prioridade,
+        Resumo=chamado.Resumo,
+        Criacao=chamado.Criacao,
+    )
 
 # POST /chamados/ — cria um novo chamado vinculado ao usuário autenticado
 @roteador.post("/", response_model=ChamadoSaida)
@@ -88,7 +115,30 @@ async def listarChamados(
 ):
     # Regra de ouro do multi-tenant: toda consulta é filtrada pela Empresa do usuário logado,
     # antes de qualquer outra regra de visibilidade por papel.
-    consulta = select(Chamado).where(Chamado.EmpresaID == usuarioAtual.EmpresaID)
+    cliente = aliased(Usuario)
+    supervisor = aliased(Usuario)
+    consulta = (
+        select(
+            Chamado,
+            cliente.Nome.label("ClienteNome"),
+            supervisor.Nome.label("SupervisorNome"),
+        )
+        .join(
+            cliente,
+            and_(
+                cliente.ID == Chamado.ClienteID,
+                cliente.EmpresaID == usuarioAtual.EmpresaID,
+            ),
+        )
+        .outerjoin(
+            supervisor,
+            and_(
+                supervisor.ID == Chamado.SupervisorID,
+                supervisor.EmpresaID == usuarioAtual.EmpresaID,
+            ),
+        )
+        .where(Chamado.EmpresaID == usuarioAtual.EmpresaID)
+    )
 
     # O filtro individual existe para a visão operacional do Gestor. Validar o papel e o tenant do
     # supervisor evita que o UUID seja usado para consultar ou enumerar usuários de outra Empresa.
@@ -118,7 +168,11 @@ async def listarChamados(
             .where(Chamado.ClienteID == usuarioAtual.ID)
             .order_by(Chamado.Criacao.desc())
         )
-    return resultado.scalars().all()
+    # Os nomes tornam a tabela pesquisável sem expor qualquer usuário fora da Empresa autenticada.
+    return [
+        montarChamadoSaida(linha.Chamado, linha.ClienteNome, linha.SupervisorNome)
+        for linha in resultado
+    ]
 
 # PATCH /chamados/{chamadoID}/status — atualiza o status de um chamado existente
 @roteador.patch("/{chamadoID}/status", response_model=ChamadoSaida)

@@ -7,6 +7,68 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fase 4 — página de tickets com filtros e busca por cliente (`CU: 868k60w2j`)
+- **Tabela pesquisável:** `/painel/chamados` (agora "Todos os tickets") lista os chamados da
+  Empresa em tabela com colunas Ticket/Cliente/Supervisor/Status/Abertura, em vez dos cards
+  anteriores.
+- **Filtros combináveis:** busca por nome de cliente (tolerante a acento/caixa), supervisor
+  (incluindo "sem supervisor"), status, categoria e período (De/Até); todas as opções vêm dos
+  dados reais da Empresa, sem lista fixa.
+- **Backend:** `GET /chamados/` passa a fazer join com `Usuario` (cliente e supervisor, via
+  `aliased`) e devolve `ClienteNome`/`SupervisorNome` junto de `ClienteID`/`SupervisorID`, sempre
+  escopado pela Empresa autenticada — nenhum nome de usuário de outro tenant é exposto.
+- **Compatibilidade:** filtragem por texto/data acontece no cliente sobre a lista já carregada,
+  preservando o polling existente e a ordenação por criação mais recente.
+- **Validado:** `tsc --noEmit` e `npm run lint` sem erros; import do backend (`app.main`)
+  confirmado no contêiner.
+- Arquivos: `backend/app/rotas/Chamados.py`, `frontend/web/src/app/painel/chamados/page.tsx`,
+  `chamados.module.css`, `frontend/web/src/types/index.ts`.
+
+### Login — primeira página pós-login passa a ser a Visão geral
+- Após autenticar, usuários não-Superadmin agora são redirecionados para `/painel/visao-geral`
+  em vez de `/painel/chamados`, para que a leitura executiva (KPIs, desempenho por supervisor)
+  seja a primeira coisa vista ao entrar no painel.
+- Mudança puramente de navegação, sem alteração de regra de negócio.
+- Arquivo: `frontend/web/src/app/(auth)/login/page.tsx`.
+
+### Fase 0.5 — ESLint com config explícita no web (`V2`, `CU: 868kb32cg`)
+- **Motivação:** `npm run lint` caía no assistente interativo do `next lint` (nenhum
+  `eslint.config.*` existia); esse comando some no Next.js 16.
+- **Config explícita:** novo `frontend/web/eslint.config.mjs` (flat config) usa `FlatCompat` para
+  reaproveitar os presets `next/core-web-vitals`/`next/typescript`; artefatos de build
+  (`.next/`, `out/`, `build/`) ficam fora do lint.
+- **Script:** `package.json` → `"lint": "eslint ."`; nova dependência de dev `@eslint/eslintrc`.
+- **Validado:** `npm run lint` roda sem interação (exit 0; 4 warnings pré-existentes e não
+  relacionados em `lib/api.ts`), `tsc --noEmit` e `npm run build` sem erro.
+- Arquivos: `frontend/web/package.json`, `frontend/web/eslint.config.mjs` (novo).
+
+### Fase 0.5 — Docker Desktop/Engine atualizado (`V1`, `CU: 868kb32ap`)
+- **Motivação:** auditoria de versões de 10/07/2026 apontou o Docker Engine 29.5.3 desatualizado;
+  a 29.6.1 traz correções de segurança do Engine.
+- **Atualização:** Docker Desktop 4.79.0 → 4.82.0 via `winget upgrade`, trazendo Engine
+  29.5.3 → 29.6.1 e Compose v5.1.4 → v5.3.0.
+- **Impacto observado:** o reinício do daemon derrubou os containers do projeto
+  (`facilichat_db`, `facilichat_backend`); religados com `docker compose up -d` e confirmados
+  saudáveis (`docker ps`).
+- Nenhum arquivo do repositório foi alterado — mudança na máquina local, conforme o item já
+  previa.
+
+### Painel — botão de saída visível no ambiente de desenvolvimento
+- O rótulo do botão “Sair” foi centralizado para não ficar encoberto pelo indicador flutuante do
+  Next.js durante a validação local; o comportamento de logout não foi alterado.
+- Arquivo: `frontend/web/src/components/painel/AdminShell.module.css`.
+
+### Fase 4 — seção Desempenho por supervisor (`CU: 868k60w1y`)
+- **Leitura executiva:** a Visão geral combina carga, primeira resposta, resolvidos/recebidos e
+  gargalos reais para apresentar o estado operacional de cada supervisor.
+- **Integração:** os contratos de carga e desempenho são carregados junto aos demais dados do
+  painel e cruzados pelo ID do supervisor, sem métricas inventadas no frontend.
+- **Validado:** TypeScript sem erros, rota local com status `200` e aprovação visual do usuário;
+  Roberto Supervisor exibiu 5 abertos, 2 de 7 resolvidos, primeira resposta de 34 min e estado
+  "Precisa de atenção".
+- Arquivos: `frontend/web/src/app/painel/visao-geral/page.tsx`, `visao-geral.module.css`,
+  `frontend/web/src/lib/api.ts`, `frontend/web/src/types/index.ts`.
+
 ### Fase 4 — desempenho por supervisor com lastro (`CU: 868k7vrwh`)
 - **Relatório objetivo:** `GET /relatorios/desempenho-supervisores` retorna recebidos (atribuições),
   resolvidos (`Concluido`), parados (`Atualizacao` além do limite configurável) e taxa de resolução.

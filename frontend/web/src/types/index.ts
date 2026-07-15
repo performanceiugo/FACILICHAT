@@ -35,7 +35,10 @@ export interface Chamado {
   ID: string
   EmpresaID: string  // Tenant do chamado (Fase 0.7)
   ClienteID: string
+  ClienteNome: string | null
   GrupoOrigemID: string | null
+  SupervisorID: string | null
+  SupervisorNome: string | null
   Fila: ChamadoFila
   Categoria: string
   Status: ChamadoStatus

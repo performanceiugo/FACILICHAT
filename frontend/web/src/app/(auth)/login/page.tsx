@@ -1,7 +1,7 @@
 'use client'
 
 // Tela de login do painel web
-// Após autenticação bem-sucedida, redireciona para /painel/chamados
+// Após autenticação bem-sucedida, redireciona para /painel/visao-geral
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -28,7 +28,7 @@ export default function LoginPage() {
       // Autentica com o backend e salva token + dados no localStorage
       const dados = await api.login(email, senha)
       auth.salvar(dados)
-      router.push(dados.funcao === 'Superadmin' ? '/plataforma/empresas' : '/painel/chamados')
+      router.push(dados.funcao === 'Superadmin' ? '/plataforma/empresas' : '/painel/visao-geral')
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro ao fazer login')
     } finally {
