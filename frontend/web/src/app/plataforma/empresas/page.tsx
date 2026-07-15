@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+// Mensagens de validação nativa do navegador em português (item M13)
+import { aoInvalidarCampo, limparValidacaoCustomizada } from '@/lib/validacao'
 import type { Empresa } from '@/types'
 import styles from './empresas.module.css'
 
@@ -24,13 +26,17 @@ export default function EmpresasPlataformaPage() {
   const [form, setForm] = useState(inicial)
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
+  // Item B2: guarda de montagem — evita setState após a tela ser desmontada (ex.: navegação
+  // para fora antes de `carregarEmpresas` responder).
+  const montadoRef = useRef(true)
 
   async function carregarEmpresas() {
     const dados = await api.plataforma.listarEmpresas()
-    setEmpresas(dados)
+    if (montadoRef.current) setEmpresas(dados)
   }
 
   useEffect(() => {
+    montadoRef.current = true
     if (!auth.autenticado()) {
       router.push('/login')
       return
@@ -41,8 +47,13 @@ export default function EmpresasPlataformaPage() {
     }
     setNome(auth.nome())
     carregarEmpresas()
-      .catch(err => setErro(err instanceof Error ? err.message : 'Erro ao carregar empresas'))
-      .finally(() => setCarregado(true))
+      .catch(err => {
+        if (montadoRef.current) setErro(err instanceof Error ? err.message : 'Erro ao carregar empresas')
+      })
+      .finally(() => {
+        if (montadoRef.current) setCarregado(true)
+      })
+    return () => { montadoRef.current = false }
   }, [router])
 
   // Logout via backend: só ele apaga o cookie `HttpOnly` da sessão (item S6).
@@ -112,6 +123,8 @@ export default function EmpresasPlataformaPage() {
                 value={form.nomeEmpresa}
                 onChange={e => setForm({ ...form, nomeEmpresa: e.target.value })}
                 required
+                onInvalid={aoInvalidarCampo}
+                onInput={limparValidacaoCustomizada}
               />
             </div>
             <div className={styles.grupo}>
@@ -121,6 +134,8 @@ export default function EmpresasPlataformaPage() {
                 value={form.cnpj}
                 onChange={e => setForm({ ...form, cnpj: e.target.value })}
                 required
+                onInvalid={aoInvalidarCampo}
+                onInput={limparValidacaoCustomizada}
               />
             </div>
 
@@ -134,6 +149,8 @@ export default function EmpresasPlataformaPage() {
                     value={form.nomeGestor}
                     onChange={e => setForm({ ...form, nomeGestor: e.target.value })}
                     required
+                    onInvalid={aoInvalidarCampo}
+                    onInput={limparValidacaoCustomizada}
                   />
                 </div>
                 <div className={styles.grupo}>
@@ -144,6 +161,8 @@ export default function EmpresasPlataformaPage() {
                     value={form.emailGestor}
                     onChange={e => setForm({ ...form, emailGestor: e.target.value })}
                     required
+                    onInvalid={aoInvalidarCampo}
+                    onInput={limparValidacaoCustomizada}
                   />
                 </div>
                 <div className={styles.grupo}>
@@ -154,6 +173,8 @@ export default function EmpresasPlataformaPage() {
                     value={form.senhaGestor}
                     onChange={e => setForm({ ...form, senhaGestor: e.target.value })}
                     required
+                    onInvalid={aoInvalidarCampo}
+                    onInput={limparValidacaoCustomizada}
                   />
                 </div>
                 <div className={styles.grupo}>

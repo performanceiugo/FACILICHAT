@@ -1,0 +1,70 @@
+/* erro.module.css — estilos compartilhados das páginas de erro globais do web
+   (app/error.tsx e app/not-found.tsx). Usa só os tokens de app/globals.css,
+   no mesmo padrão visual do card de login — nenhuma cor/espaçamento hardcoded. */
+
+/* Ocupa a viewport inteira e centraliza o card, com o mesmo fundo sutil do login */
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, var(--blue-50) 0%, var(--bg-app) 55%);
+  padding: var(--sp-4);
+}
+
+/* Card branco central — mesma largura/raio/sombra do card de login */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: var(--sp-10) var(--sp-8);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+/* Código do erro (404) ou marcador visual, em azul-marca discreto */
+.codigo {
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-extrabold);
+  color: var(--blue-500);
+  line-height: var(--lh-h1);
+}
+
+.titulo {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-bold);
+  color: var(--text-strong);
+  margin-top: var(--sp-2);
+}
+
+.descricao {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-top: var(--sp-2);
+  margin-bottom: var(--sp-8);
+}
+
+/* Botão primário de ação (tentar novamente / voltar ao início) — padrão dos botões do painel */
+.botao {
+  display: inline-block;
+  background: var(--blue-500);
+  color: var(--text-onbrand);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px var(--sp-6);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.botao:hover { background: var(--blue-600); }
+
+/* Anel de foco visível para navegação por teclado (antecipa o padrão do B5) */
+.botao:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--blue-50), 0 0 0 1px var(--border-focus);
+}

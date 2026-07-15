@@ -7,11 +7,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
 import { useAtualizacaoPeriodica } from '@/lib/useAtualizacaoPeriodica'
-import type { Chamado } from '@/types'
+import type { Chamado, ChamadoPrioridade, ChamadoStatus } from '@/types'
 import styles from './chamados.module.css'
 
-// Labels amigáveis para exibição dos status no card
-const STATUS_LABEL: Record<string, string> = {
+// Labels amigáveis para exibição dos status no card.
+// Tipar com os enums (item M7) faz o compilador cobrar esta tabela quando um status novo
+// entrar em `ChamadoStatus` — com `Record<string, string>` um valor faltante só aparecia
+// em runtime, como badge sem texto.
+const STATUS_LABEL: Record<ChamadoStatus, string> = {
   Recebido: 'Recebido',
   EmAndamento: 'Em Andamento',
   Agendado: 'Agendado',
@@ -22,7 +25,7 @@ const STATUS_LABEL: Record<string, string> = {
 // Classe de cor do badge de status — semântica do design system (pílula bg+texto).
 // Recebido fica neutro (só chegou); Em andamento usa âmbar (atenção); Agendado usa azul
 // (compromisso confirmado); Concluído usa verde; Cancelado fica neutro-esmaecido.
-const STATUS_COR: Record<string, string> = {
+const STATUS_COR: Record<ChamadoStatus, string> = {
   Recebido: 'neutro',
   EmAndamento: 'atencao',
   Agendado: 'info',
@@ -33,7 +36,7 @@ const STATUS_COR: Record<string, string> = {
 // Cores de destaque para cada nível de prioridade — tokens do design system.
 // "Crítica" não tem roxo no DS: usa o vermelho mais intenso (danger-700) para se
 // distinguir de "Alta" (danger-500) mantendo-se dentro da paleta da marca.
-const PRIORIDADE_COR: Record<string, string> = {
+const PRIORIDADE_COR: Record<ChamadoPrioridade, string> = {
   Baixa: 'var(--success-500)',  // verde
   Media: 'var(--warning-500)',  // âmbar
   Alta: 'var(--danger-500)',    // vermelho
@@ -58,8 +61,11 @@ export default function ChamadosPage() {
         setChamados(lista)
         if (mostrarCarregando) setErro('')
       })
-      .catch(err => {
-        if (montadoRef.current && mostrarCarregando) setErro(err.message)
+      .catch((err: unknown) => {
+        // Narrowing explícito (item M7): sem o instanceof, um throw não-Error viraria undefined na tela
+        if (montadoRef.current && mostrarCarregando) {
+          setErro(err instanceof Error ? err.message : 'Não foi possível carregar os chamados.')
+        }
       })
       .finally(() => {
         if (montadoRef.current && mostrarCarregando) setCarregando(false)

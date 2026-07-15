@@ -7,6 +7,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { auth } from '@/lib/auth'
+// Mensagens de validação nativa do navegador em português (item M13)
+import { aoInvalidarCampo, limparValidacaoCustomizada } from '@/lib/validacao'
 import styles from './login.module.css'
 
 export default function LoginPage() {
@@ -57,6 +59,8 @@ export default function LoginPage() {
               placeholder="seu@email.com"
               required
               autoComplete="email"
+              onInvalid={aoInvalidarCampo}
+              onInput={limparValidacaoCustomizada}
             />
           </div>
 
@@ -71,6 +75,8 @@ export default function LoginPage() {
               placeholder="••••••••"
               required
               autoComplete="current-password"
+              onInvalid={aoInvalidarCampo}
+              onInput={limparValidacaoCustomizada}
             />
           </div>
 

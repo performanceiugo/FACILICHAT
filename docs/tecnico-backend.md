@@ -180,6 +180,13 @@ Acesse: `http://localhost:8000/docs` — documentação automática da API (Swag
   (defaults seguros; `SameSite=none` sem `Secure` falha na subida)
 - Dependência `obterUsuarioAtual` protege automaticamente qualquer rota que a use
 - Login e cadastro público têm rate limit simples por IP/e-mail; login usa hash dummy quando o e-mail não existe para reduzir enumeração por timing
+- **Corrida TOCTOU no cadastro (item M2):** o check prévio de e-mail duplicado não é atômico — duas
+  requisições simultâneas podem passar juntas por ele. A constraint `UNIQUE` do banco é a fonte da
+  verdade: o `IntegrityError` do commit é capturado e vira **400 com a mesma resposta neutra do
+  check prévio** (S7 — resposta específica reabriria a enumeração de e-mail). O mesmo tratamento
+  cobre a rota da plataforma (`POST /plataforma/empresas`): CNPJ no `flush` e e-mail do gestor no
+  `commit`, com rollback desfazendo a Empresa junto (nunca fica Empresa órfã sem o primeiro Gestor);
+  lá as mensagens podem ser específicas porque a rota é exclusiva do Superadmin
 - **CORS** restrito às origens em `CORS_ORIGINS` (config/.env), sem `"*"` em nenhum eixo (item S17):
   métodos limitados aos que a API expõe (`GET, POST, PATCH, OPTIONS`) e headers a `Authorization` e
   `Content-Type`. `allow_credentials=False` — a autenticação é por header `Bearer`, nenhum cliente

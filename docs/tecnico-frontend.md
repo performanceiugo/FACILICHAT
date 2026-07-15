@@ -31,6 +31,9 @@ frontend/web/src/
 └── app/                    ← Next.js App Router
     ├── layout.tsx           ← layout raiz (fonte Figtree via next/font, metadata)
     ├── globals.css          ← tokens do design system (:root) + reset
+    ├── error.tsx            ← boundary global de erro de runtime (B3, client component)
+    ├── not-found.tsx        ← página 404 global (B3)
+    ├── erro.module.css      ← estilos compartilhados de error.tsx e not-found.tsx
     ├── page.tsx             ← redireciona / → /login
     ├── (auth)/
     │   └── login/
@@ -69,6 +72,17 @@ como `--font-figtree`/`--font-sans`.
 3. A proteção de rota já é feita automaticamente pelo `AdminShell` (via `painel/layout.tsx`)
 4. Adicionar o link na sidebar dentro de `components/painel/AdminShell.tsx`
 
+### Páginas de erro globais (`app/error.tsx` e `app/not-found.tsx`) — item B3
+
+O App Router usa esses dois arquivos na raiz do `app/` como fallback de **toda** a aplicação:
+`error.tsx` é o boundary de erro de runtime (client component obrigatório — recebe `reset()` para
+re-renderizar o segmento que falhou, exposto como botão "Tentar novamente") e `not-found.tsx` é o
+404 (rota inexistente ou `notFound()` chamado em página). Ambos em PT, com estilos compartilhados
+em `app/erro.module.css` no mesmo padrão visual do card de login (tokens do design system, sem
+valores hardcoded). O `error.tsx` loga o erro só no `console.error` — o usuário nunca vê stack
+trace. Se alguma seção futura precisar de tratamento próprio, basta criar um `error.tsx` local no
+segmento, que o Next usa o mais próximo da falha.
+
 ### Visão geral do painel (`/painel/visao-geral`)
 
 A visão geral é um recorte visual da Fase 4 que consome apenas `api.chamados.listar()`.
@@ -83,6 +97,18 @@ fora por decisão de escopo). O hook pausa o polling quando a aba fica em segund
 Visibility API) e busca na hora ao voltar. Nas duas páginas, `carregando`/`erro` só aparecem na
 carga inicial — atualizações de fundo trocam os dados em silêncio e mantêm a última leitura boa se
 uma falhar.
+
+### Guarda de montagem em `useEffect` com fetch — item B2
+
+Toda tela (web ou mobile) que busca dados assíncronos ao montar guarda um `useRef(true)`
+(`montadoRef`/`ativoRef`) setado para `false` no cleanup do `useEffect`, e só chama `setState` no
+`then`/`catch`/`finally` da chamada se a ref ainda estiver `true`. Evita o warning/estado
+inconsistente de atualizar um componente já desmontado (ex.: usuário navega para outra tela antes
+da API responder). Preferido a `AbortController` aqui porque o cliente HTTP (`lib/api.ts` web e
+mobile) não expõe `signal` nas suas funções — a ref é a forma mais simples de obter o mesmo efeito
+sem mexer no cliente. Exemplos: `painel/chamados/page.tsx`, `painel/visao-geral/page.tsx`,
+`plataforma/empresas/page.tsx` (web) e `(tabs)/chamados.tsx`, `(tabs)/perfil.tsx` (mobile).
+**Toda tela nova com fetch em `useEffect` deve seguir o mesmo padrão.**
 
 ### Supervisores (`/painel/supervisores`)
 
@@ -122,6 +148,24 @@ chamados: {
   buscar: (id: string) => req<Chamado>(`/chamados/${id}`),
 }
 ```
+
+### Validação nativa em português (`lib/validacao.ts`) — item M13
+
+Os balões de validação do HTML5 (`required`, `type="email"`) aparecem no idioma do **navegador**,
+não do app — um Chrome em inglês mostraria "Please include an '@' in the email address..." mesmo com
+a página em português. O módulo `lib/validacao.ts` exporta dois handlers que traduzem essas
+mensagens via `setCustomValidity`, mantendo a validação nativa (o formulário continua bloqueando o
+submit sozinho):
+
+- `aoInvalidarCampo` (em `onInvalid`) — traduz o motivo (`valueMissing` → "Preencha este campo.",
+  `typeMismatch` de e-mail → "Informe um e-mail válido...", genérico → "Valor inválido.").
+- `limparValidacaoCustomizada` (em `onInput`) — **obrigatório junto**: enquanto houver
+  `customValidity` setada o campo fica inválido para sempre; limpar ao digitar devolve a validação
+  ao navegador.
+
+Aplicado no login (`(auth)/login/page.tsx`) e no cadastro de Empresas (`plataforma/empresas/page.tsx`).
+**Todo formulário novo com `required`/`type="email"` deve usar os dois handlers** — complemento do
+M12, que cobre os erros vindos da API.
 
 ### Gerenciamento de sessão (`lib/auth.ts`)
 
@@ -237,15 +281,22 @@ frontend/mobile/
 Os tipos TypeScript são **idênticos** nos dois frontends e espelham os modelos do backend. Qualquer alteração de modelo no backend deve ser replicada em `frontend/web/src/types/index.ts` **e** `frontend/mobile/lib/types.ts`.
 
 ```typescript
-// Enums
-UsuarioFuncao: 'Cliente' | 'Supervisor' | 'Funcionario' | 'Gerente'
-ChamadoFila:  'Operacional' | 'RH' | 'Financeiro'
+// Enums (estado atual — 7 perfis e fila Comercial das Fases 0.6/0.7)
+UsuarioFuncao: 'Cliente' | 'Supervisor' | 'Funcionario' | 'RH' | 'Financeiro' | 'Gestor' | 'Superadmin'
+ChamadoFila:  'Operacional' | 'RH' | 'Financeiro' | 'Comercial'
 ChamadoStatus: 'Recebido' | 'EmAndamento' | 'Agendado' | 'Concluido' | 'Cancelado'
 ChamadoPrioridade: 'Baixa' | 'Media' | 'Alta' | 'Critica'
 AutorTipo: 'Cliente' | 'Supervisor' | 'Funcionario' | 'IA' | 'Sistema'
 ```
 
 > Sempre que um enum for adicionado ou alterado no backend Python, deve ser atualizado nos dois arquivos de tipos do frontend.
+
+**Mapas de exibição tipados pelos enums (item M7):** tabelas de label/cor derivadas de um enum
+(ex.: `STATUS_LABEL`, `STATUS_COR`, `PRIORIDADE_COR` em `painel/chamados/page.tsx`) devem ser
+`Record<ChamadoStatus, string>`/`Record<ChamadoPrioridade, string>` — nunca `Record<string, string>`.
+Assim, quando um valor novo entrar no enum, o compilador aponta a tabela incompleta em vez de a
+tela exibir badge vazio em runtime. Nos `catch`, tipar `err: unknown` e estreitar com
+`err instanceof Error` antes de usar `.message`.
 
 ---
 
@@ -284,5 +335,5 @@ isolados. O que muda nos frontends:
 
 ---
 
-*Última atualização: 2 de julho de 2026*
+*Última atualização: 15 de julho de 2026*
 *Alterado por: Claude Code (agente de desenvolvimento)*

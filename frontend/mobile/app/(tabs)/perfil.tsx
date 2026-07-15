@@ -1,7 +1,7 @@
 // Tela de perfil do usuário no app mobile
 // Exibe dados do usuário autenticado e oferece opção de logout
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { api } from '@/lib/api'
@@ -14,22 +14,26 @@ export default function PerfilScreen() {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  // Item B2: guarda de montagem — evita setState após sair da tela antes da API responder.
+  const montadoRef = useRef(true)
 
   // Busca os dados do usuário autenticado ao abrir a tela
   async function carregarPerfil() {
     try {
       setErro('')
       const dados = await api.eu()
-      setUsuario(dados)
+      if (montadoRef.current) setUsuario(dados)
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar perfil')
+      if (montadoRef.current) setErro(err instanceof Error ? err.message : 'Erro ao carregar perfil')
     } finally {
-      setCarregando(false)
+      if (montadoRef.current) setCarregando(false)
     }
   }
 
   useEffect(() => {
+    montadoRef.current = true
     carregarPerfil()
+    return () => { montadoRef.current = false }
   }, [])
 
   // Remove sessão do SecureStore e retorna para a tela de login

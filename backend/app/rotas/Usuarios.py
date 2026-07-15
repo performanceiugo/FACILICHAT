@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from datetime import datetime, timezone
 from app.banco_dados import obterBancoDados
@@ -214,7 +215,15 @@ async def _persistirUsuario(
         CondominioID=condominio.ID if condominio else None,
     )
     db.add(usuario)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Corrida TOCTOU (item M2): duas requisições com o mesmo e-mail podem passar juntas pelo
+        # check de duplicado acima; a constraint UNIQUE do banco é a fonte da verdade e estoura
+        # aqui no commit. Sem este catch, o cliente recebia 500. A resposta é a MESMA neutra do
+        # check prévio (item S7) — devolver "email já cadastrado" reabriria a enumeração de e-mail.
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Nao foi possivel concluir o cadastro com os dados informados")
     await db.refresh(usuario)
     return usuario, condominio.Nome if condominio else nomeCondominio
 

@@ -8,6 +8,7 @@
   max-width: 1180px;
 }
 
+/* Título + ação secundária (ex.: ir para lista de chamados), lado a lado */
 .cabecalho {
   display: flex;
   align-items: flex-start;
@@ -15,6 +16,7 @@
   gap: var(--sp-6);
 }
 
+/* Etiqueta identifica a área da aplicação sem competir com o título */
 .etiqueta {
   color: var(--blue-700);
   font-size: var(--fs-xs);
@@ -52,6 +54,7 @@
   white-space: nowrap;
 }
 
+/* Grade de 4 KPIs no topo (ex.: total de chamados, críticos, em andamento, concluídos) */
 .kpis {
   display: grid;
   gap: var(--sp-3);
@@ -71,6 +74,7 @@
   padding: var(--sp-4);
 }
 
+/* Variantes de cor da borda esquerda do KPI, por semântica do indicador */
 .kpi--info { border-left-color: var(--blue-500); }
 .kpi--danger { border-left-color: var(--danger-500); }
 .kpi--warning { border-left-color: var(--warning-500); }
@@ -94,6 +98,7 @@
   margin-top: auto;
 }
 
+/* Duas grades de dois painéis cada (principal: atenção + gráfico; secundária: categorias) */
 .gradePrincipal,
 .gradeSecundaria {
   display: grid;
@@ -111,6 +116,7 @@
   padding: var(--sp-5);
 }
 
+/* Título + descrição de cada painel, no topo do card */
 .secaoTopo {
   align-items: flex-start;
   display: flex;
@@ -132,6 +138,7 @@
   margin-top: var(--sp-1);
 }
 
+/* Lista de chamados que precisam de atenção (críticos/atrasados) no painel de alertas */
 .listaAtencao {
   display: flex;
   flex-direction: column;
@@ -149,6 +156,7 @@
   padding: var(--sp-3);
 }
 
+/* Pílula de prioridade do item de atenção, por semântica (crítico/atenção/neutro/sucesso) */
 .prioridade {
   border-radius: var(--r-full);
   font-size: var(--fs-xs);
@@ -188,6 +196,7 @@
   font-size: var(--fs-sm);
 }
 
+/* Resumo do chamado truncado com reticências para não quebrar o grid */
 .atencaoConteudo span {
   color: var(--text-muted);
   font-size: var(--fs-xs);
@@ -203,6 +212,7 @@
   text-align: right;
 }
 
+/* Gráfico de barras verticais com a distribuição de chamados por status */
 .barrasStatus {
   align-items: flex-end;
   display: grid;
@@ -219,6 +229,7 @@
   min-width: 0;
 }
 
+/* Trilho vertical que contém a barra — altura fixa para as barras crescerem proporcionalmente */
 .statusTrilho {
   align-items: flex-end;
   background: var(--bg-subtle);
@@ -237,6 +248,7 @@
   width: 100%;
 }
 
+/* Cor de cada barra corresponde ao mesmo mapeamento de status usado na lista de chamados (M7) */
 .statusBarra--Recebido { background: var(--blue-500); }
 .statusBarra--EmAndamento { background: var(--warning-500); }
 .statusBarra--Agendado { background: var(--blue-300); }
@@ -254,6 +266,7 @@
   text-align: center;
 }
 
+/* Lista de barras horizontais com a distribuição de chamados por categoria */
 .listaBarras {
   display: flex;
   flex-direction: column;
@@ -306,6 +319,7 @@
   min-width: 6px;
 }
 
+/* Lista de categorias mais frequentes, no painel secundário */
 .categorias {
   display: flex;
   flex-direction: column;
@@ -324,6 +338,7 @@
   padding-bottom: 0;
 }
 
+/* Estados de carregamento/vazio/erro da tela, exibidos no lugar dos painéis */
 .vazio,
 .info {
   color: var(--text-muted);
@@ -337,6 +352,7 @@
   margin-top: var(--sp-8);
 }
 
+/* Tablet: KPIs em 2 colunas e as grades de painéis empilham em coluna única */
 @media (max-width: 1020px) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -348,6 +364,7 @@
   }
 }
 
+/* Mobile: cabeçalho empilha, KPIs em 1 coluna e o gráfico de barras encolhe */
 @media (max-width: 640px) {
   .cabecalho {
     flex-direction: column;

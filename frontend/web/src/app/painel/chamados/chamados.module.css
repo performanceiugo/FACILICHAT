@@ -1,3 +1,8 @@
+/* chamados.module.css — lista de chamados do painel do Gestor (painel/chamados/page.tsx)
+   Card por chamado com fila, status e prioridade em pílulas coloridas (ver STATUS_COR/PRIORIDADE_COR
+   em page.tsx, que decidem qual classe --neutro/--atencao/--info/--sucesso/--apagado se aplica). */
+
+/* Título da tela + contador total de chamados, lado a lado */
 .cabecalho {
   display: flex;
   align-items: flex-start;
@@ -20,6 +25,7 @@
   white-space: nowrap;
 }
 
+/* Lista vertical de cards, um por chamado */
 .lista { display: flex; flex-direction: column; gap: var(--sp-3); }
 
 .card {
@@ -34,11 +40,13 @@
   transition: box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
+/* Feedback sutil de hover — não é clicável ainda, mas antecipa a interação futura (abrir chat) */
 .card:hover {
   box-shadow: var(--shadow-sm);
   border-color: var(--border-default);
 }
 
+/* Linha superior do card: categoria à esquerda, pílula da fila à direita */
 .cardTopo {
   display: flex;
   align-items: center;
@@ -47,6 +55,7 @@
 
 .categoria { font-weight: var(--fw-semibold); font-size: var(--fs-base); color: var(--text-strong); }
 
+/* Pílula neutra identificando a fila (Operacional/RH/Financeiro) do chamado */
 .fila {
   font-size: var(--fs-xs);
   background: var(--bg-subtle);
@@ -62,6 +71,7 @@
   color: var(--text-muted);
 }
 
+/* Linha inferior do card: status, prioridade e data lado a lado */
 .cardRodape {
   display: flex;
   align-items: center;
@@ -92,6 +102,7 @@
   color: var(--text-default);
 }
 
+/* Bolinha colorida da prioridade (cor definida inline via PRIORIDADE_COR em page.tsx) */
 .prioridadePonto {
   width: 8px;
   height: 8px;
@@ -99,11 +110,14 @@
   flex-shrink: 0;
 }
 
+/* Data de abertura empurrada para a direita do rodapé do card */
 .data { margin-left: auto; color: var(--text-muted); }
 
+/* Estados de carregamento/erro da listagem, exibidos no lugar da lista */
 .info { color: var(--text-muted); margin-top: var(--sp-8); }
 .erro { color: var(--danger-700); margin-top: var(--sp-8); }
 
+/* Mobile: empilha as linhas do card em vez de forçar tudo numa linha só */
 @media (max-width: 640px) {
   .cabecalho,
   .cardTopo,

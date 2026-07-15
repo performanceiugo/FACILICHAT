@@ -1,7 +1,7 @@
 // Tela de listagem de chamados do app mobile
 // Suporta pull-to-refresh (puxar para atualizar) para recarregar a lista
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native'
 import { api } from '@/lib/api'
 import type { Chamado } from '@/lib/types'
@@ -29,23 +29,32 @@ export default function ChamadosScreen() {
   const [carregando, setCarregando] = useState(true)
   const [recarregando, setRecarregando] = useState(false)  // true durante pull-to-refresh
   const [erro, setErro] = useState('')
+  // Item B2: guarda de montagem — evita setState após sair da tela antes da API responder
+  // (troca rápida de aba ou pull-to-refresh seguido de saída da tela).
+  const montadoRef = useRef(true)
 
   // Busca os chamados da API — reutilizada tanto no mount quanto no pull-to-refresh
   async function carregar() {
     try {
       setErro('')
       const dados = await api.chamados.listar()
-      setChamados(dados)
+      if (montadoRef.current) setChamados(dados)
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar chamados')
+      if (montadoRef.current) setErro(err instanceof Error ? err.message : 'Erro ao carregar chamados')
     } finally {
-      setCarregando(false)
-      setRecarregando(false)
+      if (montadoRef.current) {
+        setCarregando(false)
+        setRecarregando(false)
+      }
     }
   }
 
   // Carrega ao abrir a tela
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    montadoRef.current = true
+    carregar()
+    return () => { montadoRef.current = false }
+  }, [])
 
   // Spinner de carregamento inicial (tela cheia)
   if (carregando) {

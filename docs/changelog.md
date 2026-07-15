@@ -7,6 +7,91 @@
 
 ## [não versionado] — 15 de julho de 2026
 
+### Fechado `B3` — páginas de erro globais do web (`error.tsx` e `not-found.tsx`)
+- **Problema:** o painel web não tinha `error.tsx` nem `not-found.tsx` — erro de runtime mostrava a
+  tela técnica padrão do Next (em inglês, com stack trace em dev) e rota inexistente caía no 404
+  genérico do framework.
+- **Correção:** criados `app/error.tsx` (boundary global client-side com botão "Tentar novamente"
+  via `reset()`) e `app/not-found.tsx` (404 com link "Voltar ao início"), ambos em PT e no design
+  system (tokens de `globals.css`, card no mesmo padrão visual do login). Estilos compartilhados no
+  novo `app/erro.module.css`.
+- **Validado:** `tsc --noEmit` limpo; Playwright no dev server real — rota inexistente renderiza o
+  404 customizado (desktop 1440×900 e mobile 390×844) e uma rota temporária que lança exceção
+  renderiza o boundary com título e botão corretos (rota de teste removida após a captura).
+- Arquivos: `frontend/web/src/app/error.tsx` (novo), `frontend/web/src/app/not-found.tsx` (novo),
+  `frontend/web/src/app/erro.module.css` (novo).
+
+### Fechado `B2` — guarda de montagem nos `useEffect` de fetch (web e mobile)
+- **Problema:** telas que buscam dados ao montar podiam chamar `setState` depois de o componente
+  já ter sido desmontado (ex.: usuário navega para outra tela antes da API responder).
+- **Correção:** `painel/chamados/page.tsx` e `painel/visao-geral/page.tsx` já tinham a guarda
+  (`montadoRef`/`ativoRef`); adicionada a mesma guarda em `plataforma/empresas/page.tsx` (web) e em
+  `(tabs)/chamados.tsx`/`(tabs)/perfil.tsx` (mobile). Convenção documentada no
+  `tecnico-frontend.md` para telas novas.
+- **Validado:** `tsc --noEmit` limpo nos dois fronts.
+- Arquivos: `frontend/web/src/app/plataforma/empresas/page.tsx`,
+  `frontend/mobile/app/(tabs)/chamados.tsx`, `frontend/mobile/app/(tabs)/perfil.tsx`,
+  `docs/tecnico-frontend.md`.
+
+### Fechado `M9` — comentários nos arquivos CSS do frontend web
+- **Problema:** vários `*.module.css` do painel não tinham nenhum comentário, violando a regra
+  obrigatória de comentários do `CLAUDE.md`.
+- **Correção:** adicionado cabeçalho de arquivo + comentário por bloco lógico em
+  `login.module.css`, `chamados.module.css`, `empresas.module.css` e `visao-geral.module.css`.
+  `globals.css` e `supervisores.module.css` já estavam conformes (não precisaram de mudança).
+  Mudança puramente de comentários — nenhuma classe ou valor de estilo foi alterado (conferido
+  com `git diff` antes de fechar o item).
+- Arquivos: `frontend/web/src/app/**/*.css`.
+
+### Fechado `M8` (obsoleto) — `token()` duplicado entre `api.ts` e `auth.ts`
+- **Contexto:** o problema descrito (duas fontes de verdade para o token de acesso) deixou de
+  existir como efeito colateral do item `S6` — a sessão do painel web passou a viajar num cookie
+  `HttpOnly`, e nenhum dos dois arquivos guarda ou injeta token em JavaScript hoje.
+- **Ação:** fechado sem alteração de código, com a nota de que a correção original (`api.ts`
+  importar `auth.token()`) não se aplica mais.
+- Arquivos: nenhum alterado.
+
+### Fechado `M7` — tipagem estrita na página de chamados do painel (web)
+- **Contexto:** dos três pontos originais do item, `erro.detail` não tipado já havia sido resolvido
+  pelo M12 (`extrairDetail` com `unknown` em `lib/api.ts`) e quase todos os `catch` já usavam
+  `err instanceof Error` — restava a página de chamados.
+- **Correção:** `STATUS_LABEL`/`STATUS_COR` tipados como `Record<ChamadoStatus, string>` e
+  `PRIORIDADE_COR` como `Record<ChamadoPrioridade, string>` (um valor novo no enum passa a quebrar
+  a compilação em vez de renderizar badge vazio); `catch` do fetch com `err: unknown` +
+  `instanceof Error` e mensagem padrão em português. Regra registrada no `tecnico-frontend.md`
+  (mapas de exibição sempre tipados pelo enum), aproveitando para corrigir a lista de enums
+  defasada da seção "Tipos compartilhados" (ainda citava 4 perfis/"Gerente" e 3 filas).
+- **Validado:** `tsc --noEmit` limpo; página de chamados servindo normalmente no dev server.
+- Arquivos: `frontend/web/src/app/painel/chamados/page.tsx`, `docs/tecnico-frontend.md`.
+
+### Fechado `M2` — `IntegrityError` do cadastro tratado (corrida TOCTOU no check de e-mail)
+- **Problema:** o check de e-mail duplicado no cadastro não é atômico; duas requisições simultâneas
+  passavam juntas por ele e a segunda estourava a `UNIQUE` do banco como **500** não tratado.
+- **Correção:** `IntegrityError` capturado no commit de `_persistirUsuario` → rollback + **400 com a
+  mesma resposta neutra do S7** ("Nao foi possivel concluir o cadastro com os dados informados") —
+  resposta específica reabriria a enumeração de e-mail. Mesmo tratamento na rota da plataforma
+  (`POST /plataforma/empresas`): CNPJ no `flush` e e-mail do gestor no `commit` (mensagens
+  específicas lá, rota exclusiva do Superadmin; rollback nunca deixa Empresa órfã).
+- **Validado:** 4 requisições paralelas reais via curl (um 200, três 400 neutros, nenhum 500) e
+  teste determinístico dentro do container forçando a corrida exata (duas `_persistirUsuario`
+  concorrentes com barreira após os pre-checks: A criou, B recebeu 400 neutro da constraint —
+  antes vazaria `IntegrityError`). Usuários de teste removidos ao final.
+- Arquivos: `backend/app/rotas/Usuarios.py`, `backend/app/rotas/Plataforma.py`,
+  `docs/tecnico-backend.md`.
+
+### Fechado `M13` — validação nativa do navegador traduzida para português (web)
+- **Problema (relatado pelo usuário com screenshot):** os balões de validação nativa do HTML5
+  (`required`, `type="email"`) aparecem no idioma do navegador — "Please include an '@' in the
+  email address..." — no login do painel e no cadastro de Empresas. Complemento do M12, que só
+  cobriu erros vindos da API.
+- **Correção:** novo `frontend/web/src/lib/validacao.ts` com handlers reutilizáveis
+  `aoInvalidarCampo` (`onInvalid` → `setCustomValidity` em PT por motivo: campo vazio, e-mail sem
+  formato, genérico) e `limparValidacaoCustomizada` (`onInput` → limpa para o navegador revalidar);
+  aplicados aos campos de `(auth)/login/page.tsx` e `plataforma/empresas/page.tsx`.
+- **Validado:** `tsc --noEmit` limpo e Playwright lendo `validationMessage` na página real —
+  e-mail sem `@` → "Informe um e-mail válido (ex.: nome@dominio.com).", campos vazios → "Preencha
+  este campo.", e o campo destrava ao digitar valor válido.
+
 ### Fechado `M1` — validação Pydantic de tamanho/força de senha e limites de entrada
 - **Consulta prévia (`verificar-seguranca`):** OWASP Authentication Cheat Sheet atual — mínimo de
   senha **15 caracteres para aplicação sem MFA** (8 com MFA), máximo ≥ 64 para passphrases, **sem**

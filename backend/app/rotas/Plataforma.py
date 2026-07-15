@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.banco_dados import obterBancoDados
@@ -90,7 +91,14 @@ async def criarEmpresaComPrimeiroGestor(
 
     empresa = Empresa(Nome=payload.Nome, CNPJ=payload.CNPJ, Status=EmpresaStatus.Ativa)
     db.add(empresa)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Corrida TOCTOU (item M2): a constraint UNIQUE do CNPJ pode estourar no flush mesmo com o
+        # check prévio, se duas criações simultâneas passarem juntas por ele. Aqui a mensagem pode
+        # ser específica: a rota é exclusiva do Superadmin (não há enumeração por ator não confiável).
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="CNPJ ja cadastrado")
 
     gestor = Usuario(
         EmpresaID=empresa.ID,
@@ -101,7 +109,13 @@ async def criarEmpresaComPrimeiroGestor(
         Telefone=payload.Gestor.Telefone,
     )
     db.add(gestor)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Mesma corrida, agora na UNIQUE do e-mail do gestor — o rollback desfaz também a Empresa
+        # criada no flush acima (transação única: não fica Empresa órfã sem o primeiro Gestor).
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Email do gestor ja cadastrado")
     await db.refresh(empresa)
     await db.refresh(gestor)
 

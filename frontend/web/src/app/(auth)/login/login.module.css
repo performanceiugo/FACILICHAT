@@ -1,3 +1,7 @@
+/* login.module.css — estilos da tela de login (frontend/web/src/app/(auth)/login/page.tsx)
+   Usa só os tokens globais definidos em app/globals.css — nenhuma cor/espaçamento hardcoded aqui. */
+
+/* Ocupa a viewport inteira e centraliza o card do formulário */
 .container {
   min-height: 100vh;
   display: flex;
@@ -8,6 +12,7 @@
   padding: var(--sp-4);
 }
 
+/* Card branco que hospeda o formulário — largura fixa para não esticar em telas grandes */
 .card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -18,6 +23,7 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* Marca do FaciliChat (SVG inline no page.tsx) centralizada acima do título */
 .logo {
   display: block;
   width: 44px;
@@ -40,6 +46,7 @@
   font-size: var(--fs-sm);
 }
 
+/* Formulário e campos empilhados verticalmente, com espaçamento consistente entre eles */
 .form { display: flex; flex-direction: column; gap: var(--sp-5); }
 
 .campo { display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -60,11 +67,13 @@
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
+/* Anel de foco em azul-marca no lugar do outline padrão do navegador */
 .campo input:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px var(--blue-50);
 }
 
+/* Mensagem de erro de login (credenciais inválidas, falha de rede) — ver M12/handleSubmit */
 .erro {
   color: var(--danger-700);
   background: var(--danger-50);
@@ -74,6 +83,7 @@
   text-align: center;
 }
 
+/* Botão de submit — altura mínima de 44px por acessibilidade (alvo de toque) */
 .botao {
   padding: var(--sp-3);
   min-height: 44px;
@@ -90,6 +100,7 @@
 .botao:hover:not(:disabled) { background: var(--blue-600); }
 .botao:disabled { opacity: .6; cursor: not-allowed; }
 
+/* Mobile: card ocupa a largura toda e o container para de centralizar verticalmente */
 @media (max-width: 480px) {
   .container {
     align-items: stretch;
