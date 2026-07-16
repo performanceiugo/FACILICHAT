@@ -9,6 +9,12 @@ class Configuracoes(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8-sig")
 
     DATABASE_URL: str            # URL de conexão com o PostgreSQL (ex: postgresql+asyncpg://...)
+    # Papel ADMINISTRATIVO do Postgres (item F08-01) — dono do schema/tabelas, usado só por
+    # `scripts/gerenciar_banco.py` para DDL (reset, criar tabelas, aplicar RLS e grants). A API em
+    # tempo de execução NUNCA lê esta variável: ela sempre conecta com DATABASE_URL, que deve
+    # apontar para o papel RESTRITO (sem SUPERUSER/BYPASSRLS/posse das tabelas) — só assim a
+    # política de FORCE ROW LEVEL SECURITY em rls.sql tem efeito prático sobre a aplicação.
+    DATABASE_URL_ADMIN: str
     JWT_SECRET: str              # Chave secreta para assinar e verificar tokens JWT
     JWT_ALGORITHM: str = "HS256"        # Algoritmo de criptografia do JWT
     # Access token curto (item S15): 15min é o padrão atual (OWASP/2026) para limitar a janela de

@@ -4,6 +4,16 @@
 Esta trilha cobre operacao local, Docker, board, automacoes de apoio e limites do
 ambiente de desenvolvimento.
 
+## Integracao transacional planejada
+
+| ID | Status | CU | Entrega |
+|----|--------|----|---------|
+| `INF-CHAT-001` | `[ ]` | `868k60vrt`, `868kd35n1` | Proxy `/ws/*`, heartbeat/presenca de uma instancia e revisao de broker multi-replica na Fase 12 |
+| `INF-WA-001` | `[ ]` | `868kd2e33`, `868kd35m7` | WhatsApp comunica transicoes e confirmacao/lembretes 24/48/72 por evento/outbox, janela/template, opt-in, idempotencia e retry |
+
+Falha do canal nao desfaz o chamado. Testes da integracao sao preparados durante a fase e
+executados somente quando o usuario disparar explicitamente o conjunto correspondente.
+
 ## Objetivo atual
 
 Padronizar o uso do Codex no FaciliChat sem perder as regras ja formalizadas no

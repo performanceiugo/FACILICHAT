@@ -3,6 +3,20 @@
 Esta trilha consolida os itens `S1`-`S17` do levantamento de seguranca. A prioridade pratica e
 reduzir risco de tenant/session leakage antes de acelerar features novas.
 
+## Consolidacao antes das novas features (Fase 0.8)
+
+| Status | CU | ID | Entrega |
+|--------|----|----|---------|
+| `[ ]` | `868kd1jtu` | `F08-01` | Papel restrito da aplicacao e RLS efetiva no banco recriado de desenvolvimento |
+| `[ ]` | `868kd1juu` | `F08-03` | Logout mobile chama a revogacao server-side antes da limpeza local |
+| `[ ]` | `868kd1jvc` | `F08-04` | Usuario inativo perde access e refresh imediatamente |
+| `[ ]` | `868kd1jvr` | `F08-05` | Rotacao de refresh atomica e segura sob concorrencia entre contextos |
+| `[ ]` | `868kd2dug` | `F08-07C` | Cancelamento por papel/fila/atribuicao, motivo obrigatorio e tenant |
+| `[ ]` | `868kd2dum` | `F08-07D` | Reabertura somente pelo Cliente solicitante, sem IDOR ou duplicidade |
+
+Detalhes e criterios completos: `09-fase-08-consolidacao.md`. Alembic, upgrade sem perda, papel/RLS
+produtivos e Redis ficam deliberadamente na Fase 12 (`10-fase-12-finalizacao-producao.md`).
+
 ## Sequencia recomendada
 
 1. Fechar os itens independentes baratos: `S17`, `S8`, `S10`, `S12`.

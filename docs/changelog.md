@@ -5,6 +5,128 @@
 
 ---
 
+## [não versionado] — 16 de julho de 2026
+
+### Documentação — criado `docs/instrucoes-branding.md` (consolidação do branding)
+
+- **Por quê:** o material do branding está espalhado em 11 arquivos HTML/DOCX em
+  `docs/FaciliChat-Regras/` (apresentação, design system, personas, MVP02, governança de IA,
+  4 jornadas e 2 How-Might-We), difíceis de consultar durante a implementação. O usuário pediu um
+  `.md` único de instrução real do que foi definido.
+- Todos os 11 arquivos-fonte foram lidos na íntegra e consolidados em um documento normativo:
+  tese do produto, 7 perfis, personas, estados/fluxo do chamado, visitas técnicas, governança da
+  IA (matriz pode/não pode + 6 regras invioláveis), design system (tokens exatos), jornadas/HMW,
+  linguagem e tom.
+- O documento separa explicitamente **regra vigente** × **histórico da fonte** (ex.: Cancelado só
+  existe pós-ADR-001; aprovação de conclusão virou `AguardandoConfirmacao` na ADR-002) ×
+  **evolução futura registrada** (privacidade por perfil, WhatsApp como porta, ERP), e fecha com a
+  lista consolidada de divergências/lacunas (ex.: cor da pílula "Cancelado" não existe no design
+  system v1.0; SLA sem meta numérica no branding).
+- É documento DERIVADO: a precedência continua com `docs/FaciliChat-Regras/` + ADRs. Nenhum código
+  foi alterado.
+
+### Backend — F08-01: papel restrito da API separado do papel administrativo do banco
+
+- **Por quê:** a API conectava com o mesmo papel que cria/possui as tabelas (`POSTGRES_USER`), que é
+  superusuário no container oficial do Postgres — superusuário sempre ignora RLS, com ou sem
+  `FORCE`, então a trava de isolamento multi-tenant não valia nada na prática para a própria API.
+- Novo papel `APP_DB_USER`/`APP_DB_PASSWORD` (raiz) e variável `DATABASE_URL_ADMIN` (backend):
+  `DATABASE_URL` agora aponta para o papel RESTRITO (sem `SUPERUSER`/`BYPASSRLS`/posse das tabelas),
+  usado pela própria API; `DATABASE_URL_ADMIN` é o papel administrativo, usado só por
+  `gerenciar_banco.py` para DDL.
+- `gerenciar_banco.py reset`/`aplicar-rls` agora criam/atualizam o papel restrito e concedem apenas
+  os privilégios necessários (`SELECT/INSERT/UPDATE/DELETE` nas tabelas, `USAGE` no schema e nas
+  sequências) antes de aplicar as políticas de `app/rls.sql`.
+- `verificar-rls` passou a **reprovar** (não mais pular com "OK") quando o papel conectado ignora
+  RLS, e ganhou um teste explícito de que, sem `app.empresa_id` definido, nenhuma linha das tabelas
+  tenant é retornada (bloqueio fail-closed).
+- **Ambiente local:** como não há dados de produção a preservar (primeiro desenvolvimento), o banco
+  de dev foi recriado (`reset --semear`) após esta mudança — decisão já registrada em
+  `docs/implementation/09-fase-08-consolidacao.md` (F08-01).
+- **Validado em 16/07/2026** (usuário disparou `reset --semear` + `verificar-rls`): passou —
+  "filtros por EmpresaID, RLS e bloqueio fail-closed sem app.empresa_id validados". A validação
+  expôs e corrigiu dois bugs reais que a especificação original não previa:
+  1. Os comandos administrativos do script (`criar-empresa`, `criar-superadmin`, `semear`,
+     `limpar-demo`) escrevem/leem entre tenants sem `app.empresa_id` — passaram a usar uma sessão
+     administrativa dedicada (`AsyncSessionLocalAdmin`/`DATABASE_URL_ADMIN`), já que não são
+     requisições reais da API escopadas a um único tenant.
+  2. A política de RLS lançava erro 500 (em vez de fail-closed) quando `app.empresa_id` era
+     resetado numa conexão reciclada do pool — o "valor de reset" de uma GUC customizada no
+     Postgres é string vazia, não `NULL`. `rls.sql` passou a usar
+     `NULLIF(current_setting(...), '')::uuid` em todas as políticas.
+- F08-01 marcado `[x]` em `docs/plano-implementacao.md` e "✅ concluída" no ClickUp (`868kd1jtu`).
+
+### Planejamento — Fase 1 reespecificada com chat confiável, presença e confirmação
+
+- A Fase 1 (`CU: 868k60vny`) foi confrontada com o código, Design System, apresentação, personas e
+  jornadas. As 17 tarefas existentes foram preservadas e detalhadas; seis lacunas ganharam CUs:
+  contrato/permissões (`868kd35hy`), persistência/idempotência (`868kd35kj`), confirmação/SLA
+  (`868kd35m7`), leitura/presença (`868kd35n1`), integrações (`868kd35p0`) e QA/docs (`868kd35pv`).
+- Decisão `ADR-002`: Supervisor e Gestor participam de todos os chats do tenant, sem ampliar ações
+  administrativas; presença online real usa conexões autenticadas/múltiplos dispositivos/timeout;
+  HTTP+WebSocket recupera e deduplica; não lidas/digitação passam a ter contrato explícito.
+- Conclusão agora passa por `AguardandoConfirmacao`: Supervisor/Gestor envia resumo e Cliente
+  confirma ou recusa. Defaults configuráveis por Empresa em 24h/48h/72h, snapshot por janela,
+  escalonamento sem spam e nenhuma conclusão automática. SLA operacional pausa e retoma o mesmo
+  ciclo na recusa, preservando espera e tempo total.
+- Fase 9 recebeu auditoria obrigatória para Áudio/Imagem/Vídeo/Documento, não apenas fotos; MO8 e
+  Fase 10 receberam lembretes/escalonamento por WhatsApp/push. Fase 12 revisará presença multi-réplica.
+- Especificação completa criada em `docs/implementation/12-fase-01-chat.md`. Alteração somente de
+  planejamento/ClickUp/documentação: nenhum código ou teste foi executado; itens seguem em backlog.
+
+### Ferramenta de dev — `semear` entrega a base de testes completa num único passo
+
+- **Contexto:** ao subir o projeto para validação, o Superadmin da plataforma não existia no banco
+  (só havia Gestor/Supervisor/Clientes) — o login como Superadmin falhava por falta de conta, não por
+  senha errada. Corrigido a pedido do usuário para não depender de rodar `criar-superadmin` à mão a
+  cada `reset`/repopulação de teste.
+- `scripts/gerenciar_banco.py semear` agora bootstrap o **Superadmin padrão** automaticamente
+  (`superadmin@facilichat.dev`, mesma `SENHA_PADRAO` dos demais usuários demo) — reaproveita a lógica
+  de `criar-superadmin` (extraída para `_bootstrap_superadmin`, compartilhada pelos dois comandos).
+- `semear` também cria uma **2ª Empresa de demonstração** ("Horizonte Facilities"), com **3
+  supervisores** de desempenho deliberadamente desigual (um só com chamados concluídos, um misto, um
+  com chamados parados/críticos) e 9 chamados — para páginas como "Desempenho por supervisor" e
+  "Supervisores" terem comparação real entre pessoas em vez de um único card.
+- Idempotência passou a ser **por peça** (tenant principal / 2ª Empresa / Superadmin), não mais um
+  único "tudo ou nada": rodar `semear` de novo só completa o que faltar — por isso o Superadmin
+  criado manualmente antes desta mudança foi reconhecido e não duplicado.
+- Nenhuma regra de negócio ou invariante de produto foi alterada — mudança restrita à ferramenta de
+  seed de dev/teste (`backend/scripts/gerenciar_banco.py`). Por decisão do usuário, este item não foi
+  registrado em `docs/plano-implementacao.md` (fora da Regra de Ouro, exceção explícita para esta
+  mudança de tooling).
+- Validado em 16/07/2026: `reset` → `criar-empresa` → `semear` do zero criou 12 + 9 chamados nos dois
+  tenants e o Superadmin; rodar `semear` de novo confirmou idempotência total (nada duplicado);
+  `verificar-rls` continuou OK com os 3 tenants (Cefram Demo, Horizonte Facilities, Iugo Performance).
+
+### Planejamento — Fases 0.8 e 12 criadas e detalhamento obrigatório adotado
+
+- Criada a **Fase 0.8 — Consolidação pós-auditoria** (`CU: 868kd1jc1`) na ordem aprovada:
+  RLS/papéis, destinação de escopos, logout mobile, usuário inativo, concorrência do refresh, suíte
+  de regressão sob solicitação e decisão da equipe sobre `Cancelado`.
+- O banco local continua descartável nesta etapa: o F08-01 poderá ajustar `rls.sql`, resetar e
+  repopular com `gerenciar_banco.py`. Alembic e atualização sem perda foram movidos para a Fase 12.
+- Criada a **Fase 12 — Finalização do desenvolvimento e preparação para produção**
+  (`CU: 868kd1jc8`), reunindo Alembic/migrações, RLS e upgrade produtivos, rate limit compartilhado,
+  hardening de borda, recuperação e gate de go-live.
+- A suíte F08-06 foi definida como ferramenta evolutiva executada sob solicitação por fase/conjunto;
+  não como regressão integral obrigatória depois de toda manutenção.
+- A conferência dos materiais comerciais não encontrou regra de cancelamento de chamado: eles
+  descrevem Recebido, Em andamento, Agendado e Concluído. A lacuna foi levada à equipe e a decisão
+  foi aprovada em 16/07/2026 no `ADR-001`: cancelamento com motivo; Gestor no tenant, Supervisor só
+  no atribuído e RH/Financeiro só suas filas; Cliente reabre o próprio Cancelado para Recebido,
+  preservando responsável/histórico e iniciando novo ciclo SLA; Concluído exige novo chamado.
+- O F08-07 foi expandido em onze subfases (`868kd2du1`–`868kd2dx0`) para regras, histórico, APIs,
+  interfaces, IA/chat, SLA/relatórios, outbox, reatribuição do Gestor, testes e documentação.
+- Fase 1.5 recebeu `MO8` (`868kd2e33`) para comunicar todas as transições pelo WhatsApp; Fase 7
+  recebeu Supervisor padrão por Condomínio (`868kd2e3h`, `868kd2e3w`); os itens de narração da
+  Fase 5 foram detalhados com dados permitidos, idempotência e fallback.
+- Criado `docs/implementation/modelo-detalhamento-fase.md` e incorporada a regra em `AGENTS.md` e
+  `CLAUDE.md`: novas fases devem ser apresentadas ao usuário antes de ClickUp/planejamento e conter
+  contexto, evidência, motivo, escopo, destino do fora de escopo, riscos, validação e aceite.
+- Regra de teste reforçada para Claude/Codex: agentes preparam testes/comandos por fase, mas não
+  executam teste, build, smoke ou validação visual até o usuário disparar explicitamente a fase.
+- Esta entrega altera apenas planejamento e documentação; nenhum código do produto foi modificado.
+
 ## [não versionado] — 15 de julho de 2026
 
 ### Fase 0.5 — fecha por completo: V6 e atualização de dependências Python (`CU: 868kb32wc`)

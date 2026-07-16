@@ -1,8 +1,14 @@
 # Trilha QA e Validacao
 
-QA deve acompanhar cada entrega, com validacao especifica para multi-tenant, seguranca e layout.
+QA deve acompanhar cada entrega no planejamento e na preparacao da cobertura proporcional ao risco.
+A execucao pertence ao usuario: suite seletiva/ampla, teste, build, smoke e validacao visual so
+rodam quando ele disparar explicitamente a fase ou conjunto.
 
-## Validacoes obrigatorias por tipo de mudanca
+## Validacoes que devem ser preparadas por tipo de mudanca
+
+> A cobertura e os comandos sao obrigatorios no planejamento/implementacao, mas a execucao e
+> controlada pelo usuario. Nenhum agente roda testes, build, smoke ou validacao visual de uma fase
+> sem comando explicito informando a fase/conjunto.
 
 | Tipo | Validar |
 |------|---------|
@@ -23,13 +29,25 @@ QA deve acompanhar cada entrega, com validacao especifica para multi-tenant, seg
 | `QA-DOC-001` | `[ ]` | `D8` / `868kaa3h4` | Checklist de aceite dos HTMLs de branding |
 | `QA-SEC-001` | `[x]` | `S12` / `868kaa3dz` | Automatizar auditoria Python em CI/docs |
 | `QA-MOB-001` | `[ ]` | `S11` / `868kaa3dh` | Audit mobile reproduzivel com lockfile |
+| `QA-F08-001` | `[ ]` | `F08-05` / `868kd1jvr` | Teste repetivel de refresh realmente concorrente |
+| `QA-F08-002` | `[ ]` | `F08-06` / `868kd1jwg` | Suite seletiva por fase e execucao ampla sob solicitacao |
+| `QA-F08-003` | `[ ]` | `F08-07K` / `868kd2dx0` | Matriz cancelamento/reabertura/SLA/IA/WhatsApp; aguarda disparo do usuario |
+| `QA-F01-001` | `[ ]` | `F01-L` / `868kd35pv` | Matriz chat: papel/tenant, API/cursor/idempotencia, WS/recovery, leitura/presenca, confirmacao 24/48/72, SLA, web/mobile; aguarda disparo do usuario |
+| `QA-PROD-001` | `[ ]` | `F12-06` / `868kd1k82` | Gate final com regressao solicitada, smoke e decisao go/no-go |
+
+## Como solicitar a suite evolutiva
+
+O pedido deve indicar fases ou dominios, por exemplo: “confira as Fases 1 e 1.5 rodando a suite”.
+O relatorio registra o que foi executado, aprovado, reprovado ou nao executavel. Novos cenarios sao
+acrescentados conforme o produto cresce. O comando e o mapa fase -> testes serao entregues no
+`F08-06`. Mesmo quando os testes ja estiverem escritos, o estado permanece “testes preparados —
+aguardando disparo do usuario” ate esse comando.
 
 ## Checklist de saida de uma entrega
 
 - Item do plano legado atualizado.
 - ClickUp sincronizado pelo `CU:`.
 - Changelog com resumo de comportamento e validacao.
-- Teste/build/audit registrado quando aplicavel.
+- Testes/build/smoke preparados e, quando disparados pelo usuario, resultado real registrado.
 - Nenhuma tela nova sem estado de erro/vazio/carregamento.
 - Nenhuma rota nova sem verificacao de tenant e permissao.
-

@@ -36,7 +36,7 @@
 > subtarefa daquele `CU:` para o status equivalente no ClickUp via MCP do ClickUp. O hook
 > `.claude/hooks/plano-clickup-reminder.js` lembra disso sempre que este arquivo é editado.
 >
-> **Vocabulário de status do board:** `📋 backlog` = `[ ]` · `🚧 em andamento` = `[~]` ·
+> **Vocabulário de status do board:** `📋 backlog` ou `🎯 planejado` = `[ ]` · `🚧 em andamento` = `[~]` ·
 > `👀 em revisão` = em revisão · `⛔ bloqueada` = bloqueada · `✅ concluída` = `[x]` ·
 > `📦 arquivada` = arquivada.
 >
@@ -52,6 +52,11 @@
 4. **Sincronizar o ClickUp** movendo a subtarefa do `CU:` correspondente para o status equivalente.
 5. **Atualizar `docs/changelog.md`** com cada entrega.
 6. **Manter tipos TypeScript sincronizados** com os modelos Python após toda alteração de schema.
+7. **Detalhar novas fases antes de registrá-las.** Apresentar a proposta ao usuário e aplicar
+   `docs/implementation/modelo-detalhamento-fase.md` antes de criar/alterar ClickUp e planejamento.
+8. **Testes de fase são disparados pelo usuário.** Preparar testes, dados e comandos, mas não rodar
+   teste, suite, build, smoke ou validação visual sem comando explícito para a fase/conjunto; até lá,
+   registrar `testes preparados — aguardando disparo do usuário` e não marcar como validado.
 
 ---
 
@@ -82,6 +87,7 @@
 | 0.5 | Correções do levantamento (bugs, segurança e melhorias) | `868k60uzw` / `868k60v1m` | ✅ Concluída (15/07/2026) — críticos, segurança (S1–S17), altos, médios (M1–M13), baixos (B1–B7), docs (D1–D8) e versões (V1–V6) fechados |
 | 0.6 | Alinhamento de domínio com o branding | `868k60vdy` | 🟡 Núcleo e tickets irmãos concluídos; regras/refinos na fila · **PRIORITÁRIO** |
 | 0.7 | Fundação SaaS Multi-Tenant | `868k60vfm` | ✅ Concluída |
+| 0.8 | Consolidação pós-auditoria: segurança, sessão e validação | `868kd1jc1` | 🚧 Em andamento (F08-01 concluído; F08-02 em diante na fila) · executar antes da Fase 1 |
 | 1 | Chat (base do produto) | `868k60vny` | ⬜ Na fila |
 | 1.5 | Fundação Multicanal — WhatsApp como porta de entrada | `868kb75yf` | ⬜ Na fila · **NOVA (10/07/2026)** |
 | 2 | Criar chamado e detalhe (cliente) | `868k60vvt` | ⬜ Na fila |
@@ -97,14 +103,17 @@
 | 9 | Upload de arquivos | `868k60wn5` | ⬜ Na fila |
 | 10 | Notificações push | `868k60wpb` | ⬜ Na fila |
 | 11 | Experiência do Funcionário (canal único, voz/foto, sensor de campo) | `868k7vr1k` | ⬜ Na fila · **NOVA (discovery)** |
+| 12 | Finalização do desenvolvimento e preparação para produção | `868kd1jc8` | 🎯 Planejada · executar após as fases funcionais |
 | — | Adiados (pós-MVP): privacidade por tópico, integração ERP | `868k7vr1q` | ⬜ Registrado |
 
-> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 1 → 1.5 (inbound) → 2–4 → 4.1 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11**,
-> encaixando as correções pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6 e 0.7 são
-> fundação e vêm antes das features. As Fases 4.5, 5.5 e 11 saíram do material de discovery (jornadas +
+> **Ordem recomendada de desenvolvimento:** **0.6 → 0.7 → 0.8 → 1 → 1.5 (inbound) → 2–4 → 4.1 → 4.5 → 5 → 5.5 → 6 → 7 → 8–11 → 12**,
+> encaixando as correções pendentes da Fase 0.5 conforme a área que for tocada. As Fases 0.6, 0.7 e
+> 0.8 são fundação/consolidação e vêm antes das features. As Fases 4.5, 5.5 e 11 saíram do material de discovery (jornadas +
 > How Might We + Governança de IA em `docs/FaciliChat-Regras/`) revisado em 02/07/2026. A Fase 1.5
 > (10/07/2026) entra logo após a base de mensagens da Fase 1 e antes da IA; o **bloco outbound** dela
-> (respostas/templates/envio ativo) fica para **depois da Fase 5/5.5**. O detalhe de cada fase está na Parte 2.
+> (respostas/templates/envio ativo) fica para **depois da Fase 5/5.5**. A Fase 0.8 consolida a base
+> antes das features; a Fase 12 transforma o ambiente final em candidato a produção. O detalhe de
+> cada fase está na Parte 2 e em `docs/implementation/`.
 
 > **⚠️ Convenção de nomes (ler antes de modelar qualquer coisa desta revisão):** os documentos de
 > discovery usam **personas e exemplos ilustrativos** (nomes de pessoas, de serviços, de parceiros,
@@ -357,41 +366,123 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 ---
 
+## Fase 0.8 — Consolidação pós-auditoria 🔒 [antes das features] · CU: `868kd1jc1`
+
+> **Por que existe:** a revisão das fases concluídas encontrou lacunas nos limites entre o papel do
+> banco, o ciclo de sessão e a validação. A fase corrige o que sustenta o desenvolvimento corrente e
+> direciona preparação exclusiva de produção para a Fase 12. Especificação completa, evidências,
+> riscos e aceite: `docs/implementation/09-fase-08-consolidacao.md`.
+
+> **Ordem obrigatória:** RLS/papéis → destinação dos itens → logout mobile → usuário inativo →
+> concorrência do refresh → suíte sob demanda → cancelamento/reabertura e comunicação.
+
+| Status | CU | ID | Item | Decisão e critério principal |
+|--------|----|----|------|------------------------------|
+| `[x]` | `868kd1jtu` | F08-01 | **Tornar o RLS efetivo com papéis corretos de banco** | Separar papel administrativo do papel restrito da API. Como o banco atual é local/descartável, alterar `rls.sql`, resetar e repopular por `gerenciar_banco.py`; provar isolamento com a credencial real da aplicação. Upgrade sem perda fica para F12. |
+| `[ ]` | `868kd1juf` | F08-02 | **Registrar a destinação de migrações e escopos complementares** | Alembic/upgrade sem perda → F12-01/02; Redis → F12-03; privacidade sensível/RH por tópico → Adiados (`868k7vrgk`); Empresa/Condomínio → Fase 7. Item documental, sem código. |
+| `[ ]` | `868kd1juu` | F08-03 | **Fazer o logout mobile revogar a sessão no backend** | Chamar `/autenticacao/logout` com access+refresh antes da limpeza local; saída offline continua possível; reutilização online dos tokens deve falhar. |
+| `[ ]` | `868kd1jvc` | F08-04 | **Impedir acesso de usuário inativo em toda a sessão** | Bloquear login, refresh e access já emitido; revisar dependências tenant-only; reativação exige novo login e nunca restaura sessões antigas. |
+| `[ ]` | `868kd1jvr` | F08-05 | **Tornar a rotação de refresh segura sob concorrência real** | Single-flight já existe nos clientes, mas não cobre abas/instâncias/retries. Tornar consumo atômico no backend sem gerar dois sucessores nem revogar uma sessão legítima por corrida. |
+| `[ ]` | `868kd1jwg` | F08-06 | **Criar suíte automatizada executável sob solicitação** | Organizar testes por fase/domínio e CI manual. Agentes preparam testes/comandos, mas nenhuma execução de teste/build/smoke/visual ocorre sem o usuário disparar explicitamente a fase/conjunto. |
+| `[ ]` | `868kd1jwx` | F08-07 | **Implementar cancelamento, reabertura e continuidade do responsável** | Decisão aprovada em 16/07/2026: Gestor cancela qualquer chamado do tenant; Supervisor só o atribuído; RH/Financeiro só suas filas; motivo obrigatório; Cliente reabre o próprio Cancelado para Recebido, preservando responsável e criando novo ciclo SLA. Concluído não cancela/reabre. Detalhe: `docs/implementation/11-fase-08-07-cancelamento-reabertura.md`. |
+
+### F08-07 — subfases obrigatórias
+
+> **Decisão formal:** `docs/decisoes/ADR-001-cancelamento-reabertura-chamados.md`. O código atual já
+> possui o enum `Cancelado` e a reatribuição backend (`CU: 868kcv8dp`), mas ainda não implementa o
+> contrato abaixo por completo. Não confundir regra aprovada com entrega concluída.
+
+| Status | CU | ID | Entrega | Aceite principal |
+|--------|----|----|---------|------------------|
+| `[ ]` | `868kd2du1` | F08-07A | Regras, matriz de permissões e transições | Contrato único para papel, fila, atribuição, estado e erros; Concluído ≠ Cancelado |
+| `[ ]` | `868kd2dua` | F08-07B | Histórico estruturado de status, responsável e ciclos de SLA | Evento append-only com RLS; status+histórico atômicos; reatribuições e ciclos reconstruíveis |
+| `[ ]` | `868kd2dug` | F08-07C | Backend de cancelamento | `POST /chamados/{id}/cancelar`; motivo 10–1000; matriz de autorização; PATCH genérico não contorna regra |
+| `[ ]` | `868kd2dum` | F08-07D | Backend de reabertura | Somente Cliente solicitante; Cancelado→Recebido; mesmo ticket/responsável atual; novo ciclo SLA |
+| `[ ]` | `868kd2dut` | F08-07E | Interfaces internas de cancelamento | Ação/modal acessível só para papel, fila, atribuição e estado permitidos |
+| `[ ]` | `868kd2dvc` | F08-07F | Interfaces do Cliente para motivo e reabertura | Motivo sem nota interna; explicação obrigatória; Concluído orienta novo chamado |
+| `[ ]` | `868kd2dw0` | F08-07G | Evento, narração segura da IA e mensagem no chat | Uma mensagem factual por evento; IA não inventa; fallback determinístico obrigatório |
+| `[ ]` | `868kd2dw9` | F08-07H | SLA, relatórios e indicadores | Cancelado não conta como Concluído; reabertura reativa e cria ciclo; métricas/denominadores documentados |
+| `[ ]` | `868kd2dwg` | F08-07I | Outbox e notificações idempotentes | Falha externa não desfaz status; retry não duplica; tenant/destino corretos |
+| `[ ]` | `868kd2dwt` | F08-07J | Reatribuição de Supervisor na interface do Gestor | Reutiliza backend `868kcv8dp`; troca explícita, auditada e sem transferência silenciosa |
+| `[ ]` | `868kd2dx0` | F08-07K | Testes, matriz de aceite e documentação | Testes preparados por subfase; execução somente após comando explícito do usuário |
+
+### Limites explícitos da Fase 0.8
+
+- Não implantar Alembic nem migração de produção agora.
+- Não exigir preservação dos dados do banco local atual.
+- Não implementar Redis antes da preparação multi-réplica.
+- Não antecipar privacidade sensível/RH por tópico nem funcionalidades da Fase 7.
+- Não permitir que IA decida cancelamento ou invente motivo/prazo/promessa.
+- Não transformar a regressão completa nem os testes de fase em execução automática: o usuário
+  dispara explicitamente cada fase/conjunto; até lá registrar “testes preparados — aguardando disparo”.
+
+---
+
 ## Fase 1 — Chat (base do produto) · CU: `868k60vny`
 
-> Desbloqueia o produto. Implementar **logo após** a Fundação Multi-Tenant (Fase 0.7).
+> Desbloqueia o produto. Implementar **logo após** a consolidação da Fase 0.8. Especificação
+> executável: `docs/implementation/12-fase-01-chat.md`; decisão aprovada:
+> `docs/decisoes/ADR-002-chat-presenca-confirmacao.md`.
 
-### Backend
+### Resultado e decisões aprovadas
 
-| Status | CU | Item | Arquivo(s) |
-|--------|----|------|-----------|
-| `[ ]` | `868k60vpu` | Rotas de mensagens: `GET /chamados/{id}/mensagens` e `POST /chamados/{id}/mensagens` | `backend/app/rotas/Mensagens.py` (novo) |
-| `[ ]` | `868k60vq1` | Schemas Pydantic: `MensagemCriar` e `MensagemSaida` | `backend/app/rotas/Mensagens.py` |
-| `[ ]` | `868k60vrq` | Registrar router `/mensagens` no `main.py` | `backend/app/main.py` |
-| `[ ]` | `868k60vrt` | WebSocket por chamado: `GET /ws/chamados/{id}` — broadcast para participantes | `backend/app/rotas/WebSocket.py` (novo) |
-| `[ ]` | `868k7vrte` | **Confirmação automática "Recebido"** ao abrir chamado — mensagem de sistema imediata | `backend/app/rotas/Chamados.py`/`Mensagens.py` |
-| `[ ]` | `868k7vrtu` | **Mensagens de voz e foto como primeira classe** — `Mensagem` aceita `Tipo` (Texto/Audio/Imagem). Storage na Fase 9 | `backend/app/modelos/Mensagens.py` + rotas |
-| `[ ]` | `868k60vrz` | Atualizar `docs/tecnico-backend.md` com as novas rotas | `docs/tecnico-backend.md` |
+- Histórico persistente/paginado, envio idempotente, leitura/não lidas, WebSocket recuperável,
+  digitação e presença online real; central web e chat mobile resiliente.
+- Gestor participa de todos os chamados do tenant; Supervisor também participa de todos, como ponte
+  entre solicitante e áreas, sem ganhar cancelamento/reatribuição indevidos; RH/Financeiro tratam
+  suas filas; Cliente/Funcionário os próprios; Superadmin não lê conteúdo operacional automaticamente.
+- Supervisor/Gestor solicitam conclusão com resumo; Cliente decide em `AguardandoConfirmacao`.
+  Aprovação conclui; recusa justificada volta a Em andamento, mesmo responsável/ciclo SLA.
+- Lembretes configuráveis por Empresa, defaults 24h/48h/72h, snapshot por janela e sem conclusão
+  automática. SLA operacional pausa; espera e tempo total permanecem auditáveis.
+- Texto funciona nesta fase; tipos Audio/Imagem/Video/Documento são preparados, mas upload real
+  depende da auditoria/implementação da Fase 9.
 
-### Frontend Web
+### Ordem obrigatória das subfases
 
-| Status | CU | Item | Arquivo(s) |
-|--------|----|------|-----------|
-| `[ ]` | `868k60vt2` | Adicionar `api.mensagens.listar(chamadoId)` e `api.mensagens.enviar(chamadoId, texto)` | `frontend/web/src/lib/api.ts` |
-| `[ ]` | `868k60vt8` | Componente `BolhaMensagem` (recebida ← esquerda, enviada → azul/direita, sistema → pílula central) | `frontend/web/src/components/BolhaMensagem.tsx` (novo) |
-| `[ ]` | `868k60vtc` | Página `/painel/chamados/[id]` — thread de chat com input de envio | `frontend/web/src/app/(painel)/chamados/[id]/page.tsx` (novo) |
-| `[ ]` | `868k60vun` | Hook `useWebSocket(chamadoId)` para mensagens em tempo real | `frontend/web/src/lib/useWebSocket.ts` (novo) |
-| `[ ]` | `868k60vv2` | Atualizar `docs/tecnico-frontend.md` | `docs/tecnico-frontend.md` |
+`F01-A → B → C → D → E → F → G → H/I → J → K → L`
 
-### Frontend Mobile
+| Status | CU | Subfase | Entrega/gate de aceite |
+|--------|----|---------|------------------------|
+| `[ ]` | `868kd35hy` | F01-A — Contrato e permissões | Matriz papel×tenant×fila×solicitante×estado; leitura, envio e ações separados; HTTP/WS usam a mesma autoridade |
+| `[ ]` | `868kd35kj` | F01-B — Persistência/autoria | AutorTipo completo, UTC, tipo/origem, idempotência, constraints, índices/cursor e seed; banco local descartável |
+| `[ ]` | `868k60vpu`, `868k60vq1`, `868k60vrq` | F01-C — API | GET paginado + POST idempotente; autoria/tenant derivados; schemas/versionamento/erros PT; commit antes do evento |
+| `[ ]` | `868k7vrte` | F01-D — Recebido | Chamado e confirmação Sistema atômicos; nenhuma dependência de IA; tickets irmãos preservados |
+| `[ ]` | `868kd35m7` | F01-E — Confirmação e SLA | `AguardandoConfirmacao`, aprovação/recusa, configuração 24/48/72, scheduler idempotente, pausa/retomada do mesmo ciclo |
+| `[ ]` | `868k60vrt` | F01-F — Tempo real | WS autenticado, eventos versionados, heartbeat, proxy, sessão/revogação e recovery HTTP; sem gravação direta pelo socket |
+| `[ ]` | `868kd35n1` | F01-G — Leitura/presença | Não lidas monotônicas, multi-dispositivo, online real até última conexão, offline após 60s, digitação temporária |
+| `[ ]` | `868k60vtc`, `868k60vt2`, `868k60vt8`, `868k60vun` | F01-H — Web | Central lista+thread responsiva/acessível, busca/badges, retry idempotente, presença e configuração do Gestor |
+| `[ ]` | `868k60vvh`, `868k60vv3`, `868k60vv8`, `868k60vvm`, `868k60vvp` | F01-I — Mobile | Tipos alinhados, FlatList/paginação, offline/reconexão, navegação segura, presença e confirmação |
+| `[ ]` | `868k7vrtu` | F01-J — Mídia | Contrato Texto/Áudio/Imagem/Vídeo/Documento sem exibir controles não funcionais; execução real vai à Fase 9 |
+| `[ ]` | `868kd35p0` | F01-K — Integrações | Serviço/evento único para WhatsApp, IA, status, visitas, mídia e push; outbox quando externo |
+| `[ ]` | `868kd35pv`, `868k60vrz`, `868k60vv2` | F01-L — QA/docs | Matriz requisito→teste→evidência, seed multi-tenant/perfis/estados, comandos e documentação completa |
 
-| Status | CU | Item | Arquivo(s) |
-|--------|----|------|-----------|
-| `[ ]` | `868k60vv3` | Adicionar `api.mensagens.listar` e `api.mensagens.enviar` | `frontend/mobile/lib/api.ts` |
-| `[ ]` | `868k60vv8` | Tipo `Mensagem` já existe — verificar se `MensagemCriar` precisa ser adicionado | `frontend/mobile/lib/types.ts` |
-| `[ ]` | `868k60vvh` | Tela de chat por chamado com FlatList de bolhas + TextInput + botão enviar | `frontend/mobile/app/(tabs)/chamados/[id].tsx` (novo) |
-| `[ ]` | `868k60vvm` | Conectar WebSocket nativo no mobile | `frontend/mobile/lib/useWebSocket.ts` (novo) |
-| `[ ]` | `868k60vvp` | Toque no card de chamado navega para a tela de chat | `frontend/mobile/app/(tabs)/chamados.tsx` |
+### Contratos essenciais
+
+- `GET/POST /chamados/{id}/mensagens`; cursor `Criacao+ID`, limite controlado e
+  `ChaveIdempotencia` obrigatória no envio.
+- `GET /conversas` e `POST /chamados/{id}/leitura`; contador por usuário/chamado sem retrocesso.
+- `POST /chamados/{id}/solicitar-conclusao|confirmar-conclusao|recusar-conclusao|retirar-conclusao`.
+- `GET/PATCH /configuracoes/confirmacao-chamado`, somente Gestor e validação
+  `0 < primeiro < segundo < escalonamento`.
+- `WS /ws/chamados/{id}`: eventos mensagem/digitação/presença, autenticação segura, heartbeat e
+  reconexão que consulta HTTP. Token nunca vai na query string.
+
+### Fora do escopo com destino obrigatório
+
+- Upload/download/scan/compactação de mídia → Fase 9 (`868k60wn5`).
+- WhatsApp/lembretes externos → Fase 1.5/MO8 (`868kd2e33`); push → Fase 10 (`868k60wpb`).
+- IA/triagem/narração → Fases 5/5.5; visita → Fase 8; canal do Funcionário → Fase 11.
+- Privacidade por assunto sensível continua evolução futura; não contradizer a decisão de Supervisor
+  amplo no MVP.
+- Broker/pubsub para presença/WS multi-réplica e Alembic/upgrade sem perda → Fase 12.
+
+### Testes
+
+Cada subfase prepara matriz, dados e comandos. **Não executar** teste, suite, build, smoke, export,
+reset/seed de banco ou validação visual até o usuário disparar a Fase 1/conjunto. Ao implementar,
+registrar `testes preparados — aguardando disparo do usuário`; nenhum `[ ]` vira validado por haver
+teste escrito.
 
 ---
 
@@ -451,6 +542,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868kb78v0` | MO5 | Onboarding/gestão de números (WABA, verificação, display name, tiers) — depende de D1/D5 | docs + ops |
 | `[ ]` | `868kb78wq` | MO6 | Custos, limites e monitoramento de qualidade (quality rating, messaging limits, alertas) | backend |
 | `[ ]` | `868kb78y9` | MO7 | Campanhas/recursos comerciais (futuro, se aprovado; liga com a Fase 6) | backend |
+| `[ ]` | `868kd2e33` | MO8 | **Notificações transacionais do ciclo do chamado** — Recebido/Em andamento/Agendado/Aguardando confirmação/Concluído/Cancelado/Reaberto + lembretes/escalonamento F01-E; usa snapshot 24h/48h/72h, nunca conclui por silêncio; motivo/resumo/ação sem notas internas; janela ou template; outbox/idempotência/retry; falha não desfaz transição/SLA | `backend/app/servicos/canais.py`, histórico/outbox, templates por Empresa |
 
 ### ❓ Decisões pendentes de validação humana · CU: `868kb7937`
 
@@ -463,7 +555,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | D3 | Mesmo telefone representando 2+ condomínios → bot pergunta ou triagem humana | MC8 |
 | D4 | Retenção do payload bruto (LGPD): 30/90 dias | MC4 |
 | D5 | Meta Cloud API direta vs BSP (Twilio/360dialog/Infobip) | MC6, MO5 |
-| D6 | Escopo do outbound no MVP: nada / só resposta na janela / também templates | fronteira A×B |
+| D6 | **Parcialmente decidido em 16/07/2026:** notificações transacionais de status entram no escopo (MO8); respostas livres/campanhas continuam separadas e dependem das regras do outbound | fronteira A×B, MO8 |
 
 ---
 
@@ -503,8 +595,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60vxk` | `PATCH /chamados/{id}/agendar` — salvar executor, data/hora, observação ao cliente | `backend/app/rotas/Chamados.py` |
 | `[ ]` | `868k60vya` | Campo `NotaInterna` no modelo `Chamado` (nunca exposta ao cliente) | `backend/app/modelos/Chamados.py` |
 | `[ ]` | `868k60vym` | `PATCH /chamados/{id}/concluir` — transição para Concluido + mensagem automática | `backend/app/rotas/Chamados.py` |
-| `[ ]` | `868k7vru6` | **Fechamento em pouquíssimos toques** — conclusão em 1–2 toques | `frontend/mobile/app/(supervisor)/**` |
-| `[ ]` | `868k7vruk` | **Aprovação do cliente encerra o ticket** — Cliente aprova a conclusão no chat (campo `AprovadoEm`); distinto da Visita Técnica | `backend/app/modelos/Chamados.py`, rotas |
+| `[ ]` | `868k7vru6` | **Solicitar conclusão em pouquíssimos toques** — Supervisor/Gestor informa resumo e entra em `AguardandoConfirmacao`; não marca Concluído diretamente; contrato F01-E | `frontend/mobile/app/(supervisor)/**` |
+| `[ ]` | `868k7vruk` | **Aprovação do Cliente encerra o ticket** — Cliente confirma/recusa no chat; recusa justificada volta a Em andamento, mesmo responsável/ciclo SLA; defaults 24h/48h/72h sem auto-conclusão; distinto da Visita Técnica; implementação-base F01-E (`868kd35m7`) | `backend/app/modelos/Chamados.py`, rotas |
 | `[ ]` | `868k7vrv2` | **Agenda do dia com prioridade visual sobre a fila** — ao abrir, o Supervisor vê primeiro as visitas de hoje, depois os tickets | `frontend/mobile/app/(supervisor)/**` |
 
 ### Frontend Mobile
@@ -635,8 +727,8 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 |--------|----|------|-----------|
 | `[ ]` | `868k60w36` | Serviço `ia_classificar(texto)` — retorna `Fila`, `Categoria`, `Prioridade` | `backend/app/servicos/ia.py` (novo) |
 | `[ ]` | `868k60w38` | Ao criar chamado (`POST /chamados/`): chamar `ia_classificar` e preencher campos | `backend/app/rotas/Chamados.py` |
-| `[ ]` | `868k60w3e` | Serviço `ia_narrar_status(chamado)` — gera mensagem de sistema quando status muda | `backend/app/servicos/ia.py` |
-| `[ ]` | `868k60w3h` | Ao atualizar status: criar `Mensagem` automática com `AutorTipo = IA` | `backend/app/rotas/Chamados.py` |
+| `[ ]` | `868k60w3e` | Serviço de narração segura para **todas** as transições (Recebido/Em andamento/Agendado/Aguardando confirmação/Concluído/Cancelado/Reaberto), consumindo evento estruturado. IA não decide aprovação, prazos configurados ou SLA, não inventa motivo/promessa, não expõe nota interna nem fala pelo Supervisor; Cancelado nunca é serviço realizado; fallback obrigatório | `backend/app/servicos/ia.py`, histórico F01/F08-07 |
+| `[ ]` | `868k60w3h` | Após commit da transição, criar exatamente uma mensagem automática ligada ao evento e disponibilizar saída para canais; retry/concor­rência não duplica; falha de IA/WhatsApp não desfaz status | `backend/app/rotas/Chamados.py`, serviços de histórico/outbox |
 | `[ ]` | `868k7vrxw` | **Roteamento por intenção → fila correta**, incluindo **tickets irmãos** (um aviso → N chamados) usando o vínculo de grupo da Fase 0.6 | `backend/app/servicos/ia.py`, `rotas/Chamados.py` |
 | `[ ]` | `868k60w3m` | Serviço `ia_detectar_oportunidade(mensagem)` — detecta intenção de serviço extra | `backend/app/servicos/ia.py` |
 | `[ ]` | `868kahvau` | **Reforço do invariante da Fase 0.6:** IA detecta intenção de compra, mas **nunca inventa preço/prazo**; só sinaliza oportunidade ancorada em dados reais | `backend/app/servicos/ia.py` |
@@ -714,6 +806,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 | `[ ]` | `868k60wh3` | Modelo `Condominio`: `Nome`, `Endereco`, `CNPJ`, **`EmpresaID`** | `backend/app/modelos/Condominio.py` (novo) |
 | `[ ]` | `868k60wh7` | CRUD de condomínios — escopado à Empresa do Gestor | `backend/app/rotas/Condominios.py` (novo) |
 | `[ ]` | `868k60whc` | CRUD de Empresas — somente Superadmin da plataforma | `backend/app/rotas/Plataforma.py` |
+| `[ ]` | `868kd2e3h` | F07-SP1 — **Supervisor padrão por Condomínio** (`SupervisorPadraoID`) + atribuição automática em chamado individual/tickets irmãos. Supervisor ativo e do mesmo tenant; mudar padrão só afeta futuros; sem padrão válido o chamado nasce sem responsável e alerta o Gestor, nunca é perdido | `backend/app/modelos/Condominio.py`, `rotas/Condominios.py`, `rotas/Chamados.py`, RLS/histórico |
 
 ### Frontend Web
 
@@ -721,6 +814,7 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 |--------|----|------|-----------|
 | `[ ]` | `868k60whj` | Página `cadastros` — usuários e condomínios da empresa (só Gestor) | `frontend/web/src/app/painel/cadastros/page.tsx` (novo) |
 | `[ ]` | `868k60whn` | Área de plataforma — gerenciar Empresas (Superadmin) | `frontend/web/src/app/(plataforma)/...` (novo) |
+| `[ ]` | `868kd2e3w` | F07-SP2 — Configurar Supervisor padrão no cadastro do Condomínio; lista só ativos do tenant; explica que a mudança vale para novos chamados e direciona à reatribuição explícita dos abertos (`F08-07J`) | página/cliente API/tipos do cadastro de Condomínios |
 
 ---
 
@@ -770,22 +864,33 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 
 ## Fase 9 — Upload de arquivos · CU: `868k60wn5`
 
+> **Auditoria obrigatória antes de implementar:** confrontar novamente branding, código e contratos
+> da F01-J. O escopo antigo de “foto” é insuficiente: revisar Áudio, Imagem, Vídeo e Documento/PDF,
+> MIME real, limites, compressão, duração/miniatura, URLs temporárias, tenant, arquivo malicioso,
+> retenção/exclusão, upload interrompido/idempotente, mídia efêmera do WhatsApp e celulares/dados
+> limitados. Não mostrar controle antes do fluxo completo funcionar. Testes aguardam disparo do usuário.
+
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[ ]` | `868k60wnd` | Configurar storage (S3 ou MinIO local via Docker) | `backend/app/servicos/storage.py` (novo), `docker-compose.yml` |
 | `[ ]` | `868k60wng` | Rota `POST /uploads/` — retorna URL do arquivo | `backend/app/rotas/Uploads.py` (novo) |
-| `[ ]` | `868k60wnh` | Suporte a envio de fotos no chat (mensagens com `tipo = imagem`) | `backend/app/modelos/Mensagens.py`, rotas |
-| `[ ]` | `868k60wnr` | Componente de upload de imagem no chat web | `frontend/web/src/components/` |
-| `[ ]` | `868k60wnx` | Upload de imagem no chat mobile via `expo-image-picker` | `frontend/mobile/` |
+| `[ ]` | `868k60wnh` | Implementar mídia do chat conforme revisão F01-J: tipos aprovados, referência autorizada, metadados, download/stream e segurança por tenant | `backend/app/modelos/Mensagens.py`, rotas/serviços |
+| `[ ]` | `868k60wnr` | Componentes web para upload/exibição dos tipos aprovados, com progresso, retry e acessibilidade | `frontend/web/src/components/` |
+| `[ ]` | `868k60wnx` | Captura/seleção/exibição mobile dos tipos aprovados, considerando dados limitados e interrupção | `frontend/mobile/` |
 
 ---
 
 ## Fase 10 — Notificações push · CU: `868k60wpb`
 
+> Push também entrega os lembretes da F01-E: primeiro/segundo ao Cliente e escalonamento ao
+> Supervisor responsável/Gestor. Usa prazos já calculados no snapshot, nunca conclui por silêncio,
+> não recalcula SLA e falha externa não altera o chamado. Evitar conteúdo sensível excessivo na
+> tela bloqueada; deep link sempre revalida sessão/permissão. Testes aguardam disparo do usuário.
+
 | Status | CU | Item | Arquivo(s) |
 |--------|----|------|-----------|
 | `[ ]` | `868k60wpt` | Integrar Expo Push Notifications no mobile | `frontend/mobile/lib/notificacoes.ts` (novo) |
-| `[ ]` | `868k60wpx` | Backend envia push ao criar mensagem para o destinatário offline | `backend/app/servicos/notificacoes.py` (novo) |
+| `[ ]` | `868k60wpx` | Backend envia push idempotente ao destinatário offline e nos lembretes/escalonamento F01-E | `backend/app/servicos/notificacoes.py` (novo) |
 | `[ ]` | `868k60wq2` | Configurar tokens de dispositivo por usuário no banco | `backend/app/modelos/Usuarios.py` |
 
 ---
@@ -817,6 +922,29 @@ Hoje o enum `UsuarioFuncao` tem 4 (Cliente, Supervisor, Funcionario, **Gerente**
 > **Nota de modelagem:** os "tipos de aviso" acima são **classificações de intenção detectadas pela IA
 > e/ou um campo `Tipo`/`Categoria` no chamado**, não telas/rotas fixas nem nomes hard-coded. A rota de
 > origem é sempre o mesmo canal único.
+
+---
+
+## Fase 12 — Finalização do desenvolvimento e preparação para produção 🚀 · CU: `868kd1jc8`
+
+> **Por que existe:** concentra controles indispensáveis ao go-live que causariam retrabalho durante
+> o primeiro desenvolvimento. Não adiciona funcionalidades de negócio. Executar depois das fases
+> funcionais, aproveitando a Fase 4.1 (escala), a Fase 0.8 e a regressão solicitada. Especificação:
+> `docs/implementation/10-fase-12-finalizacao-producao.md`.
+
+| Status | CU | ID | Item | Critério principal |
+|--------|----|----|------|--------------------|
+| `[ ]` | `868kd1k6v` | F12-01 | **Implantar Alembic e estabelecer migrações versionadas** | Baseline coerente; banco vazio e existente chegam ao `head`; RLS/grants entram nas revisões; produção deixa de depender de reset/`create_all`. |
+| `[ ]` | `868kd1k7a` | F12-02 | **Validar atualização sem perda e papéis/RLS de produção** | Ensaio em cópia representativa, integridade preservada, papel da API sem bypass, backup e rollback/roll-forward comprovados. |
+| `[ ]` | `868kd1k7e` | F12-03 | **Migrar estado efêmero para armazenamento compartilhado quando houver múltiplas réplicas** | Redis ou equivalente: rate limit sempre compartilhado; pubsub/salas/presença da Fase 1 compartilhados se a topologia tiver 2+ backends; TTL/atomicidade/falha documentados. |
+| `[ ]` | `868kd1k7p` | F12-04 | **Fechar endurecimento de borda e configuração de produção** | TLS/DNS, cookies/origens reais, CSP aplicada, segredos, exposição e logs validados no ambiente candidato. |
+| `[ ]` | `868kd1k7w` | F12-05 | **Implantar e ensaiar backup, restauração e recuperação** | RPO/RTO definidos; restauração real medida; integridade e RLS verificadas. |
+| `[ ]` | `868kd1k82` | F12-06 | **Executar gate final de go-live e registrar decisão de publicação** | Evidências, riscos, responsáveis, implantação e rollback consolidados numa decisão explícita `go/no-go`, sem duplicar a Fase 4.1. |
+
+### Fora do escopo da Fase 12
+
+Novas funcionalidades de Empresa/Condomínio (Fase 7), privacidade sensível/RH por tópico (Adiados),
+otimizações já atribuídas à Fase 4.1 e qualquer decisão de produto não aprovada.
 
 ---
 

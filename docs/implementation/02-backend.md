@@ -25,10 +25,17 @@ continua sendo a fonte dos detalhes por fase e dos `CU:`.
 
 | Novo ID | Status | CUs | Entrega |
 |---------|--------|-----|---------|
-| `BE-CHAT-001` | `[ ]` | `868k60vpu`, `868k60vq1`, `868k60vrq` | Rotas e schemas de mensagens |
-| `BE-CHAT-002` | `[ ]` | `868k60vrt` | WebSocket por chamado |
-| `BE-CHAT-003` | `[ ]` | `868k7vrte` | Confirmacao automatica "Recebido" |
-| `BE-CHAT-004` | `[ ]` | `868k7vrtu` | Mensagens de texto/audio/imagem como primeira classe |
+| `BE-CHAT-000` | `[ ]` | `868kd35hy` | Matriz de permissao unica para HTTP/WS: Supervisor amplo no tenant sem ampliar acoes administrativas |
+| `BE-CHAT-001` | `[ ]` | `868kd35kj`, `868k60vpu`, `868k60vq1`, `868k60vrq` | Persistencia/autoria/idempotencia/cursor e API paginada segura |
+| `BE-CHAT-002` | `[ ]` | `868k60vrt`, `868kd35n1` | WebSocket autenticado, proxy, recovery, leitura, nao lidas, presenca/heartbeat e digitacao |
+| `BE-CHAT-003` | `[ ]` | `868k7vrte` | Confirmacao Sistema "Recebido" atomica com chamado e independente da IA |
+| `BE-CHAT-004` | `[ ]` | `868k7vrtu` | Contrato Texto/Audio/Imagem/Video/Documento; habilitacao real de midia somente Fase 9 |
+| `BE-CHAT-005` | `[ ]` | `868kd35m7` | AguardandoConfirmacao, configuracao 24/48/72, scheduler idempotente e pausa/retomada SLA |
+| `BE-CHAT-006` | `[ ]` | `868kd35p0` | Servico/evento versionado unico para WhatsApp, IA, status, visitas, midia e push |
+
+Detalhe obrigatorio: `docs/implementation/12-fase-01-chat.md`. Banco local pode ser recriado no
+primeiro desenvolvimento; Alembic/upgrade sem perda permanece Fase 12. Testes sao preparados, mas
+executados somente quando o usuario disparar a Fase 1/conjunto.
 
 ## Multicanal — WhatsApp como porta de entrada (Fase 1.5, nova em 10/07/2026)
 
@@ -50,7 +57,9 @@ continua sendo a fonte dos detalhes por fase e dos `CU:`.
 |---------|--------|-----|---------|
 | `BE-TICKET-001` | `[ ]` | `868k60vvx` | `POST /chamados/` retorna ID para redirecionamento |
 | `BE-TICKET-002` | `[ ]` | `868k60vxf`, `868k60vxk`, `868k60vya`, `868k60vym` | Fila do supervisor, agendamento, nota interna e conclusao |
-| `BE-TICKET-003` | `[ ]` | `868k7vruk` | Aprovacao do cliente encerra ticket |
+| `BE-TICKET-003` | `[ ]` | `868k7vruk`, `868kd35m7` | Supervisor/Gestor solicita; Cliente aprova/recusa em AguardandoConfirmacao; sem auto-conclusao |
+| `BE-TICKET-004` | `[ ]` | `868kd2dua`, `868kd2dug`, `868kd2dum` | Historico/ciclos, cancelamento autorizado e reabertura pelo Cliente |
+| `BE-TICKET-005` | `[ ]` | `868kd2dw0`, `868kd2dwg` | Evento factual, IA/fallback, outbox e notificacao idempotente |
 
 ## Relatorios e gestor
 
@@ -74,9 +83,8 @@ continua sendo a fonte dos detalhes por fase e dos `CU:`.
 | Novo ID | Status | CUs | Entrega |
 |---------|--------|-----|---------|
 | `BE-PROP-001` | `[ ]` | `868k60w47`, `868k60w4a`, `868k60w4e`, `868k60w4g` | Propostas e alertas comerciais |
-| `BE-CAD-001` | `[ ]` | `868k60wh3`, `868k60wh7`, `868k60whc` | CRUD de condominios e empresas |
+| `BE-CAD-001` | `[ ]` | `868k60wh3`, `868k60wh7`, `868k60whc`, `868kd2e3h` | CRUD de condominios/empresas e Supervisor padrao com atribuicao automatica |
 | `BE-VIS-001` | `[ ]` | `868k60wj5`, `868kahvb2`, `868kahvbe`, `868k60wjj`, `868k60wjq`, `868k60wjv`, `868k60wk2`, `868k60wk9`, `868k60wkf`, `868k60wkn`, `868kahvbk`, `868k60wkq` | Visitas tecnicas |
-| `BE-UP-001` | `[ ]` | `868k60wnd`, `868k60wng`, `868k60wnh` | Storage, upload e imagem no chat |
-| `BE-PUSH-001` | `[ ]` | `868k60wpx`, `868k60wq2` | Envio push e token de dispositivo |
+| `BE-UP-001` | `[ ]` | `868k60wnd`, `868k60wng`, `868k60wnh` | Reauditar F01-J e entregar storage/midia segura para tipos aprovados, nao so imagem |
+| `BE-PUSH-001` | `[ ]` | `868k60wpx`, `868k60wq2` | Push/offline e lembretes/escalonamento F01-E, idempotentes e sem alterar chamado |
 | `BE-FUNC-001` | `[ ]` | `868k7vrew`, `868k7vrfc`, `868k7vrfv`, `868k7vrg7` | Fluxos IA/backend do funcionario |
-

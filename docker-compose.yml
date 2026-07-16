@@ -41,10 +41,18 @@ services:
       - ./backend/.env
     environment:
       # Dentro da rede do compose o host do banco é o serviço "db" (não "localhost").
-      # Esta variável sobrescreve a DATABASE_URL do .env, que aponta para localhost.
-      # A URL é montada a partir das mesmas variáveis do serviço `db`, para que a senha
-      # exista em um lugar só e não haja como os dois lados saírem de sincronia.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Estas variáveis sobrescrevem as do .env do backend, que apontam para localhost.
+      # Montadas a partir das variáveis do serviço `db`, para que cada senha exista em um lugar só.
+      #
+      # DATABASE_URL (item F08-01): papel RESTRITO da API — sem SUPERUSER/BYPASSRLS/posse das
+      # tabelas. `gerenciar_banco.py reset`/`aplicar-rls` criam este papel e concedem só o
+      # necessário; sem essa separação, FORCE ROW LEVEL SECURITY (rls.sql) não protege nada, porque
+      # a aplicação conectaria como dono das tabelas.
+      DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:?defina APP_DB_USER no .env da raiz (veja .env.example)}:${APP_DB_PASSWORD:?defina APP_DB_PASSWORD no .env da raiz (veja .env.example)}@db:5432/${POSTGRES_DB}
+      # DATABASE_URL_ADMIN: papel ADMINISTRATIVO (dono do schema/tabelas) — usado só por
+      # scripts/gerenciar_banco.py para DDL (reset, criar tabelas, aplicar RLS e grants). A API em
+      # tempo de execução nunca lê esta variável.
+      DATABASE_URL_ADMIN: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "8000:8000"
     # Espera o banco ficar saudável antes de subir (evita erro de conexão no create_all)

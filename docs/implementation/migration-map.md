@@ -44,14 +44,33 @@ O `CU:` continua sendo a chave de sincronizacao com o ClickUp.
 | `868k60vft`, `868k60vg4`, `868k60vgm`, `868k60vhk`, `868k60vjt`, `868k60vjw`, `868k60vk6`, `868k60vkz`, `868k60vn1` | Backend |
 | `868k60vn7`, `868k60vnh`, `868k60vnp` | Frontend Web |
 
+## Fase 0.8 - Consolidacao pos-auditoria
+
+| CUs | Nova trilha |
+|-----|-------------|
+| `868kd1jtu`, `868kd1jvc`, `868kd1jvr` | Seguranca / Backend / QA |
+| `868kd1juu` | Frontend Mobile / Seguranca |
+| `868kd1jwg` | QA / Backend |
+| `868kd1juf`, `868kd1jwx`, `868kd2du1`, `868kd2dx0` | Docs/Operacao / QA |
+| `868kd2dua`, `868kd2dug`, `868kd2dum`, `868kd2dw0`, `868kd2dw9`, `868kd2dwg` | Backend / Seguranca / QA |
+| `868kd2dut`, `868kd2dvc`, `868kd2dwt` | Frontend Web / Frontend Mobile / Seguranca |
+
 ## Fase 1 - Chat
 
 | CUs | Nova trilha |
 |-----|-------------|
-| `868k60vpu`, `868k60vq1`, `868k60vrq`, `868k60vrt`, `868k7vrte`, `868k7vrtu` | Backend |
-| `868k60vrz`, `868k60vv2` | Docs/Deploy/Operacao |
-| `868k60vt2`, `868k60vt8`, `868k60vtc`, `868k60vun` | Frontend Web |
-| `868k60vv3`, `868k60vv8`, `868k60vvh`, `868k60vvm`, `868k60vvp` | Frontend Mobile |
+| `868kd35hy` (F01-A), `868kd35kj` (F01-B), `868k60vpu`, `868k60vq1`, `868k60vrq`, `868k7vrte`, `868kd35m7` (F01-E), `868k60vrt`, `868kd35n1` (F01-G), `868k7vrtu`, `868kd35p0` (F01-K) | Backend / Seguranca / Infra |
+| `868k60vt2`, `868k60vt8`, `868k60vtc`, `868k60vun`, `868kd35m7`, `868kd35n1` | Frontend Web |
+| `868k60vv3`, `868k60vv8`, `868k60vvh`, `868k60vvm`, `868k60vvp`, `868kd35m7`, `868kd35n1` | Frontend Mobile |
+| `868kd35pv` (F01-L), `868k60vrz`, `868k60vv2` | QA / Docs/Deploy/Operacao |
+
+## Fase 1.5 - Fundacao Multicanal
+
+| CUs | Nova trilha |
+|-----|-------------|
+| Inbound `868kb77b5`–`868kb78ar` | Backend / Infra / QA |
+| Outbound `868kb78gx`–`868kb78y9` | Backend / Infra / Web |
+| `868kd2e33` (MO8, notificacoes transacionais de status) | Backend / Infra / QA |
 
 ## Fases 2 a 4.5 - Chamados, supervisor, gestor e catalogo
 
@@ -69,15 +88,15 @@ O `CU:` continua sendo a chave de sincronizacao com o ClickUp.
 | Fase 5 | `868k60w36`, `868k60w38`, `868k60w3e`, `868k60w3h`, `868k7vrxw`, `868k60w3m`, `868kahvau`, `868k7vryf`, `868k7vryy` | Backend |
 | Fase 5.5 | `868k7vraj`, `868k7vray`, `868k7vrbc`, `868k7vrbh`, `868k7vrc1`, `868k7vrcg`, `868k7vrcn`, `868k7vrd0` | Backend / Web |
 | Fase 6 | `868k60w47`, `868k60w4a`, `868k60w4e`, `868k60w4g`, `868k60w4n`, `868k60w4u`, `868k60w4x` | Backend / Web / Mobile |
-| Fase 7 | `868k60wh3`, `868k60wh7`, `868k60whc`, `868k60whj`, `868k60whn` | Backend / Web |
+| Fase 7 | `868k60wh3`, `868k60wh7`, `868k60whc`, `868k60whj`, `868k60whn`, `868kd2e3h`, `868kd2e3w` | Backend / Web |
 | Fase 8 | `868k60wj5`, `868kahvb2`, `868kahvbe`, `868k60wjj`, `868k60wjq`, `868k60wjv`, `868k60wk2`, `868k60wk9`, `868k60wkf`, `868k60wkn`, `868kahvbk`, `868k60wkq`, `868k60wkv`, `868k60wm6`, `868k60wmf`, `868k60wmm`, `868k60wmu`, `868k60wn0` | Backend / Mobile / Web |
 
-## Fases 9 a 11 e Adiados
+## Fases 9 a 12 e Adiados
 
 | Fase antiga | CUs | Nova trilha |
 |-------------|-----|-------------|
-| Fase 9 | `868k60wnd`, `868k60wng`, `868k60wnh`, `868k60wnr`, `868k60wnx` | Infra / Backend / Web / Mobile |
-| Fase 10 | `868k60wpt`, `868k60wpx`, `868k60wq2` | Infra / Backend / Mobile |
+| Fase 9 | `868k60wnd`, `868k60wng`, `868k60wnh`, `868k60wnr`, `868k60wnx` + auditoria obrigatoria dos tipos F01-J | Infra / Backend / Web / Mobile / QA |
+| Fase 10 | `868k60wpt`, `868k60wpx`, `868k60wq2` + lembretes/escalonamento F01-E | Infra / Backend / Mobile / QA |
 | Fase 11 | `868k7vre5`, `868k7vreg`, `868k7vren`, `868k7vrew`, `868k7vrfc`, `868k7vrfv`, `868k7vrg7` | Mobile / Backend |
+| Fase 12 | `868kd1k6v`, `868kd1k7a`, `868kd1k7e`, `868kd1k7p`, `868kd1k7w`, `868kd1k82` | Backend / Seguranca / Infra / QA / Docs/Operacao |
 | Adiados | `868k7vrgk`, `868k7vrgw` | Seguranca / Infra |
-

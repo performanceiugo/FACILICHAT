@@ -286,15 +286,16 @@ Rode a partir de `backend/` ou via `docker compose exec backend python scripts/g
 
 | Comando | O que faz |
 |---|---|
-| `reset [--semear]` | Dropa o schema inteiro, recria as tabelas (a partir dos modelos) e aplica a RLS. Com `--semear`, também popula os dados de demonstração. É o jeito correto de aplicar mudança de schema em dev. |
+| `reset [--semear]` | Dropa o schema inteiro, recria as tabelas (a partir dos modelos), cria/atualiza o papel RESTRITO da API (item F08-01) e aplica a RLS. Com `--semear`, também popula os dados de demonstração. É o jeito correto de aplicar mudança de schema em dev. |
 | `criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>` | Cria a 1ª Empresa (tenant) + o 1º Gestor numa transação só. **Não** é idempotente. |
-| `criar-superadmin "<Nome>" <email> <senha> [--empresa-nome N] [--cnpj C]` | Cria a Empresa `Iugo Performance` (se faltar) + o 1º **Superadmin** da plataforma. **Idempotente.** Aborta se o e-mail já pertence a outro perfil — nunca promove usuário existente. |
-| `semear` | Popula clientes, supervisor, chamados e chat de demonstração na 1ª Empresa (idempotente). **Recusa rodar se `AMBIENTE=producao`** (item S10) — usuários demo nascem com senha padrão, inaceitável fora de dev/staging. |
+| `criar-superadmin "<Nome>" <email> <senha> [--empresa-nome N] [--cnpj C]` | Comando avulso para Superadmin com **credenciais customizadas** (ex.: produção, com `--cnpj` real). Cria a Empresa `Iugo Performance` (se faltar) + o Superadmin. **Idempotente.** Aborta se o e-mail já pertence a outro perfil — nunca promove usuário existente. |
+| `semear` | Popula a **base de testes completa**: tenant principal (clientes/supervisor/chamados/chat na 1ª Empresa), uma **2ª Empresa de demonstração** ("Horizonte Facilities") com **3 supervisores** de desempenho desigual e 9 chamados (para páginas de comparação entre supervisores terem mais de um card), e o **Superadmin padrão** (`superadmin@facilichat.dev`, mesma senha demo) — sem precisar rodar `criar-superadmin` à parte. **Idempotente peça por peça:** rodar de novo só completa o que faltar (tenant / 2ª Empresa / Superadmin verificados de forma independente). **Recusa rodar se `AMBIENTE=producao`** (item S10) — usuários demo nascem com senha padrão, inaceitável fora de dev/staging. |
 | `limpar-demo` | Remove os usuários de demonstração (marcados pelo domínio `DOMINIO_DEMO`) e tudo que depende deles — chamados, mensagens, refresh tokens, sessões revogadas (idempotente). Item S10: rotação/limpeza dos dados demo em ambientes compartilhados (staging). |
-| `aplicar-rls` | (Re)aplica só as políticas de `app/rls.sql`. |
-| `verificar-rls` | Testa o isolamento multi-tenant (filtros por `EmpresaID` + RLS do Postgres). |
+| `aplicar-rls` | Garante o papel restrito da API (item F08-01) e (re)aplica as políticas de `app/rls.sql`. |
+| `verificar-rls` | Testa o isolamento multi-tenant (filtros por `EmpresaID`, RLS do Postgres e bloqueio fail-closed sem `app.empresa_id`) usando a credencial real da API. **Reprova** (não pula) se o papel conectado for capaz de ignorar RLS. |
 
-Fluxo do zero: `reset` → `criar-empresa ...` → `semear`.
+Fluxo do zero: `reset` → `criar-empresa ...` → `semear` (este último já entrega Superadmin + 2ª
+Empresa de demonstração; `criar-superadmin` manual só é necessário para credenciais customizadas).
 
 > **Por que não há mais migrações incrementais:** como não há Alembic e o banco de dev não tem dados
 > de produção a preservar, `Base.metadata.create_all` já reconstrói o schema completo a partir dos
@@ -338,6 +339,21 @@ valerão para **todo** o backend a partir desta fase:
 - **Escopo obrigatório:** **toda** query (`select`, `update`, `delete`) filtra por
   `EmpresaID` do usuário logado. Nenhuma rota retorna dados de outro tenant.
 - **Row-Level Security (RLS)** no PostgreSQL como segunda trava (defesa em profundidade).
+- **Dois papéis de banco, nunca um só (item F08-01):** a API conecta com um papel **restrito**
+  (`DATABASE_URL`) — sem `SUPERUSER`, sem `BYPASSRLS` e sem posse das tabelas — enquanto
+  `gerenciar_banco.py` usa um papel **administrativo** (`DATABASE_URL_ADMIN`, dono do schema) só
+  para DDL (reset, criar tabelas, criar/atualizar o papel restrito, aplicar RLS/grants). Sem essa
+  separação, `FORCE ROW LEVEL SECURITY` não protege nada, porque quem tem posse das tabelas ou é
+  superusuário sempre ignora RLS, `FORCE` ou não. `verificar-rls` reprova (não pula) se o papel
+  conectado ignorar RLS.
+  > Dentro de `gerenciar_banco.py`, `AsyncSessionLocal` (papel restrito) só é usado para simular a
+  > API de verdade (`verificar-rls`, seed dentro de um tenant já escopado); comandos que cruzam
+  > tenants por natureza (`criar-empresa`, `criar-superadmin`, `semear`, `limpar-demo`) usam
+  > `AsyncSessionLocalAdmin` (papel administrativo) — sob RLS eles seriam bloqueados, e não
+  > representam uma requisição real da API. As políticas em `rls.sql` usam
+  > `NULLIF(current_setting('app.empresa_id', true), '')::uuid`: o "valor de reset" de uma GUC
+  > customizada no Postgres é string vazia (não `NULL`), e sem o `NULLIF` isso quebraria com erro
+  > 500 numa conexão reciclada do pool, em vez de simplesmente não retornar linhas.
 - **Papéis por tenant:** `Gestor`/`Supervisor`/etc. valem dentro da sua Empresa.
 - **Superadmin da plataforma (Iugo Performance):** nível acima dos tenants (rotas em `Plataforma.py`)
   para cadastrar/suspender Empresas e criar o 1º Gestor de cada uma. Dois bootstraps distintos:

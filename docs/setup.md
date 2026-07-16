@@ -24,7 +24,7 @@
 ```bash
 # .env da RAIZ: credenciais do Postgres (lido pelo docker-compose.yml)
 cp .env.example .env
-# edite .env e defina uma POSTGRES_PASSWORD aleatória:
+# edite .env e defina POSTGRES_PASSWORD e APP_DB_PASSWORD aleatórias (senhas diferentes):
 #   python -c "import secrets; print(secrets.token_hex(24))"
 
 # .env do BACKEND: configuração da aplicação
@@ -33,6 +33,13 @@ cp backend/.env.example backend/.env
 #   python -c "import secrets; print(secrets.token_urlsafe(32))"
 # (ANTHROPIC_API_KEY pode ficar como placeholder — a IA ainda não é usada)
 ```
+
+> **Dois papéis de banco (item F08-01):** `POSTGRES_USER`/`POSTGRES_PASSWORD` (raiz) são o papel
+> **administrativo** — dono do schema, usado só por `gerenciar_banco.py` para DDL (reset, criar
+> tabelas, aplicar RLS/grants). `APP_DB_USER`/`APP_DB_PASSWORD` (raiz) são o papel **restrito** que a
+> própria API usa em tempo de execução — sem `SUPERUSER`/`BYPASSRLS`/posse das tabelas. O compose
+> cria as duas URLs (`DATABASE_URL` e `DATABASE_URL_ADMIN`) a partir dessas variáveis; rodando fora
+> do Docker, defina as duas em `backend/.env` (ver tabela abaixo).
 
 > **Dois arquivos, papéis diferentes:** o da **raiz** guarda só as credenciais do Postgres;
 > o de **`backend/`** guarda a configuração da aplicação. Ambos estão no `.gitignore`.
@@ -43,7 +50,8 @@ cp backend/.env.example backend/.env
 
 | Variável | Para que serve | Observação |
 |---|---|---|
-| `DATABASE_URL` | Conexão com o Postgres | Usada só quando o backend roda **fora** do Docker (o compose monta a URL sozinho). Usuário/senha/banco devem bater com o `.env` da raiz. Manter o driver `+asyncpg`. |
+| `DATABASE_URL` | Conexão da **API** com o Postgres — papel RESTRITO (item F08-01) | Em Docker o compose monta sozinho a partir de `APP_DB_USER`/`APP_DB_PASSWORD`. Fora do Docker, aponte para o papel restrito criado por `gerenciar_banco.py reset`/`aplicar-rls` — nunca o superusuário. Manter o driver `+asyncpg`. |
+| `DATABASE_URL_ADMIN` | Conexão **administrativa** usada só por `gerenciar_banco.py` (DDL) | Em Docker o compose monta sozinho a partir de `POSTGRES_USER`/`POSTGRES_PASSWORD`. Fora do Docker, use o superusuário do seu Postgres local. A API em si nunca lê esta variável em tempo de execução. |
 | `JWT_SECRET` | Assina/valida os tokens de login | Chave aleatória forte, mínimo 32 bytes — o backend recusa placeholder/curta na subida. **Nunca** commite. Se mudar, todos os logins caem. |
 | `JWT_EXPIRE_MINUTES` | Validade do token (minutos) | Padrão 480 (8h). |
 | `ANTHROPIC_API_KEY` | Funcionalidades de IA (Fase 5) | Ainda **não é usada**, mas é obrigatória para a app subir. Placeholder serve. |
@@ -81,18 +89,26 @@ por padrão. O bootstrap é pelo CLI do banco (ver "Scripts do banco" em `docs/t
 ```bash
 docker compose exec backend python scripts/gerenciar_banco.py criar-empresa "Nome da Empresa" "12.345.678/0001-90" "Nome do Gestor" gestor@exemplo.com SenhaForte123
 
-# opcional: clientes, chamados e chat de demonstração (idempotente)
+# base de testes completa (idempotente): clientes/supervisor/chamados/chat na Empresa acima,
+# + uma 2ª Empresa de demonstração com 3 supervisores, + o Superadmin padrão da plataforma
 docker compose exec backend python scripts/gerenciar_banco.py semear
 
 # remove os dados de demonstração acima (idempotente) — útil para rotacionar/limpar em staging
 docker compose exec backend python scripts/gerenciar_banco.py limpar-demo
 
-# Superadmin da plataforma (Iugo) — dá acesso a /plataforma/empresas. Idempotente.
+# se precisar de um Superadmin com credenciais customizadas (ex.: produção, com --cnpj real) em vez
+# do padrão criado por `semear`. Idempotente.
 docker compose exec backend python scripts/gerenciar_banco.py criar-superadmin "Superadmin Iugo" superadmin@iugo.com.br SenhaForte123
 
-# se precisar zerar o banco de dev (dropa tudo, recria e aplica RLS):
+# se precisar zerar o banco de dev (dropa tudo, recria, cria/atualiza o papel restrito da API e
+# aplica RLS):
 docker compose exec backend python scripts/gerenciar_banco.py reset
 ```
+
+> **Ambiente já existente antes do item F08-01:** se seu `.env` da raiz ainda não tem
+> `APP_DB_USER`/`APP_DB_PASSWORD`, adicione-os (ver `.env.example`) e rode
+> `docker compose up -d --build` seguido de `reset --semear` — o papel restrito da API só passa a
+> existir depois do primeiro `reset` após esta mudança.
 
 Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe`).
 
@@ -100,7 +116,9 @@ Depois, o Gestor cria o resto da equipe logado no painel (`POST /usuarios/equipe
 > autenticado, mas nada criava o primeiro — ovo e galinha. O comando cria a Empresa
 > `Iugo Performance` (o schema exige que todo usuário tenha uma Empresa) e o Superadmin dentro dela.
 > Ele **não promove** um usuário existente: se o e-mail já existir com outro perfil, aborta.
-> Em produção, passe o CNPJ real com `--cnpj` — o padrão é um placeholder de dev.
+> Em produção, passe o CNPJ real com `--cnpj` — o padrão é um placeholder de dev. Em dev/staging,
+> `semear` já chama essa mesma lógica internamente com credenciais padrão — só rode este comando à
+> parte se precisar de um e-mail/senha diferente.
 
 > **`semear` nunca roda em produção (item S10):** os usuários de demonstração nascem com a mesma
 > senha padrão (`FaciliChat2026Demo`) em toda instalação — inaceitável fora de dev/staging. O comando recusa

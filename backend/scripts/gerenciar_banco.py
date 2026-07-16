@@ -8,16 +8,29 @@
 # recriar. Este CLI consolida tudo num lugar visível, com subcomandos.
 #
 # Uso (a partir de backend/, ou via `docker compose exec backend python scripts/gerenciar_banco.py <cmd>`):
-#   python scripts/gerenciar_banco.py reset [--semear]     # zera o banco: dropa tudo, recria e aplica RLS
+#   python scripts/gerenciar_banco.py reset [--semear]     # zera o banco: dropa tudo, recria, cria o
+#                                                           # papel restrito da API e aplica RLS
 #   python scripts/gerenciar_banco.py criar-empresa "<Nome>" <CNPJ> "<Gestor>" <email> <senha>
-#   python scripts/gerenciar_banco.py criar-superadmin "<Nome>" <email> <senha>   # Superadmin da Iugo
-#   python scripts/gerenciar_banco.py semear               # popula dados de demonstração (idempotente; recusa em AMBIENTE=producao)
+#   python scripts/gerenciar_banco.py criar-superadmin "<Nome>" <email> <senha>   # Superadmin da Iugo (avulso/credenciais customizadas)
+#   python scripts/gerenciar_banco.py semear               # popula base de testes (idempotente; recusa em AMBIENTE=producao)
 #   python scripts/gerenciar_banco.py limpar-demo          # remove usuários/chamados de demonstração (idempotente)
-#   python scripts/gerenciar_banco.py aplicar-rls          # (re)aplica as políticas de app/rls.sql
-#   python scripts/gerenciar_banco.py verificar-rls        # testa o isolamento multi-tenant
+#   python scripts/gerenciar_banco.py aplicar-rls          # garante o papel restrito e (re)aplica app/rls.sql
+#   python scripts/gerenciar_banco.py verificar-rls        # testa o isolamento multi-tenant com o papel restrito
+#
+# Papéis do Postgres (item F08-01): este script conecta com DOIS papéis, lidos de variáveis
+# distintas — nunca o mesmo papel que a API usa. DATABASE_URL_ADMIN é o papel administrativo (dono
+# do schema/tabelas), usado aqui só para DDL (criar/dropar schema, criar tabelas, criar o papel
+# restrito e aplicar RLS/grants). DATABASE_URL é o papel RESTRITO — o mesmo que a API usa em
+# produção/dev — usado para semear dados e para `verificar-rls` provar o isolamento com a
+# credencial real da aplicação. Ver backend/.env.example e docker-compose.yml.
 #
 # Fluxo típico de dev do zero:
 #   reset  →  criar-empresa ...  →  semear
+#
+# `semear` agora entrega a base de testes completa num único passo: além do tenant principal
+# (clientes/supervisor/chamados), cria também o Superadmin padrão da plataforma e uma 2ª Empresa de
+# demonstração com 3 supervisores — sem exigir `criar-superadmin` manual. Tudo idempotente peça por
+# peça: rodar de novo só completa o que faltar (ex.: um Superadmin criado à mão antes continua único).
 
 import argparse
 import asyncio
@@ -32,8 +45,10 @@ from datetime import timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import delete, func, select, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.banco_dados import AsyncSessionLocal, Base, engine
+from app.banco_dados import AsyncSessionLocal, Base
 from app.configuracoes import configuracoes
 from app.modelos.CategoriaChamado import CategoriaChamado
 from app.modelos.Chamados import Chamado, ChamadoFila, ChamadoPrioridade, ChamadoStatus
@@ -53,6 +68,77 @@ CAMINHO_RLS_SQL = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "rls.sql"
 )
 
+# Engine ADMINISTRATIVO (item F08-01) — dono do schema/tabelas, usado só por este script para DDL
+# (dropar/criar schema, criar tabelas, criar o papel restrito e aplicar RLS/grants). `AsyncSessionLocal`
+# (importado de app.banco_dados) continua ligado ao papel RESTRITO — o mesmo que a API usa — e segue
+# reservado para semear dados e para `verificar-rls` provar o isolamento com a credencial real.
+engine_admin = create_async_engine(configuracoes.DATABASE_URL_ADMIN, echo=configuracoes.DEBUG)
+
+# Sessões administrativas (F08-01): usadas pelas operações deste script que legitimamente cruzam
+# tenants — bootstrap de Empresa/Superadmin, seed e limpeza de demonstração. Sob o papel restrito
+# (AsyncSessionLocal) essas escritas seriam bloqueadas pela RLS, porque nenhuma delas representa uma
+# requisição real da API escopada a um único `app.empresa_id`.
+AsyncSessionLocalAdmin = async_sessionmaker(engine_admin, expire_on_commit=False)
+
+# Só letras/números/underscore, começando por letra ou underscore — o nome do papel restrito vem de
+# DATABASE_URL (configurável via APP_DB_USER) e é interpolado em DDL (CREATE ROLE/GRANT), que não
+# aceita parâmetros de identificador; validar aqui evita que um valor malformado gere SQL inválido.
+IDENTIFICADOR_PAPEL_VALIDO = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+# Escapa um literal de string para uso dentro de DDL (dobra aspas simples) — necessário porque
+# CREATE ROLE/ALTER ROLE ... PASSWORD exige um literal na sintaxe, sem suporte a bind parameters.
+def _escapar_literal_sql(valor: str) -> str:
+    return valor.replace("'", "''")
+
+
+# Lê o papel e a senha que a API usa (DATABASE_URL) — é esse papel que precisa existir no Postgres
+# com privilégios restritos para o isolamento multi-tenant valer de fato (F08-01).
+def _credenciais_papel_app() -> tuple[str, str]:
+    url = make_url(configuracoes.DATABASE_URL)
+    if not url.username or url.password is None:
+        raise SystemExit(
+            "DATABASE_URL precisa incluir usuário e senha do papel restrito da API (ver "
+            "backend/.env.example)."
+        )
+    if not IDENTIFICADOR_PAPEL_VALIDO.match(url.username):
+        raise SystemExit(
+            f"Usuário de DATABASE_URL inválido como nome de papel do Postgres: {url.username!r}. "
+            "Use apenas letras, números e _ (começando por letra ou _)."
+        )
+    return url.username, url.password
+
+
+# Garante que o papel restrito da API existe no Postgres, com a senha atual de DATABASE_URL e sem
+# nenhum privilégio capaz de ignorar RLS — e concede só o necessário para operar as tabelas do
+# schema. Idempotente: pode rodar de novo (ex.: depois de trocar a senha) sem duplicar nada.
+# Precisa rodar DEPOIS de `criar_tabelas()` (as tabelas precisam existir para "ALL TABLES" e "ALL
+# SEQUENCES" alcançarem algo) e via `engine_admin` (só o dono do schema pode criar papéis e conceder
+# privilégios sobre objetos que não são dele).
+async def garantir_papel_app() -> None:
+    papel, senha = _credenciais_papel_app()
+    senha_escapada = _escapar_literal_sql(senha)
+
+    async with engine_admin.begin() as conn:
+        await conn.execute(text(
+            f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{papel}') THEN
+                    CREATE ROLE "{papel}" LOGIN PASSWORD '{senha_escapada}'
+                        NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+                ELSE
+                    ALTER ROLE "{papel}" WITH LOGIN PASSWORD '{senha_escapada}'
+                        NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+                END IF;
+            END
+            $$;
+            """
+        ))
+        await conn.execute(text(f'GRANT USAGE ON SCHEMA public TO "{papel}"'))
+        await conn.execute(text(f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "{papel}"'))
+        await conn.execute(text(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{papel}"'))
+
 
 # ---------------------------------------------------------------------------
 # Dados de demonstração (usados pelo subcomando `semear`)
@@ -62,14 +148,21 @@ CAMINHO_RLS_SQL = os.path.join(
 # que também serve de marcador de idempotência do seed.
 # Atualizada no item M1 para cumprir a política de senha (mínimo 15 caracteres — OWASP sem MFA):
 # a senha antiga "Senha123" (8) ficaria abaixo do mínimo que a própria API passou a exigir.
-#Perfil	Nome	Usuário
-#Superadmin	Superadmin Iugo	superadmin@iugo.com.br
-#Gestor	Gestor Demo	admin@facilichat.dev
-#Supervisor	Roberto Supervisor	supervisor@demo.facilichat.dev
-#Cliente	Ana Costa	ana@demo.facilichat.dev
-#Cliente	Carlos Lima	carlos@demo.facilichat.dev
-#Cliente	João Souza	joao@demo.facilichat.dev
-#Cliente	Maria Silva	maria@demo.facilichat.dev
+#Perfil	Nome	Usuário				Empresa
+#Superadmin	Superadmin Demo	superadmin@facilichat.dev	Iugo Performance (criado por `semear`, sem CNPJ real)
+#Gestor	Gestor Demo	admin@facilichat.dev		1ª Empresa (criada por `criar-empresa`, nome livre)
+#Supervisor	Roberto Supervisor	supervisor@demo.facilichat.dev	1ª Empresa
+#Cliente	Ana Costa	ana@demo.facilichat.dev	1ª Empresa
+#Cliente	Carlos Lima	carlos@demo.facilichat.dev	1ª Empresa
+#Cliente	João Souza	joao@demo.facilichat.dev	1ª Empresa
+#Cliente	Maria Silva	maria@demo.facilichat.dev	1ª Empresa
+#Gestor	Gestora Horizonte	gestora.horizonte@demo.facilichat.dev	Horizonte Facilities (2ª Empresa, criada por `semear`)
+#Supervisor	Marcos Andrade	marcos.andrade@demo.facilichat.dev	Horizonte Facilities
+#Supervisor	Patricia Nunes	patricia.nunes@demo.facilichat.dev	Horizonte Facilities
+#Supervisor	Diego Ramos	diego.ramos@demo.facilichat.dev	Horizonte Facilities
+#Cliente	Fernanda Alves	fernanda.alves@demo.facilichat.dev	Horizonte Facilities
+#Cliente	Ricardo Teixeira	ricardo.teixeira@demo.facilichat.dev	Horizonte Facilities
+#Cliente	Juliana Martins	juliana.martins@demo.facilichat.dev	Horizonte Facilities
 
 
 
@@ -225,23 +318,160 @@ CHAMADOS = [
 
 
 # ---------------------------------------------------------------------------
+# 2ª Empresa de demonstração — mesmo domínio DOMINIO_DEMO, tenant diferente. Existe para dar
+# visualização com MAIS de um supervisor por Empresa (o tenant principal acima só tem um), o que
+# páginas como "Desempenho por supervisor" e "Supervisores" precisam para mostrar comparação real
+# entre pessoas — não só um card sozinho.
+# ---------------------------------------------------------------------------
+
+EMPRESA2_NOME = "Horizonte Facilities"
+EMPRESA2_CNPJ = "23.456.789/0001-01"
+EMPRESA2_GESTOR_NOME = "Gestora Horizonte"
+EMPRESA2_GESTOR_EMAIL = f"gestora.horizonte{DOMINIO_DEMO}"
+
+# Três supervisores com desempenho deliberadamente desigual (ver CHAMADOS_EMPRESA2): um só com
+# chamados concluídos, um misto, um com chamados parados/críticos — para o painel do Gestor
+# renderizar estados diferentes (bom desempenho, atenção, gargalo) sem precisar de dados reais.
+SUPERVISORES_EMPRESA2 = [
+    {"Nome": "Marcos Andrade",  "Email": f"marcos.andrade{DOMINIO_DEMO}"},
+    {"Nome": "Patricia Nunes",  "Email": f"patricia.nunes{DOMINIO_DEMO}"},
+    {"Nome": "Diego Ramos",     "Email": f"diego.ramos{DOMINIO_DEMO}"},
+]
+
+CLIENTES_EMPRESA2 = [
+    {"Nome": "Fernanda Alves",   "Email": f"fernanda.alves{DOMINIO_DEMO}",  "Condominio": "Ed. Torres do Parque"},
+    {"Nome": "Ricardo Teixeira", "Email": f"ricardo.teixeira{DOMINIO_DEMO}", "Condominio": "Cond. Villa Bela"},
+    {"Nome": "Juliana Martins",  "Email": f"juliana.martins{DOMINIO_DEMO}",  "Condominio": "Res. Monte Azul"},
+]
+
+# Índice de "supervisor" aqui aponta para SUPERVISORES_EMPRESA2 (0, 1 ou 2) — diferente do tenant
+# principal, que só usa True/False porque tem um único supervisor (ver _resolver_supervisor).
+CHAMADOS_EMPRESA2 = [
+    # Marcos (0): os 3 concluídos — supervisor de alta performance.
+    {
+        "cliente": 0, "fila": ChamadoFila.Operacional, "categoria": "Elétrica",
+        "prioridade": ChamadoPrioridade.Media, "status": ChamadoStatus.Concluido,
+        "dias": 5, "supervisor": 0,
+        "resumo": "Troca das lâmpadas queimadas do hall de entrada do bloco A.",
+        "chat": [
+            (AutorTipo.Cliente, "As lâmpadas do hall de entrada queimaram, dá para trocar?"),
+            (AutorTipo.Supervisor, "Vou passar lá hoje ainda com a equipe de manutenção."),
+            (AutorTipo.Sistema, "Seu chamado foi concluído. Qualquer coisa, estamos por aqui."),
+        ],
+    },
+    {
+        "cliente": 1, "fila": ChamadoFila.Operacional, "categoria": "Pintura",
+        "prioridade": ChamadoPrioridade.Baixa, "status": ChamadoStatus.Concluido,
+        "dias": 9, "supervisor": 0,
+        "resumo": "Repintura da fachada lateral do bloco B, descascando há meses.",
+        "chat": [
+            (AutorTipo.Cliente, "A fachada lateral está descascando, podemos programar a repintura?"),
+            (AutorTipo.Supervisor, "Já orçamos e a equipe começa na próxima semana."),
+            (AutorTipo.Sistema, "Seu chamado foi concluído. Qualquer coisa, estamos por aqui."),
+        ],
+    },
+    {
+        "cliente": 2, "fila": ChamadoFila.Operacional, "categoria": "Jardinagem",
+        "prioridade": ChamadoPrioridade.Baixa, "status": ChamadoStatus.Concluido,
+        "dias": 3, "supervisor": 0,
+        "resumo": "Poda das árvores próximas ao playground, galhos baixos demais.",
+        "chat": [
+            (AutorTipo.Cliente, "Os galhos perto do playground estão baixos, dá risco para as crianças."),
+            (AutorTipo.Supervisor, "Podamos hoje de manhã, antes do horário de uso do playground."),
+            (AutorTipo.Sistema, "Seu chamado foi concluído. Qualquer coisa, estamos por aqui."),
+        ],
+    },
+    # Patricia (1): mix — desempenho médio (1 concluído, 1 recebido, 1 crítico em andamento).
+    {
+        "cliente": 0, "fila": ChamadoFila.Operacional, "categoria": "Hidráulica",
+        "prioridade": ChamadoPrioridade.Critica, "status": ChamadoStatus.EmAndamento,
+        "dias": 0, "supervisor": 1,
+        "resumo": "Vazamento na caixa d'água do bloco A, pressão caindo nos apartamentos altos.",
+        "chat": [
+            (AutorTipo.Cliente, "A água está fraca nos andares altos, acho que tem vazamento na caixa d'água."),
+            (AutorTipo.Sistema, "Recebemos sua solicitação. Ela está registrada e já foi encaminhada à equipe."),
+            (AutorTipo.Supervisor, "Confirmado, o encanador está subindo para a caixa d'água agora."),
+        ],
+    },
+    {
+        "cliente": 1, "fila": ChamadoFila.Financeiro, "categoria": "Cobrança",
+        "prioridade": ChamadoPrioridade.Media, "status": ChamadoStatus.Recebido,
+        "dias": 2, "supervisor": 1,
+        "resumo": "Taxa extra no boleto deste mês que o morador não reconhece.",
+        "chat": [
+            (AutorTipo.Cliente, "Tem uma taxa extra no meu boleto que eu não sei o que é."),
+            (AutorTipo.Sistema, "Recebemos sua solicitação. Ela está registrada e já foi encaminhada à equipe."),
+        ],
+    },
+    {
+        "cliente": 2, "fila": ChamadoFila.RH, "categoria": "Escala",
+        "prioridade": ChamadoPrioridade.Media, "status": ChamadoStatus.Concluido,
+        "dias": 6, "supervisor": 1,
+        "resumo": "Ajuste da escala de plantão da portaria no feriado.",
+        "chat": [
+            (AutorTipo.Cliente, "Como fica o plantão da portaria no feriado?"),
+            (AutorTipo.Supervisor, "Já ajustei a escala e confirmei com a equipe."),
+            (AutorTipo.Sistema, "Seu chamado foi concluído. Qualquer coisa, estamos por aqui."),
+        ],
+    },
+    # Diego (2): nenhum concluído — supervisor em estado de atenção/gargalo (chamados parados).
+    {
+        "cliente": 0, "fila": ChamadoFila.Operacional, "categoria": "Elevador",
+        "prioridade": ChamadoPrioridade.Critica, "status": ChamadoStatus.EmAndamento,
+        "dias": 4, "supervisor": 2,
+        "resumo": "Elevador social do bloco C fazendo ruído forte e parando entre andares.",
+        "chat": [
+            (AutorTipo.Cliente, "O elevador social está fazendo um barulho estranho e parou entre andares de novo."),
+            (AutorTipo.Sistema, "Recebemos sua solicitação. Ela está registrada e já foi encaminhada à equipe."),
+            (AutorTipo.Supervisor, "Chamei a manutenção do elevador, aguardando confirmação da visita."),
+        ],
+    },
+    {
+        "cliente": 1, "fila": ChamadoFila.Operacional, "categoria": "Portaria",
+        "prioridade": ChamadoPrioridade.Alta, "status": ChamadoStatus.Recebido,
+        "dias": 3, "supervisor": 2,
+        "resumo": "Câmera da portaria principal fora do ar desde ontem.",
+        "chat": [
+            (AutorTipo.Cliente, "A câmera da portaria principal está fora do ar desde ontem, isso é sério."),
+            (AutorTipo.Sistema, "Recebemos sua solicitação. Ela está registrada e já foi encaminhada à equipe."),
+        ],
+    },
+    {
+        "cliente": 2, "fila": ChamadoFila.Operacional, "categoria": "Segurança",
+        "prioridade": ChamadoPrioridade.Alta, "status": ChamadoStatus.EmAndamento,
+        "dias": 5, "supervisor": 2,
+        "resumo": "Cerca elétrica do muro dos fundos desarmada há dias.",
+        "chat": [
+            (AutorTipo.Cliente, "A cerca elétrica dos fundos está desarmada, isso é uma brecha de segurança."),
+            (AutorTipo.Sistema, "Recebemos sua solicitação. Ela está registrada e já foi encaminhada à equipe."),
+            (AutorTipo.Supervisor, "Vou verificar o disjuntor da cerca ainda hoje."),
+        ],
+    },
+]
+
+
+# ---------------------------------------------------------------------------
 # Helpers de schema e RLS
 # ---------------------------------------------------------------------------
 
 # Cria todas as tabelas/colunas a partir dos modelos atuais (idempotente — não recria o existente).
+# Usa o engine ADMINISTRATIVO (F08-01): CREATE TABLE exige posse/privilégio de CREATE no schema, que
+# o papel restrito da API deliberadamente não tem.
 async def criar_tabelas() -> None:
-    async with engine.begin() as conn:
+    async with engine_admin.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 # Lê app/rls.sql e executa cada comando isoladamente (asyncpg não aceita múltiplos statements por
-# chamada). O SQL usa DROP POLICY IF EXISTS, então é idempotente.
+# chamada). O SQL usa DROP POLICY IF EXISTS, então é idempotente. Usa o engine ADMINISTRATIVO
+# (F08-01): ALTER TABLE ... ENABLE/FORCE ROW LEVEL SECURITY e CREATE POLICY exigem ser o dono da
+# tabela (ou superusuário) — privilégio que o papel restrito da API não tem.
 async def aplicar_rls() -> None:
     with open(CAMINHO_RLS_SQL, "r", encoding="utf-8") as arquivo:
         script_sql = arquivo.read()
 
     script_sem_comentarios = re.sub(r"(?m)^\s*--.*$", "", script_sql)
-    async with engine.begin() as conn:
+    async with engine_admin.begin() as conn:
         for comando in [c.strip() for c in script_sem_comentarios.split(";") if c.strip()]:
             await conn.execute(text(comando))
 
@@ -319,6 +549,107 @@ async def _obter_ou_criar_usuario(db, empresa_id, nome, email, funcao, condomini
     return usuario
 
 
+# Busca uma Empresa de demonstração pelo nome ou a cria junto com o próprio Gestor — mesma lógica de
+# `criar-empresa`, mas idempotente (usada pelo seed para a 2ª Empresa, que ninguém cria à mão).
+async def _obter_ou_criar_empresa_demo(db, nome, cnpj, gestor_nome, gestor_email):
+    resultado = await db.execute(select(Empresa).where(Empresa.Nome == nome))
+    empresa = resultado.scalar_one_or_none()
+    if empresa:
+        return empresa
+
+    empresa = Empresa(Nome=nome, CNPJ=cnpj, Status=EmpresaStatus.Ativa)
+    db.add(empresa)
+    await db.flush()  # empresa.ID preenchido antes de criar o Gestor que o referencia
+
+    gestor = Usuario(
+        EmpresaID=empresa.ID,
+        Nome=gestor_nome,
+        Email=gestor_email,
+        SenhaHash=pwd.hash(SENHA_PADRAO),
+        Funcao=UsuarioFuncao.Gestor,
+    )
+    db.add(gestor)
+    await db.flush()
+    print(f"2ª Empresa de demonstração criada: {nome} ({cnpj}) — Gestor: {gestor_email}")
+    return empresa
+
+
+# Resolve qual supervisor (se algum) fica em `Chamado.SupervisorID` e autor das mensagens de chat.
+# `indice` aceita True (compatibilidade com o tenant principal, que só tem 1 supervisor → índice 0),
+# um inteiro (tenant com vários supervisores, ver CHAMADOS_EMPRESA2) ou False/None (sem atribuição).
+def _resolver_supervisor(indice, supervisores):
+    if not indice and indice != 0:
+        return None
+    return supervisores[0 if indice is True else indice]
+
+
+# Popula um tenant (Empresa) com clientes, supervisores e chamados/chat de demonstração. Extraído
+# para ser reaproveitado por mais de uma Empresa no seed (tenant principal + 2ª Empresa de demo) sem
+# duplicar a lógica de criação de chamado e histórico de chat.
+async def _semear_tenant(db, empresa_id, clientes_def, supervisores_def, chamados_def):
+    supervisores = [
+        await _obter_ou_criar_usuario(db, empresa_id, s["Nome"], s["Email"], UsuarioFuncao.Supervisor)
+        for s in supervisores_def
+    ]
+    clientes = [
+        await _obter_ou_criar_usuario(db, empresa_id, c["Nome"], c["Email"], UsuarioFuncao.Cliente, c["Condominio"])
+        for c in clientes_def
+    ]
+
+    agora = agoraUtc()
+
+    # Cria cada chamado com data de abertura escalonada e o histórico de chat correspondente.
+    for item in chamados_def:
+        categoria = await _obter_ou_criar_categoria(db, empresa_id, item["categoria"])
+        aberto_em = agora - timedelta(days=item["dias"], hours=2)
+        supervisor = _resolver_supervisor(item["supervisor"], supervisores)
+        chamado = Chamado(
+            EmpresaID=empresa_id,
+            ClienteID=clientes[item["cliente"]].ID,
+            SupervisorID=supervisor.ID if supervisor else None,
+            Fila=item["fila"],
+            CategoriaID=categoria.ID,
+            Status=item["status"],
+            Prioridade=item["prioridade"],
+            Resumo=item["resumo"],
+            Criacao=aberto_em,
+            Atualizacao=aberto_em,
+        )
+        db.add(chamado)
+        await db.flush()  # obtém o ID do chamado para vincular as mensagens
+
+        # Insere as mensagens do chat em ordem, espaçadas em minutos a partir da abertura.
+        for i, (autor_tipo, conteudo) in enumerate(item["chat"]):
+            # Cliente e Supervisor têm autor; Sistema/IA não têm AutorID (nullable).
+            if autor_tipo == AutorTipo.Cliente:
+                autor_id = clientes[item["cliente"]].ID
+            elif autor_tipo == AutorTipo.Supervisor:
+                autor_id = supervisor.ID  # só há mensagem de Supervisor quando ele está atribuído
+            else:
+                autor_id = None
+            db.add(Mensagem(
+                EmpresaID=empresa_id,
+                ChamadoID=chamado.ID,
+                AutorID=autor_id,
+                AutorTipo=autor_tipo,
+                Conteudo=conteudo,
+                Criacao=aberto_em + timedelta(minutes=15 * (i + 1)),
+            ))
+
+    return clientes, supervisores
+
+
+# Diz se o tenant já tem chamados de demonstração (Cliente com e-mail no DOMINIO_DEMO) — critério de
+# idempotência por Empresa, para o seed poder completar só o que falta em vez de tudo ou nada.
+async def _chamados_demo_existem(db, empresa_id) -> bool:
+    resultado = await db.execute(
+        select(func.count(Chamado.ID))
+        .join(Usuario, Usuario.ID == Chamado.ClienteID)
+        .where(Usuario.Email.like(f"%{DOMINIO_DEMO}"), Chamado.EmpresaID == empresa_id)
+    )
+    return (resultado.scalar() or 0) > 0
+
+
 # ---------------------------------------------------------------------------
 # Helpers da verificação de isolamento multi-tenant
 # ---------------------------------------------------------------------------
@@ -386,9 +717,12 @@ async def _papel_ignora_rls() -> bool:
         return bool(resultado.scalar_one())
 
 
-# Confirma a camada do app: mesmo com dois tenants, queries por EmpresaID retornam só o bloco pedido.
+# Confirma a camada do app: mesmo com dois tenants, queries por EmpresaID retornam só o bloco
+# pedido. Usa a sessão ADMINISTRATIVA de propósito — o objetivo é testar a trava PRIMÁRIA (filtro
+# explícito por EmpresaID) isolada da RLS; com o papel restrito, a RLS mascararia qualquer resultado
+# sem `app.empresa_id` definido, e o teste deixaria de provar o que se propõe a provar.
 async def _validar_filtros_aplicacao(empresa_id, esperado_cond, esperado_user, esperado_chamado):
-    async with AsyncSessionLocal() as session:
+    async with AsyncSessionLocalAdmin() as session:
         condominios = (await session.execute(
             select(Condominio.ID).where(Condominio.EmpresaID == empresa_id).order_by(Condominio.Nome.asc())
         )).scalars().all()
@@ -416,6 +750,22 @@ async def _validar_visibilidade_tenant(empresa_id, esperado_cond, esperado_user,
     assert chamados == [esperado_chamado], f"Tenant {empresa_id} viu chamados indevidos: {chamados}"
 
 
+# Confirma o comportamento fail-closed da política (F08-01, aceite explícito): sem `app.empresa_id`
+# definido na sessão, nenhuma linha das tabelas tenant é visível — nem as de outros tenants criados
+# neste mesmo teste. Usa AsyncSessionLocal (papel restrito da API) sem passar por `_sessao_tenant`,
+# que sempre define a variável — aqui o ponto é justamente testar a ausência dela.
+async def _validar_bloqueio_sem_tenant() -> None:
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("RESET app.empresa_id"))
+        condominios = (await session.execute(select(Condominio.ID))).scalars().all()
+        usuarios = (await session.execute(select(Usuario.ID))).scalars().all()
+        chamados = (await session.execute(select(Chamado.ID))).scalars().all()
+
+    assert condominios == [], f"Sem app.empresa_id, Condominios deveria estar vazio: {condominios}"
+    assert usuarios == [], f"Sem app.empresa_id, Usuarios deveria estar vazio: {usuarios}"
+    assert chamados == [], f"Sem app.empresa_id, Chamados deveria estar vazio: {chamados}"
+
+
 # Remove os dados temporários no mesmo tenant que os criou (respeitando a RLS durante a limpeza).
 async def _limpar_dados_tenant(empresa_id: uuid.UUID) -> None:
     async with _sessao_tenant(empresa_id) as session:
@@ -434,14 +784,19 @@ async def _limpar_dados_tenant(empresa_id: uuid.UUID) -> None:
 # recria e aplica a RLS. Substitui as antigas migrações incrementais: em dev não há dado a preservar,
 # então recriar a partir dos modelos é o caminho correto e sem remendos.
 async def cmd_reset(args) -> None:
-    async with engine.begin() as conn:
+    # Todo o DDL de reset roda no engine ADMINISTRATIVO (F08-01) — o papel restrito da API não tem
+    # (e não deve ter) privilégio para dropar/criar schema.
+    async with engine_admin.begin() as conn:
         # DROP SCHEMA ... CASCADE remove tudo que pertence ao schema (inclusive os tipos ENUM criados
         # pelo SQLAlchemy); recriar deixa o banco limpo para o create_all reconstruir do zero.
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
     await criar_tabelas()
+    # Recria as tabelas zera todos os grants do schema anterior — reconceder ao papel restrito
+    # antes de aplicar as políticas de RLS.
+    await garantir_papel_app()
     await aplicar_rls()
-    print("Banco resetado: schema recriado, tabelas criadas e RLS aplicada.")
+    print("Banco resetado: schema recriado, papel restrito garantido e RLS aplicada.")
 
     if args.semear:
         await _semear()
@@ -450,10 +805,12 @@ async def cmd_reset(args) -> None:
 # `criar-empresa` — bootstrap da primeira Empresa (tenant) + primeiro Gestor, numa única transação
 # (se o Gestor falhar, a Empresa também não é persistida — evita tenant órfão). É o ponto de entrada
 # do sistema, já que o cadastro público fica fechado e /usuarios/equipe exige um Gestor autenticado.
+# Usa a sessão ADMINISTRATIVA (F08-01): é um bootstrap fora de qualquer tenant ainda existente — sob
+# o papel restrito, a RLS bloquearia o INSERT em "Usuarios" por não haver `app.empresa_id` definido.
 async def cmd_criar_empresa(args) -> None:
     await criar_tabelas()  # garante que as tabelas existem (idempotente)
 
-    async with AsyncSessionLocal() as db:
+    async with AsyncSessionLocalAdmin() as db:
         empresa = Empresa(Nome=args.nome, CNPJ=args.cnpj)
         db.add(empresa)
         await db.flush()  # empresa.ID preenchido antes de criar o Usuario que o referencia
@@ -481,79 +838,92 @@ EMPRESA_PLATAFORMA_NOME = "Iugo Performance"
 # Este é um PLACEHOLDER de desenvolvimento — passe `--cnpj` com o CNPJ real ao rodar em produção.
 EMPRESA_PLATAFORMA_CNPJ_PADRAO = "00.000.000/0001-00"
 
+# Credenciais do Superadmin padrão criado automaticamente por `semear` — mesma convenção de senha
+# dos demais usuários de demonstração (SENHA_PADRAO). Quem precisar de credenciais diferentes usa
+# `criar-superadmin` diretamente, que aceita nome/e-mail/senha customizados.
+SUPERADMIN_NOME_PADRAO = "Superadmin Demo"
+SUPERADMIN_EMAIL_PADRAO = "superadmin@facilichat.dev"
 
-# `criar-superadmin` — bootstrap do primeiro Superadmin (Iugo Performance).
+
+# Bootstrap do Superadmin (Iugo Performance) dentro de uma sessão/transação já aberta pelo chamador
+# — não abre sessão nem comita, para poder compor com `_semear` (que faz tudo numa única transação)
+# e também com `cmd_criar_superadmin` (que abre sua própria sessão e comita sozinho).
 #
 # Por que existe: `POST /plataforma/empresas` exige um Superadmin já autenticado (`exigirSuperadmin`
 # em rotas/Plataforma.py), e nada no backend criava o primeiro — um ovo-e-galinha que travava o
 # acesso ao painel de plataforma.
 #
-# Idempotente, ao contrário de `criar-empresa`: pode rodar de novo sem duplicar nada. Isso importa
-# porque ele é um passo de provisionamento, executado à mão em cada ambiente.
+# Idempotente: pode rodar de novo (inclusive dentro do `semear`) sem duplicar nada.
+async def _bootstrap_superadmin(db, nome, email, senha, empresa_nome, cnpj) -> None:
+    # --- Empresa da plataforma: reutiliza se já existir -------------------------------------
+    resultado = await db.execute(select(Empresa).where(Empresa.Nome == empresa_nome))
+    empresa = resultado.scalar_one_or_none()
+
+    if empresa is None:
+        empresa = Empresa(Nome=empresa_nome, CNPJ=cnpj, Status=EmpresaStatus.Ativa, EhPlataforma=True)
+        db.add(empresa)
+        await db.flush()  # empresa.ID preenchido antes de o Usuario referenciá-lo
+        print(f"Empresa da plataforma criada: {empresa_nome} ({cnpj})")
+    else:
+        # Empresa suspensa faz `obterUsuarioAtual` responder 403 — o Superadmin ficaria trancado
+        # para fora da própria plataforma. Reativar é a única saída sensata aqui.
+        if empresa.Status == EmpresaStatus.Suspensa:
+            empresa.Status = EmpresaStatus.Ativa
+            print(f"Empresa da plataforma reativada: {empresa.Nome}")
+        # Corrige instalações que rodaram este bootstrap antes do campo existir (ambiente gravado
+        # sem o flag) — reutilizar a Empresa da Iugo sempre a marca como plataforma.
+        if not empresa.EhPlataforma:
+            empresa.EhPlataforma = True
+            print("Empresa da plataforma marcada como EhPlataforma=True (correção)")
+
+    # --- Usuário Superadmin ------------------------------------------------------------------
+    resultado = await db.execute(select(Usuario).where(Usuario.Email == email))
+    usuario = resultado.scalar_one_or_none()
+
+    if usuario is not None:
+        # Já é Superadmin: nada a fazer. É o caminho da idempotência (rodar 2x é seguro).
+        if usuario.Funcao == UsuarioFuncao.Superadmin:
+            print(f"Superadmin já existia, nada a fazer: {email}")
+            return
+
+        # NÃO promover um usuário existente. Um comando de bootstrap que transforma qualquer
+        # conta em Superadmin é escalonamento de privilégio disfarçado — quem tiver acesso ao
+        # shell promoveria o próprio Cliente. Falha alto e explícito.
+        raise SystemExit(
+            f"ERRO: o e-mail {email} já pertence a um usuário com perfil "
+            f"{usuario.Funcao.value}. Este comando não promove usuários existentes a "
+            f"Superadmin. Use outro e-mail."
+        )
+
+    superadmin = Usuario(
+        EmpresaID=empresa.ID,
+        Nome=nome,
+        Email=email,
+        SenhaHash=pwd.hash(senha),  # argon2, mesmo hasher das rotas
+        Funcao=UsuarioFuncao.Superadmin,
+    )
+    db.add(superadmin)
+    print(f"Superadmin criado com sucesso: {email} (Empresa: {empresa_nome})")
+
+
+# `criar-superadmin` — comando avulso para provisionar um Superadmin com credenciais customizadas
+# (ex.: produção, com `--cnpj` real). Abre sua própria sessão/transação em torno de `_bootstrap_superadmin`.
+# Sessão ADMINISTRATIVA (F08-01): o Superadmin não pertence a um tenant comum, e o bootstrap
+# recorrente da Empresa da plataforma não é uma requisição real da API escopada por `app.empresa_id`.
 async def cmd_criar_superadmin(args) -> None:
     await criar_tabelas()  # garante que as tabelas existem (idempotente)
 
-    async with AsyncSessionLocal() as db:
-        # --- Empresa da plataforma: reutiliza se já existir ---------------------------------
-        resultado = await db.execute(select(Empresa).where(Empresa.Nome == args.empresa_nome))
-        empresa = resultado.scalar_one_or_none()
-
-        if empresa is None:
-            empresa = Empresa(
-                Nome=args.empresa_nome, CNPJ=args.cnpj, Status=EmpresaStatus.Ativa, EhPlataforma=True
-            )
-            db.add(empresa)
-            await db.flush()  # empresa.ID preenchido antes de o Usuario referenciá-lo
-            print(f"Empresa da plataforma criada: {args.empresa_nome} ({args.cnpj})")
-        else:
-            # Empresa suspensa faz `obterUsuarioAtual` responder 403 — o Superadmin ficaria trancado
-            # para fora da própria plataforma. Reativar é a única saída sensata aqui.
-            if empresa.Status == EmpresaStatus.Suspensa:
-                empresa.Status = EmpresaStatus.Ativa
-                print(f"Empresa da plataforma reativada: {empresa.Nome}")
-            else:
-                print(f"Empresa da plataforma já existia: {empresa.Nome}")
-            # Corrige instalações que rodaram este bootstrap antes do campo existir (ambiente
-            # gravado sem o flag) — reutilizar a Empresa da Iugo sempre a marca como plataforma.
-            if not empresa.EhPlataforma:
-                empresa.EhPlataforma = True
-                print("Empresa da plataforma marcada como EhPlataforma=True (correção)")
-
-        # --- Usuário Superadmin --------------------------------------------------------------
-        resultado = await db.execute(select(Usuario).where(Usuario.Email == args.email))
-        usuario = resultado.scalar_one_or_none()
-
-        if usuario is not None:
-            # Já é Superadmin: nada a fazer. É o caminho da idempotência (rodar 2x é seguro).
-            if usuario.Funcao == UsuarioFuncao.Superadmin:
-                await db.commit()  # persiste uma eventual reativação da Empresa
-                print(f"Superadmin já existia, nada a fazer: {args.email}")
-                return
-
-            # NÃO promover um usuário existente. Um comando de bootstrap que transforma qualquer
-            # conta em Superadmin é escalonamento de privilégio disfarçado — quem tiver acesso ao
-            # shell promoveria o próprio Cliente. Falha alto e explícito.
-            raise SystemExit(
-                f"ERRO: o e-mail {args.email} já pertence a um usuário com perfil "
-                f"{usuario.Funcao.value}. Este comando não promove usuários existentes a "
-                f"Superadmin. Use outro e-mail."
-            )
-
-        superadmin = Usuario(
-            EmpresaID=empresa.ID,
-            Nome=args.nome,
-            Email=args.email,
-            SenhaHash=pwd.hash(args.senha),  # argon2, mesmo hasher das rotas
-            Funcao=UsuarioFuncao.Superadmin,
-        )
-        db.add(superadmin)
+    async with AsyncSessionLocalAdmin() as db:
+        await _bootstrap_superadmin(db, args.nome, args.email, args.senha, args.empresa_nome, args.cnpj)
         await db.commit()
 
-    print(f"Superadmin criado com sucesso: {args.email} (Empresa: {args.empresa_nome})")
 
-
-# `semear` — popula os dados de demonstração (clientes, supervisor, chamados e histórico de chat)
-# na primeira Empresa existente. Idempotente: não semeia de novo se já houver chamados demo.
+# `semear` — entrega a base de testes completa: tenant principal (clientes/supervisor/chamados),
+# 2ª Empresa de demonstração com 3 supervisores (melhor visualização de comparação entre eles) e o
+# Superadmin padrão da plataforma. Idempotente peça por peça — rodar de novo só completa o que
+# faltar, nunca duplica (cada bloco checa a própria condição antes de agir). Sessão ADMINISTRATIVA
+# (F08-01): semeia DOIS tenants na mesma execução, o que a RLS do papel restrito impediria — não é
+# uma simulação de requisição real da API, que sempre opera dentro de um único `app.empresa_id`.
 async def _semear() -> None:
     # Guarda de ambiente (item S10): usuários demo nascem com SENHA_PADRAO, previsível e igual em
     # toda instalação — inaceitável em produção. Falha cedo, sem sequer tocar no banco, em vez de
@@ -564,77 +934,45 @@ async def _semear() -> None:
 
     await criar_tabelas()
 
-    async with AsyncSessionLocal() as db:
-        # Idempotência: se já existir qualquer cliente de demonstração COM chamados, não semeia de novo.
-        ja_existe = await db.execute(
-            select(func.count(Chamado.ID))
-            .join(Usuario, Usuario.ID == Chamado.ClienteID)
-            .where(Usuario.Email.like(f"%{DOMINIO_DEMO}"))
+    async with AsyncSessionLocalAdmin() as db:
+        # --- Tenant principal: reaproveita a Empresa criada por `criar-empresa` -------------
+        resultado_empresa = await db.execute(
+            select(Empresa).where(Empresa.EhPlataforma.is_(False)).order_by(Empresa.Criacao).limit(1)
         )
-        if (ja_existe.scalar() or 0) > 0:
-            print("Dados de demonstração já semeados — nada a fazer (idempotente).")
-            return
-
-        # Reaproveita a primeira Empresa existente (criada por `criar-empresa`) — este seed é
-        # multi-tenant-aware, mas não cria Empresa: pressupõe que o bootstrap já rodou.
-        resultado_empresa = await db.execute(select(Empresa).order_by(Empresa.Criacao).limit(1))
         empresa = resultado_empresa.scalar_one_or_none()
         if not empresa:
             print("Nenhuma Empresa encontrada — rode `criar-empresa` antes de semear.")
             return
 
-        supervisor = await _obter_ou_criar_usuario(
-            db, empresa.ID, SUPERVISOR["Nome"], SUPERVISOR["Email"], UsuarioFuncao.Supervisor
+        if await _chamados_demo_existem(db, empresa.ID):
+            print(f"Tenant principal ({empresa.Nome}) já tem chamados demo — pulando (idempotente).")
+        else:
+            await _semear_tenant(db, empresa.ID, CLIENTES, [SUPERVISOR], CHAMADOS)
+            print(f"Tenant principal semeado: {len(CLIENTES)} clientes, 1 supervisor e {len(CHAMADOS)} chamados.")
+
+        # --- 2ª Empresa de demonstração: cria o próprio tenant + Gestor se não existir --------
+        empresa2 = await _obter_ou_criar_empresa_demo(
+            db, EMPRESA2_NOME, EMPRESA2_CNPJ, EMPRESA2_GESTOR_NOME, EMPRESA2_GESTOR_EMAIL
         )
-        clientes = []
-        for c in CLIENTES:
-            clientes.append(await _obter_ou_criar_usuario(
-                db, empresa.ID, c["Nome"], c["Email"], UsuarioFuncao.Cliente, c["Condominio"]
-            ))
-
-        agora = agoraUtc()
-
-        # Cria cada chamado com data de abertura escalonada e o histórico de chat correspondente.
-        for item in CHAMADOS:
-            categoria = await _obter_ou_criar_categoria(db, empresa.ID, item["categoria"])
-            aberto_em = agora - timedelta(days=item["dias"], hours=2)
-            chamado = Chamado(
-                EmpresaID=empresa.ID,
-                ClienteID=clientes[item["cliente"]].ID,
-                SupervisorID=supervisor.ID if item["supervisor"] else None,
-                Fila=item["fila"],
-                CategoriaID=categoria.ID,
-                Status=item["status"],
-                Prioridade=item["prioridade"],
-                Resumo=item["resumo"],
-                Criacao=aberto_em,
-                Atualizacao=aberto_em,
+        if await _chamados_demo_existem(db, empresa2.ID):
+            print(f"2ª Empresa ({empresa2.Nome}) já tem chamados demo — pulando (idempotente).")
+        else:
+            await _semear_tenant(db, empresa2.ID, CLIENTES_EMPRESA2, SUPERVISORES_EMPRESA2, CHAMADOS_EMPRESA2)
+            print(
+                f"2ª Empresa semeada: {len(CLIENTES_EMPRESA2)} clientes, "
+                f"{len(SUPERVISORES_EMPRESA2)} supervisores e {len(CHAMADOS_EMPRESA2)} chamados."
             )
-            db.add(chamado)
-            await db.flush()  # obtém o ID do chamado para vincular as mensagens
 
-            # Insere as mensagens do chat em ordem, espaçadas em minutos a partir da abertura.
-            for i, (autor_tipo, conteudo) in enumerate(item["chat"]):
-                # Cliente e Supervisor têm autor; Sistema/IA não têm AutorID (nullable).
-                if autor_tipo == AutorTipo.Cliente:
-                    autor_id = clientes[item["cliente"]].ID
-                elif autor_tipo == AutorTipo.Supervisor:
-                    autor_id = supervisor.ID
-                else:
-                    autor_id = None
-                db.add(Mensagem(
-                    EmpresaID=empresa.ID,
-                    ChamadoID=chamado.ID,
-                    AutorID=autor_id,
-                    AutorTipo=autor_tipo,
-                    Conteudo=conteudo,
-                    Criacao=aberto_em + timedelta(minutes=15 * (i + 1)),
-                ))
+        # --- Superadmin padrão da plataforma --------------------------------------------------
+        await _bootstrap_superadmin(
+            db, SUPERADMIN_NOME_PADRAO, SUPERADMIN_EMAIL_PADRAO, SENHA_PADRAO,
+            EMPRESA_PLATAFORMA_NOME, EMPRESA_PLATAFORMA_CNPJ_PADRAO,
+        )
 
         await db.commit()
 
-    print(f"Seed concluído: {len(CLIENTES)} clientes, 1 supervisor e {len(CHAMADOS)} chamados criados.")
-    print(f"Login dos clientes demo: <email>{DOMINIO_DEMO} / senha: {SENHA_PADRAO}")
+    print(f"Login dos clientes/supervisores/gestores demo: <email>{DOMINIO_DEMO} / senha: {SENHA_PADRAO}")
+    print(f"Login do Superadmin: {SUPERADMIN_EMAIL_PADRAO} / senha: {SENHA_PADRAO}")
 
 
 async def cmd_semear(args) -> None:
@@ -645,8 +983,10 @@ async def cmd_semear(args) -> None:
 # depende deles (chamados, mensagens, refresh tokens, sessões revogadas). Item S10: existe para dar
 # um jeito documentado de rotacionar/remover os dados de seed em ambientes compartilhados (ex.:
 # staging), sem precisar resetar o banco inteiro. Idempotente: rodar sem usuários demo não faz nada.
+# Sessão ADMINISTRATIVA (F08-01): apaga usuários demo de QUALQUER tenant numa só passada — a RLS do
+# papel restrito, escopada a um único `app.empresa_id`, não permitiria esse alcance cross-tenant.
 async def _limpar_demo() -> None:
-    async with AsyncSessionLocal() as db:
+    async with AsyncSessionLocalAdmin() as db:
         resultado = await db.execute(select(Usuario.ID).where(Usuario.Email.like(f"%{DOMINIO_DEMO}")))
         ids_demo = [linha[0] for linha in resultado.all()]
         if not ids_demo:
@@ -678,20 +1018,33 @@ async def cmd_limpar_demo(args) -> None:
     await _limpar_demo()
 
 
-# `aplicar-rls` — (re)aplica só as políticas de app/rls.sql (útil após mexer no arquivo de políticas
-# sem precisar resetar o banco inteiro).
+# `aplicar-rls` — garante o papel restrito da API (F08-01) e (re)aplica só as políticas de
+# app/rls.sql (útil após mexer no arquivo de políticas ou trocar a senha em DATABASE_URL, sem
+# precisar resetar o banco inteiro).
 async def cmd_aplicar_rls(args) -> None:
+    await garantir_papel_app()
     await aplicar_rls()
-    print("Políticas de RLS aplicadas com sucesso.")
+    print("Papel restrito garantido e políticas de RLS aplicadas com sucesso.")
 
 
 # `verificar-rls` — cria duas Empresas temporárias, grava dados em cada tenant e confirma que cada
-# sessão só enxerga os próprios registros (filtros do app + RLS do Postgres). Limpa tudo ao final.
+# sessão só enxerga os próprios registros (filtros do app + RLS do Postgres), além do bloqueio
+# fail-closed sem `app.empresa_id`. Usa AsyncSessionLocal (DATABASE_URL) para provar o isolamento
+# com a MESMA credencial que a API usa — não o papel administrativo. Limpa tudo ao final.
+#
+# Item F08-01 (aceite explícito): reprova — não pula — se o papel conectado ignora RLS
+# (superuser/bypassrls), porque nesse caso a validação de RLS não provaria nada.
 async def cmd_verificar_rls(args) -> None:
+    if await _papel_ignora_rls():
+        raise SystemExit(
+            "REPROVADO: o papel conectado via DATABASE_URL ignora RLS (é superuser ou tem "
+            "BYPASSRLS). A API deve conectar com o papel restrito criado por "
+            "`gerenciar_banco.py reset`/`aplicar-rls` — ajuste DATABASE_URL antes de verificar."
+        )
+
     tag = uuid.uuid4().hex[:8]
     empresa_a_id: uuid.UUID | None = None
     empresa_b_id: uuid.UUID | None = None
-    rls_disponivel = not await _papel_ignora_rls()
 
     try:
         async with AsyncSessionLocal() as session:
@@ -707,13 +1060,13 @@ async def cmd_verificar_rls(args) -> None:
 
         await _validar_filtros_aplicacao(empresa_a_id, cond_a, user_a, chamado_a)
         await _validar_filtros_aplicacao(empresa_b_id, cond_b, user_b, chamado_b)
-
-        if rls_disponivel:
-            await _validar_visibilidade_tenant(empresa_a_id, cond_a, user_a, chamado_a)
-            await _validar_visibilidade_tenant(empresa_b_id, cond_b, user_b, chamado_b)
-            print("OK: filtros por EmpresaID e RLS validados para Condominios, Usuarios e Chamados.")
-        else:
-            print("OK: filtros por EmpresaID validados. RLS do Postgres foi pulada porque o papel local bypassa RLS.")
+        await _validar_visibilidade_tenant(empresa_a_id, cond_a, user_a, chamado_a)
+        await _validar_visibilidade_tenant(empresa_b_id, cond_b, user_b, chamado_b)
+        await _validar_bloqueio_sem_tenant()
+        print(
+            "OK: filtros por EmpresaID, RLS e bloqueio fail-closed sem app.empresa_id validados "
+            "para Condominios, Usuarios e Chamados."
+        )
     finally:
         if empresa_a_id:
             await _limpar_dados_tenant(empresa_a_id)

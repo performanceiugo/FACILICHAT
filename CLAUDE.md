@@ -29,8 +29,19 @@ MVP02). É o material do comercial. **Nada implementado pode contrariá-lo.**
   Superadmin. **Funcionário é perfil único** (sem subtipos). Papéis são por Empresa, não globais.
 - **IA (inegociável):** detecta intenção de compra mas **nunca inventa preço nem prazo**; só narra
   campos estruturados (status, datas, responsável); **nunca** responde em nome de um supervisor.
-- **Chat é o palco, ticket é o bastidor.** Estados do ticket (MVP): Recebido, Em andamento,
-  Agendado, Concluído. Linguagem simples, sem jargão.
+- **Chat é o palco, ticket é o bastidor.** Estados: Recebido, Em andamento, Agendado,
+  Aguardando confirmação, Concluído e Cancelado. Supervisor/Gestor solicita conclusão com resumo;
+  somente o Cliente solicitante confirma ou recusa. Lembretes 24h/48h e escalonamento 72h são
+  configuráveis por Empresa, sem conclusão automática; SLA operacional pausa e retoma o mesmo
+  ciclo na recusa. Concluído significa atendido e não cancela/reabre. Cancelado exige motivo: Gestor
+  cancela no tenant; Supervisor só o atribuído; RH/Financeiro só suas filas. Somente o Cliente
+  solicitante reabre Cancelado para Recebido, com explicação, mesmo responsável atual e novo ciclo
+  SLA sem apagar o anterior. No chat, o Supervisor lê/participa de todos os chamados do tenant como
+  ponte, sem ampliar cancelamento/reatribuição; presença online real faz parte da Fase 1. Linguagem
+  simples, sem jargão. Decisões: `ADR-001`/`F08-07` e `ADR-002`/`F01`.
+- **Supervisor responsável:** cada Condomínio terá Supervisor padrão definido pelo Gestor; novos
+  chamados herdam esse responsável. Trocar o padrão não move chamados existentes; reatribuição de
+  abertos é explícita pelo Gestor. Ausência temporária não exige desativar a conta.
 - **Visita técnica** é entidade **irmã do ticket** (não um tipo de ticket): proativa
   (supervisor→cliente), com tempo cronometrado; duração **derivada** (não armazenada); o cliente
   **não aprova**, só recebe/consulta a prova.
@@ -94,6 +105,30 @@ Vou alterar o plano agora: <arquivo>, item <ID/CU>, motivo <motivo>. Posso segui
 diretas em arquivos de plano. Depois de confirmação explícita do usuário, crie a flag local
 `.claude/plan-edit-approved.flag`; ela é ignorada pelo Git e vale por 30 minutos. Se o usuário tiver
 pedido explicitamente a mudança nesta conversa, registre esse contexto na mensagem antes de editar.
+
+### Padrão obrigatório de detalhamento de novas fases — Claude e Codex
+
+Antes de criar uma fase no ClickUp ou nos arquivos de planejamento, confira o código, o plano e as
+fontes de produto relacionadas. Apresente primeiro a proposta completa ao usuário na conversa,
+explicando por que a fase existe, sua posição e o motivo de cada inclusão, adiamento ou realocação.
+Depois da autorização aplicável, use `docs/implementation/modelo-detalhamento-fase.md`.
+
+Toda fase deve registrar contexto/evidência, problema, motivo da decisão, objetivo, escopo, fora do
+escopo **com destino rastreável**, dependências/ordem, componentes prováveis, dados/migração,
+segurança/privacidade, riscos/casos de borda/rollback, validação, critérios de aceite, documentação,
+`CU:`/tags e decisões ainda abertas. Não transforme automaticamente uma descoberta em código:
+classifique primeiro como correção imediata, decisão de produto, preparação para produção, pós-MVP
+ou item que já pertence a outra fase. Decisão aberta deve trazer perguntas e opções, sem o agente
+escolher silenciosamente pela equipe.
+
+### Testes de fase são disparados pelo usuário
+
+Toda fase/subfase deve especificar e preparar testes, dados, ambiente e comandos, mas Claude e Codex
+**não executam testes, suites, builds, smoke tests ou validações visuais de fase por iniciativa
+própria**. Ao terminar a implementação, registrar `testes preparados — aguardando disparo do
+usuário`. Executar somente quando o usuário nomear explicitamente a fase/conjunto a validar. Teste
+escrito não equivale a teste aprovado, e nenhum aceite dependente de teste pode ser marcado como
+validado/concluído antes do resultado real.
 
 ---
 

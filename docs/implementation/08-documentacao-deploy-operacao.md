@@ -15,6 +15,13 @@ Esta trilha garante que cada entrega seja operavel, verificavel e compreensivel 
 | `docs/setup-manual.md` | Setup de dev alternativo sem Docker (WSL/venv) |
 | `docs/deploy-producao.md` | Runbook de produção: secrets, banco, cookies/CSRF, CSP/HSTS, checklist final (fecha com o S9) |
 | `docs/visao-geral.md` | Visao de produto e estado atual |
+| `docs/implementation/modelo-detalhamento-fase.md` | Padrao obrigatorio para novas fases no ClickUp e no plano |
+| `docs/implementation/09-fase-08-consolidacao.md` | Especificacao completa da Fase 0.8 |
+| `docs/implementation/10-fase-12-finalizacao-producao.md` | Especificacao completa da preparacao para producao |
+| `docs/implementation/11-fase-08-07-cancelamento-reabertura.md` | Especificacao executavel das onze subfases do F08-07 |
+| `docs/implementation/12-fase-01-chat.md` | Especificacao executavel do chat, presenca, confirmacao configuravel, SLA e interfaces |
+| `docs/decisoes/ADR-001-cancelamento-reabertura-chamados.md` | Decisao aprovada de produto; nao significa codigo ja implementado |
+| `docs/decisoes/ADR-002-chat-presenca-confirmacao.md` | Decisoes aprovadas da Fase 1; nao significa codigo ja implementado |
 
 ## Itens documentais
 
@@ -30,6 +37,8 @@ Esta trilha garante que cada entrega seja operavel, verificavel e compreensivel 
 | `DOC-008` | `[x]` | `868kaa3fz` | `D6` | `arquitetura.md` atualizada com RLS real |
 | `DOC-009` | `[ ]` | `868kaa3ga` | `D7` | Notas de arquitetura sincronizadas |
 | `DOC-010` | `[ ]` | `868kaa3h4` | `D8` | Checklist de aceite do branding |
+| `DOC-011` | `[ ]` | `868kd2du1` | `F08-07A` | Consolidar a decisao aprovada com a matriz final durante a implementacao; ADR/especificacao inicial ja registrados |
+| `DOC-012` | `[ ]` | `868kd35pv` | `F01-L` | Manter matriz, contratos, operacao e evidencias da Fase 1 sincronizados com a implementacao/testes disparados |
 
 ## Deploy e operacao
 
@@ -46,4 +55,3 @@ Esta trilha garante que cada entrega seja operavel, verificavel e compreensivel 
 Toda entrega relevante deve deixar tres rastros: status no plano, entrada no changelog e criterio de
 validacao executado. Se um item so mudou documentacao, nao precisa build de produto, mas precisa
 validacao de links/estrutura.
-

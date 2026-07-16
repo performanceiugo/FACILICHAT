@@ -37,3 +37,29 @@ Observacao para Claude Code:
 - O hook `.claude/hooks/plano-guard.js` bloqueia edicoes diretas no plano.
 - Depois de confirmacao explicita do usuario, crie a flag local `.claude/plan-edit-approved.flag`.
 - A flag e ignorada pelo Git e vale por 30 minutos; remova ou deixe expirar depois da edicao.
+
+## Padrao obrigatorio para novas fases
+
+Antes de criar uma fase no ClickUp ou nos arquivos de planejamento:
+
+1. Confira codigo, plano e fontes de produto relacionadas.
+2. Apresente a fase completa ao usuario na conversa e explique por que ela existe, por que entra
+   nessa ordem e por que cada item foi incluido, adiado ou movido.
+3. Aguarde autorizacao quando a proposta mudar escopo, prioridade, ordem ou aceite.
+4. Aplique integralmente `docs/implementation/modelo-detalhamento-fase.md`.
+5. Crie tarefa-pai/subtarefas no ClickUp com tags existentes e registre todos os `CU:` no plano.
+
+O detalhamento minimo inclui contexto/evidencia, problema, motivo da decisao, objetivo, escopo, fora
+do escopo com destino, dependencias, componentes provaveis, dados/migracao, seguranca, riscos/casos
+de borda/rollback, validacao, criterios de aceite, documentacao, rastreabilidade e decisoes abertas.
+Uma descoberta nao autoriza automaticamente implementacao: primeiro classifique se e correcao
+imediata, decisao de produto, preparacao para producao, pos-MVP ou item de outra fase.
+
+## Testes disparados pelo usuario
+
+- Toda fase/subfase deve detalhar e preparar seus testes, dados, ambiente e comandos.
+- Nao execute testes, suites, builds, smoke tests ou validacoes visuais de fase por iniciativa
+  propria, mesmo depois de implementar o codigo.
+- Ao terminar a implementacao, registre: `testes preparados - aguardando disparo do usuario`.
+- Execute somente quando o usuario indicar explicitamente a fase ou conjunto a validar.
+- Nunca marque como validado/concluido um aceite dependente de teste antes do resultado real.

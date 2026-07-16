@@ -255,9 +255,42 @@ EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
 
 ### Eixo 6 — Jornadas (chat é o palco, ticket é o bastidor)
 - [ ] O cliente interage por conversa; o ticket organiza o trabalho nos bastidores
-- [ ] Estados do ticket no MVP: Recebido, Em andamento, Agendado, Concluído (+ Cancelado)
+- [ ] Estados do ticket no MVP: Recebido, Em andamento, Agendado, Aguardando confirmação,
+  Concluído e Cancelado
 - [ ] Filas roteiam ao papel certo: Operacional→Supervisor, RH→RH, Financeiro→Financeiro, Comercial→Gestor
 - [ ] Cliente vê só os próprios chamados; equipe vê conforme o papel
+
+### Decisão aprovada do chat — Fase 1
+
+- [ ] Gestor e Supervisor leem/participam de todos os chamados da própria Empresa; isso não amplia
+  cancelamento, reatribuição ou configuração. RH/Financeiro participam das respectivas filas;
+  Cliente/Funcionário dos próprios; Superadmin sem conteúdo operacional automático.
+- [ ] Histórico é paginado/idempotente; HTTP é a fonte persistente e WebSocket distribui/reconecta
+  sem duplicar. Leitura/não lidas, digitação e presença online real respeitam tenant/permissão.
+- [ ] Online significa ao menos uma conexão autenticada; múltiplos dispositivos e timeout de 60s;
+  sem “visto por último” ou promessa de disponibilidade.
+- [ ] Supervisor/Gestor solicita conclusão com resumo; Cliente confirma ou recusa em
+  Aguardando confirmação. Recusa volta a Em andamento com mesmo responsável/ciclo SLA.
+- [ ] Empresa configura 24h/48h/72h (defaults) com snapshot por janela; sem auto-conclusão. SLA
+  operacional pausa, espera/total continuam auditáveis. WhatsApp/push apenas entregam eventos.
+- [ ] Texto funciona na Fase 1; Áudio/Imagem/Vídeo/Documento exigem revisão e entrega da Fase 9.
+
+> Contrato: `docs/implementation/12-fase-01-chat.md`; decisão: `docs/decisoes/ADR-002-chat-presenca-confirmacao.md`.
+> Itens permanecem não aceitos até implementação e testes disparados pelo usuário.
+
+### Decisão aprovada de cancelamento/reabertura — F08-07
+
+- [ ] Cancelamento usa endpoint próprio e motivo obrigatório; o PATCH genérico não permite bypass.
+- [ ] Gestor cancela no tenant; Supervisor só o atribuído; RH/Financeiro só suas filas.
+- [ ] Somente Recebido/Em andamento/Agendado cancelam; Concluído exige novo chamado se surgir nova necessidade.
+- [ ] Cliente solicitante reabre Cancelado para Recebido, preservando responsável/histórico e iniciando novo ciclo SLA.
+- [ ] Histórico append-only registra status, motivo, autor, origem, reatribuições e ciclos com RLS.
+- [ ] IA narra somente o evento estruturado e possui fallback; falha externa não desfaz a transição.
+- [ ] WhatsApp comunica todas as transições por outbox idempotente quando o canal estiver configurado.
+- [ ] Condomínio possui Supervisor padrão; mudança vale para novos chamados e abertos só são reatribuídos pelo Gestor.
+
+> Esta seção registra a decisão de produto de 16/07/2026. As caixas permanecem vazias até a
+> implementação correspondente e a execução dos testes, que depende de comando explícito do usuário.
 
 > Status em 15/07/2026: eixos 1, 2 (parcial — chat pendente), 3 e 6 (parcial — chat pendente) já
 > têm implementação conferível no código; eixos 4 e 5 valem como critério de aceite para as fases

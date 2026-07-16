@@ -54,9 +54,21 @@ O branding define **7 perfis** — **todos já implementados no sistema**:
 - Clientes abrem chamados informando: departamento, categoria, descrição e prioridade
 - Chamados organizados em **4 filas**: **Operacional**, **RH**, **Financeiro** e **Comercial** (contratos/propostas, roteada ao Gestor)
 - Um mesmo aviso pode gerar mais de um chamado ao mesmo tempo (**tickets irmãos** — ex.: atestado → RH valida + Supervisão cobre o posto), sem que nada se perca
-- Cada chamado tem um status acompanhável: Recebido → Em Andamento → Agendado → Concluído / Cancelado
+- Cada chamado terá o fluxo: Recebido → Em Andamento/Agendado → Aguardando confirmação → Concluído,
+  além de Cancelado. Supervisor/Gestor solicita conclusão; somente o Cliente solicitante confirma
+  ou recusa. A espera usa prazos configuráveis 24h/48h/72h, sem conclusão automática, e pausa o SLA
+  operacional preservando espera e tempo total.
+- **Regra aprovada para implementação (F08-07):** Cancelado significa atendimento interrompido,
+  nunca serviço concluído. Gestor cancela qualquer chamado da Empresa; Supervisor somente o seu;
+  RH/Financeiro somente suas filas, sempre com motivo. O Cliente solicitante pode reabrir um
+  Cancelado para Recebido, preservando responsável/histórico e iniciando novo ciclo de SLA.
 - Prioridades: Baixa, Média, Alta e Crítica
-- Supervisores e gestores visualizam todos os chamados; clientes veem apenas os seus
+- Supervisores e gestores visualizam e participam de todos os chamados da Empresa; isso não amplia
+  cancelamento ou reatribuição. RH/Financeiro tratam suas filas; clientes/funcionários veem os seus.
+
+> A regra de cancelamento/reabertura foi aprovada em 16/07/2026 e está planejada no F08-07. Até as
+> subfases serem implementadas e os testes serem disparados pelo usuário, não presumir que todas as
+> interfaces, permissões, SLA e comunicações já estejam disponíveis.
 
 ### Painel Web do Gestor
 - Área de login com a identidade visual da marca
@@ -77,7 +89,8 @@ O branding define **7 perfis** — **todos já implementados no sistema**:
 
 ## O que está sendo desenvolvido (próximos passos)
 
-- **Chat por chamado** — troca de mensagens dentro de cada solicitação, incluindo histórico completo *(é a base do produto: "o chat é o palco, o ticket é o bastidor")*
+- **Chat por chamado** — histórico paginado, não lidas, presença/digitação real, tempo real
+  recuperável e confirmação da conclusão *(é a base: "o chat é o palco, o ticket é o bastidor")*
 - **WhatsApp como porta de entrada** — o cliente conversa pelo WhatsApp que já usa, e o FaciliChat registra tudo como chamado
 - **Criação de chamado e tela de detalhe** no aplicativo do cliente
 - **Inteligência Artificial** — triagem automática e respostas ancoradas: a IA nunca inventa preço nem prazo, só narra o que está registrado
@@ -96,7 +109,7 @@ O branding define **7 perfis** — **todos já implementados no sistema**:
 | Web Admin (painel do Gestor) | Visão geral com dados reais, chamados e supervisores no ar |
 | Área da plataforma (Superadmin) | Cadastro e suspensão de Empresas no ar |
 | App Mobile | Estrutura inicial pronta (login, lista de chamados, perfil) |
-| Chat / Mensagens | Banco de dados modelado, rotas pendentes |
+| Chat / Mensagens | Fase 1 reespecificada e planejada; modelo base existe, rotas/interfaces ainda pendentes |
 | Inteligência Artificial | SDK instalado, integração pendente |
 | Deploy / Publicação | Ambiente de produção preparado (Docker); publicação pendente |
 
