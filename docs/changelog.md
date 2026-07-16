@@ -7,6 +7,19 @@
 
 ## [não versionado] — 16 de julho de 2026
 
+### Documentação — removidas trilhas redundantes e fontes paralelas de status
+
+- Removidos `docs/implementation/00-visao-geral.md` a `08-documentacao-deploy-operacao.md` e
+  `docs/implementation/migration-map.md`: esses arquivos duplicavam o plano/ClickUp e continham
+  diversos estados desatualizados de itens já concluídos.
+- `docs/implementation/README.md` passou a ser apenas um índice das especificações detalhadas
+  ativas (`09`–`12`) e do modelo obrigatório para novas fases.
+- O cabeçalho de `docs/plano-implementacao.md` agora declara uma única fonte canônica de execução e
+  elimina a referência contraditória ao mapa separado; nenhum `CU:`, status, prioridade, escopo ou
+  critério de aceite foi modificado.
+- As fontes comerciais em `docs/FaciliChat-Regras/`, os ADRs e a documentação técnica foram
+  preservados.
+
 ### Documentação — criado `docs/instrucoes-branding.md` (consolidação do branding)
 
 - **Por quê:** o material do branding está espalhado em 11 arquivos HTML/DOCX em

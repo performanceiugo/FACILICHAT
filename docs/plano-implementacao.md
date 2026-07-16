@@ -12,11 +12,11 @@
 
 ---
 
-## Plano por trilhas (visao de execucao)
+## Fonte canônica de execução
 
-> Este arquivo continua sendo o registro canonico por fase, status e `CU:` do ClickUp.
-> A visao reorganizada por trilhas foi criada em `docs/implementation/README.md`, com mapa
-> antigo -> novo em `docs/implementation/migration-map.md`.
+> Este arquivo é o registro canônico por fase, status e `CU:` do ClickUp.
+> `docs/implementation/README.md` indexa somente as especificações detalhadas que complementam
+> itens deste plano; não mantém status paralelo nem um mapa separado de `CU:`.
 
 ---
 
